@@ -31,19 +31,18 @@ services:
       - backend-network
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
-  # ai:
-  #   build:
-  #     context: ./ai
-  #     dockerfile: Dockerfile
-  #   container_name: ai-fastapi
-  #   restart: always
-  #   environment:
-  #     - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY}
-  #     - UPSTAGE_OCR_API_KEY=${UPSTAGE_OCR_API_KEY}
-  #   networks:
-  #     - backend-network
-  #   depends_on:
-  #     - db
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: ai-fastapi
+    restart: always
+    networks:
+      - backend-network
+    depends_on:
+      - db
+    ports:
+      - 8000:8000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
