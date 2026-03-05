@@ -27,14 +27,23 @@ uv sync
 uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## 4. API 확인 및 테스트
+## 4. API 확인 및 테스트 (수동)
 서버가 실행되면 아래 URL을 통해 API 문서를 확인하고 테스트할 수 있습니다.
 
 - **Swagger UI (OpenAPI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Redoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 - **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
 
-## 5. 주요 파일 구조
+## 5. 자동화 테스트 실행 (권장)
+다른 개발 환경에서 서버가 정상적으로 작동하는지 즉시 검증하려면 아래 명령어를 실행하세요. 별도의 서버 실행 없이도 핵심 기능을 테스트할 수 있습니다.
+
+```bash
+cd ai
+uv run pytest
+```
+
+## 6. 주요 파일 구조
 - `main.py`: FastAPI 애플리케이션의 엔트리 포인트. API 엔드포인트 정의.
+- `tests/`: 서버 로직을 검증하는 자동화 테스트 코드.
 - `pyproject.toml`: `uv` 설정 파일 및 프로젝트 의존성 관리.
 - `uv.lock`: 패키지 버전 잠금 파일 (수정 금지).
