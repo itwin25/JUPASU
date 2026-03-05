@@ -42,7 +42,18 @@ cd ai
 uv run pytest
 ```
 
-## 6. 주요 파일 구조
+## 6. Docker 배포
+운영 환경을 위해 Docker 이미지를 빌드하고 실행할 수 있습니다.
+
+```bash
+# 이미지 빌드
+docker build -t jupasu-ai-server .
+
+# 컨테이너 실행
+docker run -p 8000:8000 jupasu-ai-server
+```
+
+## 7. 주요 파일 구조
 - `main.py`: FastAPI 애플리케이션의 엔트리 포인트. API 엔드포인트 정의.
 - `tests/`: 서버 로직을 검증하는 자동화 테스트 코드.
 - `pyproject.toml`: `uv` 설정 파일 및 프로젝트 의존성 관리.
