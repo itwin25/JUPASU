@@ -14,3 +14,4 @@ htmlcov/
 
 # Local files
 ai.db
+*.png
