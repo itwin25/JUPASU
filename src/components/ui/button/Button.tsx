@@ -2,7 +2,7 @@ import { ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'icon';
   size?: 'sm' | 'md' | 'lg' | 'full';
   isLoading?: boolean;
 }
@@ -10,17 +10,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, children, disabled, ...props }, ref) => {
     const variants = {
-      primary: 'bg-primary-900 text-white hover:bg-primary-700 disabled:bg-primary-100 disabled:text-gray-400',
-      outline: 'border border-primary-900 text-primary-900 bg-transparent hover:bg-primary-100 disabled:border-gray-300 disabled:text-gray-300',
-      ghost: 'bg-transparent text-primary-900 hover:bg-primary-100 disabled:text-gray-300',
-      danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-100',
+      primary: 'bg-primary-700 text-white hover:bg-primary-900 disabled:bg-primary-100 disabled:text-gray-400',
+      secondary: 'bg-primary-100 text-text-main hover:bg-primary-100/80 disabled:bg-gray-100',
+      outline: 'border-2 border-primary-500 text-primary-700 bg-transparent hover:bg-primary-100 disabled:border-gray-200',
+      ghost: 'bg-transparent text-primary-700 hover:bg-primary-100/50',
+      icon: 'bg-white border border-primary-100 text-text-main hover:bg-gray-50 rounded-full p-2.5 shadow-sm active:scale-90',
     };
 
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm rounded-lg',
-      md: 'px-6 py-3 text-base rounded-xl',
-      lg: 'px-8 py-4 text-lg font-bold rounded-2xl',
-      full: 'w-full py-4 text-base font-bold rounded-xl',
+      sm: 'px-4 py-2 text-sm rounded-full',
+      md: 'px-6 py-3.5 text-base rounded-2xl font-bold',
+      lg: 'px-8 py-4.5 text-lg rounded-2xl font-extrabold',
+      full: 'w-full py-4.5 text-base rounded-2xl font-bold',
+      icon: '',
     };
 
     return (
@@ -28,9 +30,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(
-          'inline-flex items-center justify-center font-medium transition-colors active:scale-95 disabled:pointer-events-none',
+          'inline-flex items-center justify-center transition-all active:scale-[0.98] disabled:pointer-events-none',
           variants[variant],
-          sizes[size],
+          variant !== 'icon' && sizes[size],
           className,
         )}
         {...props}

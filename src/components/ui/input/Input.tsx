@@ -4,15 +4,14 @@ import { cn } from '@/lib/utils';
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
-  helperText?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, helperText, disabled, ...props }, ref) => {
+  ({ className, label, error, disabled, ...props }, ref) => {
     return (
       <div className="w-full space-y-1.5">
         {label && (
-          <label className="text-sm font-medium text-text-main/80">
+          <label className="text-sm font-bold text-text-main/60 ml-1">
             {label}
           </label>
         )}
@@ -20,15 +19,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           ref={ref}
           disabled={disabled}
           className={cn(
-            'flex w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-text-main transition-colors placeholder:text-gray-400 focus:border-primary-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400',
-            error && 'border-red-500 focus:border-red-500',
+            'flex w-full rounded-2xl border-2 border-primary-100 bg-white px-5 py-4 text-base text-text-main transition-all placeholder:text-text-main/20 focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-100/50 disabled:bg-gray-50 disabled:text-gray-300',
+            error && 'border-red-400 focus:border-red-400 focus:ring-red-100',
             className,
           )}
           {...props}
         />
-        {(error || helperText) && (
-          <p className={cn('text-xs', error ? 'text-red-500' : 'text-gray-500')}>
-            {error || helperText}
+        {error && (
+          <p className="text-xs text-red-500 font-bold ml-1">
+            {error}
           </p>
         )}
       </div>

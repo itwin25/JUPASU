@@ -1,1 +1,45 @@
-export default function Page() { return <div className='p-8'><h1>mypage Page</h1><p>ÁÖÆÄ¼ö ¸ŞÀÎ ¼­ºñ½º ÆäÀÌÁöÀÔ´Ï´Ù.</p></div>; }
+import Header from '@/components/common/header/Header';
+import SectionTitle from '@/components/common/section-title/SectionTitle';
+import Card from '@/components/ui/card/Card';
+import BottomNav from '@/components/common/bottom-nav/BottomNav';
+import { User, Settings, ChevronRight } from 'lucide-react';
+
+export default function MyPage() {
+  const menus = [
+    { title: 'ë‚´ ì •ë³´ ìˆ˜ì •', icon: User, path: '/mypage/profile' },
+    { title: 'ì·¨í–¥ ì •ë³´ ìˆ˜ì •', icon: Settings, path: '/mypage/taste' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      <Header title="ë§ˆì´í˜ì´ì§€" showBackButton={false} />
+      <main className="px-4 py-6 space-y-6">
+        <Card className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xl">
+            ì£¼
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-text-main">ì£¼íŒŒìˆ˜ë‹˜</h2>
+            <p className="text-sm text-text-main/40">ë‚˜ë§Œì˜ ì™€ì¸ì„ ì°¾ì•„ê°€ëŠ” ì¤‘</p>
+          </div>
+        </Card>
+
+        <section className="space-y-3">
+          <SectionTitle title="ì„¤ì •" />
+          <div className="space-y-2">
+            {menus.map((menu) => (
+              <Card key={menu.title} padding="sm" className="flex items-center justify-between active:bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <menu.icon size={20} className="text-text-main/60" />
+                  <span className="font-bold text-text-main/80">{menu.title}</span>
+                </div>
+                <ChevronRight size={18} className="text-text-main/20" />
+              </Card>
+            ))}
+          </div>
+        </section>
+      </main>
+      <BottomNav />
+    </div>
+  );
+}

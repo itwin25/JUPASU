@@ -11,6 +11,7 @@
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
   
   --font-inter: "Inter", sans-serif;
 }
@@ -24,9 +25,10 @@
   body {
     @apply bg-background text-text-main font-inter antialiased;
     min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* 모바일 세이프 영역 처리 (iOS 등) */
+  /* 모바일 하단 여백 처리 */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
