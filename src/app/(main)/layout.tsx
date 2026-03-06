@@ -1,0 +1,1 @@
+export default function MainLayout({ children }: { children: React.ReactNode }) { return <div className='main-container min-h-screen'><nav className='p-4 border-b bg-white'>Navigation (GNB Placeholder)</nav><main>{children}</main></div>; }

@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-900: #880606;
+  --color-primary-700: #B36262;
+  --color-primary-500: #D95F63;
+  --color-primary-100: #EBE6DF;
+  
+  --color-background: #F9F7F2;
+  --color-text-main: #332211;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  
+  --font-inter: "Inter", sans-serif;
+}
+
+:root {
+  --background: #F9F7F2;
+  --foreground: #332211;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main font-inter antialiased;
+    min-height: 100dvh;
+  }
+
+  /* 모바일 세이프 영역 처리 (iOS 등) */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
