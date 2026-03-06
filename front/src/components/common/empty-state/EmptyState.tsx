@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { PackageOpen } from 'lucide-react';
+import { Wine } from 'lucide-react';
 
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -10,22 +10,22 @@ interface EmptyStateProps {
 }
 
 export default function EmptyState({ 
-  icon = <PackageOpen size={48} className="text-gray-300" />, 
+  icon = <Wine size={64} className="text-primary-100" />, 
   title, 
   description, 
   action,
   className 
 }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center p-12 text-center", className)}>
-      <div className="mb-4">{icon}</div>
-      <h3 className="text-lg font-bold text-text-main">{title}</h3>
+    <div className={cn("flex flex-col items-center justify-center p-16 text-center bg-white/40 rounded-[2.5rem] border border-dashed border-primary-100", className)}>
+      <div className="mb-6 opacity-80">{icon}</div>
+      <h3 className="text-xl font-bold text-text-main">{title}</h3>
       {description && (
-        <p className="mt-2 text-sm text-text-main/50 max-w-[240px]">
+        <p className="mt-3 text-base text-text-main/40 font-medium max-w-[280px] leading-relaxed">
           {description}
         </p>
       )}
-      {action && <div className="mt-6">{action}</div>}
+      {action && <div className="mt-8 w-full">{action}</div>}
     </div>
   );
 }

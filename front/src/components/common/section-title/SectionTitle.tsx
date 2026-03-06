@@ -8,12 +8,12 @@ interface SectionTitleProps {
 
 export default function SectionTitle({ title, rightSlot, className }: SectionTitleProps) {
   return (
-    <div className={cn("flex items-center justify-between mb-4 mt-2", className)}>
-      <h2 className="text-lg font-bold text-text-main">
+    <div className={cn("flex items-end justify-between mb-5 mt-2 px-1", className)}>
+      <h2 className="text-xl font-extrabold text-text-main tracking-tight">
         {title}
       </h2>
       {rightSlot && (
-        <div className="text-sm font-medium text-primary-700">
+        <div className="text-sm font-bold text-primary-700 active:opacity-60 transition-opacity">
           {rightSlot}
         </div>
       )}

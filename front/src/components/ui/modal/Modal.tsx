@@ -30,37 +30,37 @@ export default function Modal({ isOpen, onClose, title, children, footer, classN
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 md:p-4">
+      {/* Overlay - 부드러운 오버레이 */}
       <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+        className="absolute inset-0 bg-black/30 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-300" 
         onClick={onClose}
       />
       
-      {/* Content */}
+      {/* Content - 큰 radius와 여백 */}
       <div 
         className={cn(
-          "relative w-full max-w-sm rounded-2xl bg-background p-6 shadow-xl animate-in fade-in zoom-in duration-200",
+          "relative w-full max-w-sm rounded-[2rem] bg-background p-8 shadow-2xl animate-in fade-in zoom-in duration-300",
           className
         )}
       >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-text-main">{title}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
-            <X size={20} className="text-gray-500" />
-          </button>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-text-main tracking-tight">{title}</h2>
+          <Button variant="icon" onClick={onClose} className="border-none shadow-none -mr-2 bg-transparent">
+            <X size={24} className="text-text-main/40" />
+          </Button>
         </div>
 
-        <div className="text-text-main/80 mb-6">
+        <div className="text-text-main/80 text-base leading-relaxed mb-8">
           {children}
         </div>
 
         {footer ? (
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col gap-3">
             {footer}
           </div>
         ) : (
-          <Button variant="primary" size="md" className="w-full" onClick={onClose}>
+          <Button variant="primary" size="full" onClick={onClose} className="rounded-2xl">
             확인
           </Button>
         )}
