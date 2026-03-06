@@ -14,3 +14,5 @@ htmlcov/
 
 # Local files
 ai.db
+*.png
+crawled_images.zip
