@@ -10,9 +10,9 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, label, error, helperText, disabled, ...props }, ref) => {
     return (
-      <div className="w-full space-y-1.5">
+      <div className="w-full space-y-2">
         {label && (
-          <label className="text-sm font-medium text-text-main/80">
+          <label className="text-sm font-semibold text-text-main/70 ml-1">
             {label}
           </label>
         )}
@@ -20,14 +20,16 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           disabled={disabled}
           className={cn(
-            'flex min-h-[120px] w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-text-main transition-colors placeholder:text-gray-400 focus:border-primary-900 focus:outline-none disabled:bg-gray-50 disabled:text-gray-400',
-            error && 'border-red-500 focus:border-red-500',
+            'flex min-h-[140px] w-full rounded-2xl border border-primary-100 bg-white px-5 py-4 text-base text-text-main transition-all placeholder:text-text-main/30',
+            'focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-100',
+            'disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-100',
+            error && 'border-red-400 focus:border-red-400 focus:ring-red-500/10',
             className,
           )}
           {...props}
         />
         {(error || helperText) && (
-          <p className={cn('text-xs', error ? 'text-red-500' : 'text-gray-500')}>
+          <p className={cn('text-xs ml-1', error ? 'text-red-500 font-medium' : 'text-text-main/40')}>
             {error || helperText}
           </p>
         )}
