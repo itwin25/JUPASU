@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.a505.jupasu.global.common.ApiResponse;
+import com.a505.jupasu.domain.auth.dto.request.CheckEmailRequest;
+import com.a505.jupasu.domain.auth.dto.request.CheckNicknameRequest;
 import java.util.Map;
 
 @RestController
@@ -25,8 +27,8 @@ public class AuthController {
      * 닉네임 중복 확인
      */
     @PostMapping("/check-nickname")
-    public ApiResponse<Void> checkNickname(@RequestBody Map<String, String> request) {
-        authService.checkNicknameDuplicate(request.get("nickname"));
+    public ApiResponse<Void> checkNickname(@Valid @RequestBody CheckNicknameRequest request) {
+        authService.checkNicknameDuplicate(request.getNickname());
         return ApiResponse.success("사용 가능한 닉네임입니다.");
     }
 
@@ -36,8 +38,8 @@ public class AuthController {
      * 이메일 중복 확인
      */
     @PostMapping("/check-email")
-    public ApiResponse<Void> checkEmail(@RequestBody Map<String, String> request) {
-        authService.checkEmailDuplicate(request.get("email"));
+    public ApiResponse<Void> checkEmail(@Valid @RequestBody CheckEmailRequest request) {
+        authService.checkEmailDuplicate(request.getEmail());
         return ApiResponse.success("사용 가능한 이메일입니다.");
     }
 
