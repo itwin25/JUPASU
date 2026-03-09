@@ -25,11 +25,32 @@ def health_check():
         "ocr_model": get_settings().OCR_MODEL_NAME
     }
 
+from langchain_core.prompts import ChatPromptTemplate
+
 @app.post("/ai/chat", response_model=LLMResponse)
 async def chat(request: LLMRequest):
+    """
+    제미나이를 통한 싱글턴(Single-turn) 대화 구현 엔드포인트입니다.
+    이전 대화 맥락을 유지하지 않고 독립적인 질의응답을 수행합니다.
+    """
+    settings = get_settings()
     llm = get_llm()
-    response = await llm.ainvoke(request.prompt)
-    return {"answer": response.content}
+    
+    # 1. 프롬프트 템플릿 정의 (시스템 역할 부여)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "당신은 SSAFY 팀 프로젝트 '주파수'의 유능한 AI 어시스턴트입니다. 친절하고 전문적으로 답변해 주세요."),
+        ("user", "{input}")
+    ])
+    
+    # 2. LCEL(LangChain Expression Language) 체인 생성
+    chain = prompt | llm
+    
+    # 3. 비동기 호출 및 결과 반환
+    try:
+        response = await chain.ainvoke({"input": request.prompt})
+        return {"answer": response.content}
+    except Exception as e:
+        return {"answer": f"Gemini 호출 중 오류가 발생했습니다: {str(e)}"}
 
 @app.post("/ai/ocr")
 async def perform_ocr(file: UploadFile = File(...)):
