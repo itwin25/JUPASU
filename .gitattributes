@@ -1,0 +1,7 @@
+# 모든 텍스트 파일의 줄바꿈과 인코딩 자동 처리 방지
+* text=auto
+
+# 소스 파일들에 대해 명시적으로 UTF-8 준수 유도
+*.tsx text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
