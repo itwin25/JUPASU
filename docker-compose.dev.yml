@@ -79,11 +79,11 @@ services:
       context: ./front
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     container_name: front-nextjs-dev
     restart: always
     environment:
-      - NEXT_PUBLIC_API_URL = ${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     ports:
