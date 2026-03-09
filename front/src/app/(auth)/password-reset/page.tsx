@@ -1,6 +1,5 @@
 import Header from '@/components/common/header/Header';
 import PageTitle from '@/components/common/page-title/PageTitle';
-import PasswordResetForm from '@/features/auth/components/PasswordResetForm';
 
 export default function PasswordResetPage() {
   return (
@@ -9,9 +8,9 @@ export default function PasswordResetPage() {
       <main className="px-6 py-8">
         <PageTitle 
           title="비밀번호 찾기" 
-          description="이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다." 
+          description="가입하신 이메일을 입력해주시면 임시 비밀번호를 보내드려요." 
         />
-        <PasswordResetForm />
+        {/* TODO: 비밀번호 재설정 폼 구현 */}
       </main>
     </div>
   );

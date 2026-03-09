@@ -1,1 +1,24 @@
-export default function Page() { return <div className='p-8'><h1>signup/complete Page</h1><p>ÁÖÆÄ¼ö ÀÎÁõ °ü·Ã ÆäÀÌÁöÀÔ´Ï´Ù.</p></div>; }
+import Header from '@/components/common/header/Header';
+import PageTitle from '@/components/common/page-title/PageTitle';
+import Button from '@/components/ui/button/Button';
+import { CheckCircle2 } from 'lucide-react';
+
+export default function SignupCompletePage() {
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <main className="flex-1 px-6 py-20 flex flex-col items-center text-center space-y-8">
+        <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 animate-bounce">
+          <CheckCircle2 size={56} />
+        </div>
+        <PageTitle 
+          title="ê°€ì…ì„ ì¶•í•˜ë“œë ¤ìš”!" 
+          description="ì´ì œ ì£¼íŒŒìˆ˜ì™€ í•¨ê»˜ ì™€ì¸ì˜ ì„¸ê³„ë¡œ ë– ë‚˜ë³¼ê¹Œìš”?" 
+          className="items-center"
+        />
+        <Button variant="primary" size="full" className="max-w-xs">
+          ì‹œì‘í•˜ê¸°
+        </Button>
+      </main>
+    </div>
+  );
+}

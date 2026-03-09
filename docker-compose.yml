@@ -66,25 +66,29 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      ai:
+        condition: service_started
     networks:
       - backend-network
-      # - frontend-network
+      - frontend-network
 
-  # Frontend: React 19 (Vite)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: front-react
-  #   restart: always
-  #   ports:
-  #     - "80:80"
-  #   environment:
-  #     - VITE_API_BASE_URL=http://localhost:8080
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - frontend-network
+  # Frontend: Next.js (React 19)
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: front-nextjs
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - frontend-network
 
 networks:
   frontend-network:
