@@ -1,1 +1,8 @@
-export default function Page() { return <div className='p-8'><h1>Mypage scraps Page</h1><p>¸¶ÀÌÆäÀÌÁö scraps °ü·Ã È­¸éÀÔ´Ï´Ù.</p></div>; }
+export default function Page() {
+  return (
+    <div className="p-8">
+      <h1>Mypage scraps Page</h1>
+      <p>ë§ˆì´í˜ì´ì§€ scraps ê´€ë ¨ í™”ë©´ì…ë‹ˆë‹¤.</p>
+    </div>
+  );
+}
