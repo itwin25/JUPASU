@@ -1,7 +1,6 @@
 package com.a505.jupasu.domain.user.dto.response;
 
 import com.a505.jupasu.domain.user.entity.User;
-import com.a505.jupasu.domain.user.service.UserService;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,6 +18,7 @@ public class UserMyPageResponse {
 
     /**
      * User 엔티티를 UserMyPageResponse DTO로 변환하는 정적 팩토리 메서드
+     *
      * @param user 변환할 사용자 엔티티
      * @return 가공된 마이페이지 응답 DTO
      */
