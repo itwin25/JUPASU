@@ -20,7 +20,15 @@ public enum ErrorCode {
     // 와인 및 도메인 관련 예외
     WINE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 와인입니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 리뷰입니다."),
-    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다.");
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
+
+    // OTP / 이메일 인증 관련
+    OTP_EXPIRED_OR_INVALID(HttpStatus.BAD_REQUEST, "인증 코드가 유효하지 않거나 만료되었습니다."),
+    OTP_INVALID(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."),
+    OTP_MAX_ATTEMPTS_EXCEEDED(HttpStatus.BAD_REQUEST, "인증 시도 횟수를 초과했습니다. 다시 회원가입을 시도해주세요."),
+    SIGNUP_SESSION_EXPIRED(HttpStatus.BAD_REQUEST, "회원가입 세션이 만료되었습니다. 다시 시도해주세요."),
+    SIGNUP_EMAIL_SEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "이메일 재전송은 60초 후에 가능합니다."),
+    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "이메일 인증을 먼저 완료해주세요.");
 
     private final HttpStatus status;
     private final String message;

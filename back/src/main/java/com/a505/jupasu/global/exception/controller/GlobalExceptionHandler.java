@@ -5,6 +5,7 @@ import com.a505.jupasu.global.exception.ErrorCode;
 import com.a505.jupasu.global.exception.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -47,14 +48,36 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
-        log.error("CustomException : {}", e.getMessage());
-
         ErrorCode errorCode = e.getErrorCode();
+
+        String message = errorCode.getMessage();
+
+        // detail이 있을 때만 뒤에 추가 ex) "인증 코드가 올바르지 않습니다. (남은 시도: 3회)"
+        if (e.getDetail() != null) {
+            message = message + " " + e.getDetail();
+        }
+
+        log.error("CustomException : {}", message);
+
         ErrorResponse response = ErrorResponse.builder()
                 .code(errorCode)
-                .message(errorCode.getMessage())
+                .message(message)
                 .build();
-
         return ResponseEntity.status(errorCode.getStatus()).body(response);
+    }
+
+    /** @Valid 검증 실패 처리 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .findFirst()
+                .orElse(ErrorCode.INVALID_REQUEST.getMessage());
+        log.warn("Validation 실패: {}", message);
+        ErrorResponse response = ErrorResponse.builder()
+                .code(ErrorCode.INVALID_REQUEST)
+                .message(message)
+                .build();
+        return ResponseEntity.status(ErrorCode.INVALID_REQUEST.getStatus()).body(response);
     }
 }
