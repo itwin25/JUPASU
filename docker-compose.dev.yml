@@ -2,14 +2,14 @@ services:
   # Database: PostgreSQL 18 with pgvector extension
   db:
     image: pgvector/pgvector:pg18
-    container_name: db-postgres
+    container_name: db-postgres-dev
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "8282:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
@@ -18,38 +18,39 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - backend-network
+      - backend-network-dev
 
   # Cache & Session: Redis
   redis:
     image: redis:7.4-alpine
-    container_name: cache-redis
+    container_name: cache-redis-dev
     restart: always
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
-      - backend-network
+      - backend-network-dev
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
   ai:
     build:
       context: ./ai
       dockerfile: Dockerfile
-    container_name: ai-fastapi
+    container_name: ai-fastapi-dev
     restart: always
     networks:
-      - backend-network
+      - backend-network-dev
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
-      - 8000:8000
+      - 8001:8000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
     build:
       context: ./back
       dockerfile: Dockerfile
-    container_name: backend-spring
+    container_name: backend-spring-dev
     restart: always
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
@@ -60,7 +61,7 @@ services:
       AI_SERVICE_URL: http://ai:8000
       JWT_SECRET: ${JWT_SECRET}
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -69,31 +70,33 @@ services:
       ai:
         condition: service_started
     networks:
-      - backend-network
-      - frontend-network
+      - backend-network-dev
+      - frontend-network-dev
 
   # Frontend: Next.js (React 19)
   frontend:
     build:
       context: ./front
       dockerfile: Dockerfile
-    container_name: front-nextjs
+      args:
+        - NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: front-nextjs-dev
     restart: always
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_URL = ${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     ports:
-      - "80:80"
+      - "8888:80"
     depends_on:
       - backend
     networks:
-      - frontend-network
+      - frontend-network-dev
 
 networks:
-  frontend-network:
+  frontend-network-dev:
     driver: bridge
-  backend-network:
+  backend-network-dev:
     driver: bridge
 
 volumes:
