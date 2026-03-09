@@ -1,24 +1,36 @@
-import Header from '@/components/common/header/Header';
-import PageTitle from '@/components/common/page-title/PageTitle';
-import Button from '@/components/ui/button/Button';
-import { CheckCircle2 } from 'lucide-react';
+'use client';
+
+import Image from 'next/image';
+import { X } from 'lucide-react';
+import Link from 'next/link';
 
 export default function SignupCompletePage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 px-6 py-20 flex flex-col items-center text-center space-y-8">
-        <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 animate-bounce">
-          <CheckCircle2 size={56} />
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 relative">
+      <div className="flex flex-col items-center space-y-8 animate-in fade-in zoom-in duration-700">
+        <div className="relative h-40 w-40">
+          <Image src="/logo.png" alt="Logo" fill className="object-contain" />
         </div>
-        <PageTitle 
-          title="가입을 축하드려요!" 
-          description="이제 주파수와 함께 와인의 세계로 떠나볼까요?" 
-          className="items-center"
-        />
-        <Button variant="primary" size="full" className="max-w-xs">
-          시작하기
-        </Button>
-      </main>
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-extrabold text-text-main">환영합니다!</h1>
+          <p className="text-lg text-text-main/60 font-medium">와인의 세계에 오신 것을 환영합니다!</p>
+        </div>
+      </div>
+
+      {/* Bottom Toast-style Banner */}
+      <div className="absolute bottom-10 left-6 right-6">
+        <div className="bg-white rounded-3xl p-5 flex items-center justify-between shadow-xl border border-primary-100">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🍞</span>
+            <Link href="/login" className="font-bold text-text-main hover:text-primary-700 transition-colors">
+              로그인 페이지로 이동합니다.
+            </Link>
+          </div>
+          <button className="text-text-main/30">
+            <X size={24} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
