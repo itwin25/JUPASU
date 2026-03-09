@@ -1,3 +1,17 @@
 .idea
 .vscode/
 .env
+.env.local
+
+# Temporary UI Analysis
+temp_ui/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Project Artifacts
+node_modules/
+.next/
+build/
+dist/
