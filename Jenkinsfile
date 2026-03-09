@@ -5,7 +5,7 @@ pipeline {
         // 운영 서버 정보 (본인의 환경에 맞게 수정)
         PROD_SERVER_IP = "13.124.55.70"
         PROD_SERVER_USER = "ubuntu"
-        SSH_CRED_ID = "prod-server-ssh"
+        SSH_CRED_ID = "ssh-agent-key"
         DEV_PATH = "/home/ubuntu/jupasu_dev"
         PROD_PATH = "/home/ubuntu/jupasu_prod" // 서버 내 프로젝트 위치
     }
