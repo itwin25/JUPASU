@@ -10,9 +10,13 @@ class Settings(BaseSettings):
     # LLM Provider: 'local' (vLLM/Ollama OpenAI API) or 'gemini'
     LLM_PROVIDER: Literal["local", "gemini"] = "local"
     
-    # Local vLLM Config (OpenAI-compatible)
-    VLLM_API_URL: str = "http://localhost:8000/v1"
-    VLLM_MODEL_NAME: str = "my-local-model"
+    # Remote GPU Server (vLLM) Config
+    # 대여받은 GPU 서버의 IP와 포트(기본 8000)를 입력하세요.
+    # 예: http://123.456.78.90:8000/v1
+    VLLM_API_URL: str = "http://your-gpu-server-ip:8000/v1"
+    
+    # 사용할 모델명 (vLLM 서버 기동 시 설정한 --served-model-name과 일치해야 함)
+    VLLM_MODEL_NAME: str = "selected-model-name-later"
     
     # Gemini Config
     GOOGLE_API_KEY: str | None = None
