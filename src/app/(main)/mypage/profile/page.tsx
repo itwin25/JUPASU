@@ -1,1 +1,8 @@
-export default function Page() { return <div className='p-8'><h1>Mypage profile Page</h1><p>¸¶ÀÌÆäÀÌÁö profile °ü·Ã È­¸éÀÔ´Ï´Ù.</p></div>; }
+export default function Page() {
+  return (
+    <div className="p-8">
+      <h1>Mypage profile Page</h1>
+      <p>ë§ˆì´í˜ì´ì§€ profile ê´€ë ¨ í™”ë©´ì…ë‹ˆë‹¤.</p>
+    </div>
+  );
+}
