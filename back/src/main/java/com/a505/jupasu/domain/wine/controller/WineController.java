@@ -1,14 +1,12 @@
 package com.a505.jupasu.domain.wine.controller;
 
+import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
 import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
 import com.a505.jupasu.domain.wine.service.WineService;
 import com.a505.jupasu.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -26,12 +24,29 @@ public class WineController {
      *  추후 필터링 -> elasticSearch 고도화 예정
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<WineSearchResponse>>> searchWines(
+    public ApiResponse<List<WineSearchResponse>> searchWines(
             //TODO: 로그인한 사용자 확인 (Authentication 추가)
             @RequestParam(required = false) String keyword
     ) {
 
         List<WineSearchResponse> response = wineService.searchWines(keyword);
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return ApiResponse.success("와인 검색 완료", response);
+    }
+
+
+    /**
+     * 와인 상세 정보 검색
+     *
+     */
+    @GetMapping("/{wine_id}")
+    public ApiResponse<WineDetailResponse> getWineDetail(
+            //TODO: 로그인한 사용자 확인
+            @PathVariable("wine_id") Long wineId
+    ) {
+        //현재는 로그인한 유저 아이디 1L 로 고정
+        Long userId = 1L;
+        WineDetailResponse response = wineService.getWineDetail(userId, wineId);
+        return ApiResponse.success("와인 상세 정보 조회 성공", response);
+
     }
 }
