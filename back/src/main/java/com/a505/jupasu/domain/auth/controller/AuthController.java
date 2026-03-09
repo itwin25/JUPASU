@@ -10,6 +10,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.a505.jupasu.global.common.ApiResponse;
+import com.a505.jupasu.domain.auth.dto.request.CheckEmailRequest;
+import com.a505.jupasu.domain.auth.dto.request.CheckNicknameRequest;
 import java.util.Map;
 
 @RestController
@@ -19,15 +22,14 @@ public class AuthController {
 
     private final AuthService authService;
 
-
     /**
      * POST /api/auth/check-nickname
      * 닉네임 중복 확인
      */
     @PostMapping("/check-nickname")
-    public ResponseEntity<Map<String, String>> checkNickname(@RequestBody Map<String, String> request) {
-        authService.checkNicknameDuplicate(request.get("nickname"));
-        return ResponseEntity.ok(Map.of("message", "사용 가능한 닉네임입니다."));
+    public ApiResponse<Void> checkNickname(@Valid @RequestBody CheckNicknameRequest request) {
+        authService.checkNicknameDuplicate(request.getNickname());
+        return ApiResponse.success("사용 가능한 닉네임입니다.");
     }
 
 
@@ -36,9 +38,9 @@ public class AuthController {
      * 이메일 중복 확인
      */
     @PostMapping("/check-email")
-    public ResponseEntity<Map<String, String>> checkEmail(@RequestBody Map<String, String> request) {
-        authService.checkEmailDuplicate(request.get("email"));
-        return ResponseEntity.ok(Map.of("message", "사용 가능한 이메일입니다."));
+    public ApiResponse<Void> checkEmail(@Valid @RequestBody CheckEmailRequest request) {
+        authService.checkEmailDuplicate(request.getEmail());
+        return ApiResponse.success("사용 가능한 이메일입니다.");
     }
 
 
@@ -47,11 +49,10 @@ public class AuthController {
      * OTP 메일 발송
      */
     @PostMapping("/otp/send")
-    public ResponseEntity<Map<String, String>> sendOtp(@Valid @RequestBody SendOtpRequest request) {
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<Void> sendOtp(@Valid @RequestBody SendOtpRequest request) {
         authService.sendOtp(request);
-        return ResponseEntity
-                .status(HttpStatus.ACCEPTED)
-                .body(Map.of("message", "인증 코드가 이메일로 발송되었습니다. 5분 내에 입력해주세요."));
+        return ApiResponse.success("인증 코드가 이메일로 발송되었습니다. 5분 내에 입력해주세요.");
     }
 
 
@@ -60,10 +61,9 @@ public class AuthController {
      * OTP 검증만 (DB 저장 안 함, 인증완료 플래그만 Redis에 저장)
      */
     @PostMapping("/otp/verify")
-    public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+    public ApiResponse<Void> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
         authService.verifyOtp(request);
-        return ResponseEntity
-                .ok(Map.of("message", "이메일 인증이 완료되었습니다. 회원가입을 진행해주세요."));
+        return ApiResponse.success("이메일 인증이 완료되었습니다. 회원가입을 진행해주세요.");
     }
 
 
@@ -72,10 +72,10 @@ public class AuthController {
      * 인증완료 플래그 확인 + DB INSERT (회원가입 버튼)
      */
     @PostMapping("/signup")
-    public ResponseEntity<Map<String, String>> signup(@Valid @RequestBody SignupRequest request) {
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest request) {
         authService.signup(request);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(Map.of("message", "회원가입이 완료되었습니다. 로그인해주세요."));
+        // ApiResponse.java 수정 금지 요청이 있었으므로, 기존 생성되어 있는 메서드를 활용
+        return ApiResponse.created("회원가입이 완료되었습니다. 로그인해주세요.", null);
     }
 }
