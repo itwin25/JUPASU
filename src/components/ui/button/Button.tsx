@@ -21,7 +21,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       sm: 'px-4 py-2 text-sm rounded-full',
       md: 'px-6 py-3.5 text-base rounded-2xl font-bold',
       lg: 'px-8 py-4.5 text-lg rounded-2xl font-extrabold',
-      full: 'w-full py-4.5 text-base rounded-2xl font-bold',
+      full: 'w-full py-3.5 text-base rounded-2xl font-bold',
       icon: '',
     };
 
