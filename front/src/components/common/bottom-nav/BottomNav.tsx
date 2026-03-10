@@ -2,61 +2,57 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Camera, MessageCircle, User } from 'lucide-react';
+import { Home, Camera, Search, User, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ROUTE_PATH } from '@/constants/route-path';
 
 const NAV_ITEMS = [
-  { icon: Home, label: '홈', path: ROUTE_PATH.HOME },
-  { icon: Search, label: '검색', path: ROUTE_PATH.WINE_SEARCH },
-  { icon: MessageCircle, label: '챗봇', path: ROUTE_PATH.CHATBOT, isCenter: true },
-  { icon: Camera, label: '스캔', path: '/scan' },
-  { icon: User, label: '마이', path: ROUTE_PATH.MY_PAGE },
+  { label: '홈', icon: Home, path: '/home' },
+  { label: '스캔', icon: Camera, path: '/scan' },
+  { label: '챗봇', icon: MessageCircle, path: '/chat', isCenter: true },
+  { label: '검색', icon: Search, path: '/search' },
+  { label: '마이', icon: User, path: '/mypage' },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
+  // 챗봇 페이지(/chat)에서는 하단 탭을 표시하지 않음
+  if (pathname === '/chat') return null;
+
   return (
-    <nav className="fixed bottom-0 left-0 z-40 w-full border-t border-primary-100 bg-background/95 backdrop-blur-xl pb-safe shadow-[0_-4px_24px_rgba(51,34,17,0.04)]">
-      <div className="flex h-20 items-center justify-around px-2 relative">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-primary-100 px-6 pb-safe pt-2 shadow-sm">
+      <div className="flex items-center justify-between h-16 relative max-w-md mx-auto">
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.path;
+          const isActive = pathname.startsWith(item.path);
           
           if (item.isCenter) {
             return (
-              <Link 
-                key={item.path} 
-                href={item.path}
-                className="flex flex-col items-center justify-center -mt-10 group"
-              >
-                <div className={cn(
-                  "w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all group-active:scale-90",
-                  isActive ? "bg-primary-900" : "bg-primary-700"
-                )}>
-                  <item.icon size={28} className="text-white" strokeWidth={2.5} />
-                </div>
-                <span className={cn(
-                  "text-[10px] font-extrabold mt-2 tracking-tighter transition-colors",
-                  isActive ? "text-primary-700" : "text-text-main/40"
-                )}>
-                  {item.label}
-                </span>
-              </Link>
+              <div key={item.path} className="relative w-16 h-16 flex items-center justify-center">
+                <Link
+                  href={item.path}
+                  className="absolute -top-10 w-20 h-20 bg-[#B36262] rounded-full border-[8px] border-background flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                >
+                  <item.icon size={36} className="text-white fill-white" />
+                </Link>
+              </div>
             );
           }
 
           return (
-            <Link 
-              key={item.path} 
+            <Link
+              key={item.path}
               href={item.path}
               className={cn(
-                "flex flex-col items-center justify-center gap-1.5 w-full h-full transition-all active:scale-95",
-                isActive ? "text-primary-700" : "text-text-main/20 hover:text-text-main/40"
+                'flex flex-col items-center gap-1 px-3 transition-colors py-2',
+                isActive ? 'text-[#B36262]' : 'text-gray-400'
               )}
             >
-              <item.icon size={24} strokeWidth={isActive ? 2.8 : 2} />
-              <span className="text-[10px] font-extrabold uppercase tracking-widest">{item.label}</span>
+              <item.icon 
+                size={26} 
+                className={cn(
+                  isActive ? 'stroke-[2.5px]' : 'stroke-[2px]'
+                )} 
+              />
             </Link>
           );
         })}
