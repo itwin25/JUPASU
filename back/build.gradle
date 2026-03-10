@@ -33,7 +33,7 @@ dependencies {
 
     // Web & Security 의존성
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    //implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 
     // Lombok 의존성 추가
     compileOnly 'org.projectlombok:lombok'
@@ -41,7 +41,7 @@ dependencies {
 
     // Test 의존성
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    //testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // Swagger
