@@ -39,6 +39,11 @@ public class RedisService {
         return stringRedisTemplate.opsForValue().increment(key);
     }
 
+    /** EXPIRE — 키의 만료 시간을 설정 */
+    public void expire(String key, long ttlSeconds) {
+        stringRedisTemplate.expire(key, Duration.ofSeconds(ttlSeconds));
+    }
+
     /** EXISTS */
     public boolean exists(String key) {
         return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));

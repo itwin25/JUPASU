@@ -14,7 +14,9 @@ public enum ErrorCode {
     FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
     // 회원 관련 예외
-    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 유저입니다."),
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "아이디와 비밀번호를 정확히 입력해 주세요."),
+    INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "아이디와 비밀번호를 정확히 입력해 주세요."),
+    ACCOUNT_LOCKED(HttpStatus.FORBIDDEN, "연속 로그인 실패로 계정이 잠겼습니다. 30분 후 다시 시도해주세요."),
     EXISTING_EMAIL(HttpStatus.CONFLICT, "이미 존재하는 이메일입니다"),
     EXISTING_NICKNAME(HttpStatus.CONFLICT, "이미 존재하는 닉네임입니다"),
     INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "닉네임은 2~20자의 한글, 영어, 숫자만 가능합니다."),
