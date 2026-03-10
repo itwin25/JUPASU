@@ -1,8 +1,10 @@
 package com.a505.jupasu.domain.auth.controller;
 
 import com.a505.jupasu.domain.auth.dto.request.SendOtpRequest;
+import com.a505.jupasu.domain.auth.dto.request.SignInRequest;
 import com.a505.jupasu.domain.auth.dto.request.SignupRequest;
 import com.a505.jupasu.domain.auth.dto.request.VerifyOtpRequest;
+import com.a505.jupasu.domain.auth.dto.response.SignInResponse;
 import com.a505.jupasu.domain.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,16 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+
+    /**
+     * POST /api/auth/signin
+     * 일반 로그인 (액세스 및 리프레시 토큰 발급)
+     */
+    @PostMapping("/signin")
+    public ApiResponse<SignInResponse> signIn(@Valid @RequestBody SignInRequest request) {
+        SignInResponse response = authService.signIn(request);
+        return ApiResponse.success("로그인 성공", response);
+    }
 
     /**
      * POST /api/auth/check-nickname
@@ -75,7 +87,6 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest request) {
         authService.signup(request);
-        // ApiResponse.java 수정 금지 요청이 있었으므로, 기존 생성되어 있는 메서드를 활용
         return ApiResponse.created("회원가입이 완료되었습니다. 로그인해주세요.", null);
     }
 }

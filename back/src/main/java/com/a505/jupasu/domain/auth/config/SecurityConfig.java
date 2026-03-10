@@ -2,6 +2,7 @@ package com.a505.jupasu.domain.auth.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -14,8 +15,10 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+    public BCryptPasswordEncoder passwordEncoder(
+            @Value("${auth.bcrypt.cost:10}") int bcryptCost
+    ) {
+        return new BCryptPasswordEncoder(bcryptCost);
     }
 
     @Bean

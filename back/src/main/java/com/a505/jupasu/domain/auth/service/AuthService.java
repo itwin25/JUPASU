@@ -3,11 +3,14 @@ package com.a505.jupasu.domain.auth.service;
 import com.a505.jupasu.domain.auth.dto.request.SendOtpRequest;
 import com.a505.jupasu.domain.auth.dto.request.SignupRequest;
 import com.a505.jupasu.domain.auth.dto.request.VerifyOtpRequest;
+import com.a505.jupasu.domain.auth.dto.request.SignInRequest;
+import com.a505.jupasu.domain.auth.dto.response.SignInResponse;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import com.a505.jupasu.global.redis.RedisService;
+import com.a505.jupasu.global.security.jwt.JwtTokenProvider;
 import java.security.SecureRandom;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,10 +29,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class AuthService {
 
     // Redis Key Prefix
-    private static final String CODE_PREFIX     = "verify:code:";
-    private static final String ATTEMPTS_PREFIX = "verify:attempts:";
-    private static final String RESEND_PREFIX   = "resend:lock:";
-    private static final String VERIFIED_PREFIX = "verified:email:";
+    private static final String CODE_PREFIX     = "auth:verify:code:";
+    private static final String ATTEMPTS_PREFIX = "auth:verify:attempts:";
+    private static final String RESEND_PREFIX   = "auth:resend:lock:";
+    private static final String VERIFIED_PREFIX = "auth:verified:email:";
+    private static final String LOCKOUT_PREFIX  = "auth:lockout:account:";
+    private static final String RT_PREFIX       = "auth:rt:";
 
     // Redis Lua Script — 2개 키 원자적 SET
     private static final RedisScript<Long> STORE_OTP_SCRIPT = RedisScript.of(
@@ -47,8 +52,10 @@ public class AuthService {
     private final StringRedisTemplate   stringRedisTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService          emailService;
+    private final JwtTokenProvider      jwtTokenProvider;
 
-    // 이메일 / 닉네임 중복 확인
+
+    // 이메일 중복 확인
     public void checkEmailDuplicate(String email) {
         if (userRepository.existsByEmail(email)) {
             throw new CustomException(ErrorCode.EXISTING_EMAIL);
@@ -56,6 +63,7 @@ public class AuthService {
     }
 
 
+    // 닉네임 중복 확인
     public void checkNicknameDuplicate(String nickname) {
         if (userRepository.existsByNickname(nickname)) {
             throw new CustomException(ErrorCode.EXISTING_NICKNAME);
@@ -166,6 +174,43 @@ public class AuthService {
         });
     }
 
+
+    // POST /api/auth/signin — 로그인 (액세스 및 리프레시 토큰 발급)
+    @Transactional(readOnly = true)
+    public SignInResponse signIn(SignInRequest request) {
+        String email = request.getEmail();
+        String lockoutKey = LOCKOUT_PREFIX + email;
+
+        // 계정 잠김 체크 (redis에서 수행)
+        String lockoutCountStr = redisService.get(lockoutKey);
+
+        if (lockoutCountStr != null && Integer.parseInt(lockoutCountStr) >= 5) {
+            throw new CustomException(ErrorCode.ACCOUNT_LOCKED);
+        }
+
+        // 유저 및 암호 검증
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 비밀번호 오류
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            // increment & expire 동시 호출
+            redisService.increment(lockoutKey);
+            redisService.expire(lockoutKey, 1800);
+            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 로그인 성공 -> 실패 기록 정리 및 토큰 발급
+        redisService.delete(lockoutKey);
+
+        String accessToken = jwtTokenProvider.createAccessToken(email);
+        String refreshToken = jwtTokenProvider.createRefreshToken(email);
+
+        // Redis에 Refresh Token 저장 (TTL: 7일)
+        redisService.set(RT_PREFIX + email, refreshToken, 604800);
+
+        return SignInResponse.of(accessToken, refreshToken);
+    }
 
     // 내부 유틸
     private void storeOtpKeys(String email, String code) {

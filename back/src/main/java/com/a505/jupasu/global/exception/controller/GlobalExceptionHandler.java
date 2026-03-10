@@ -4,10 +4,12 @@ import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import com.a505.jupasu.global.exception.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
 @Slf4j
 @RestControllerAdvice
@@ -73,11 +75,27 @@ public class GlobalExceptionHandler {
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .findFirst()
                 .orElse(ErrorCode.INVALID_REQUEST.getMessage());
+
         log.warn("Validation 실패: {}", message);
+
         ErrorResponse response = ErrorResponse.builder()
                 .code(ErrorCode.INVALID_REQUEST)
                 .message(message)
                 .build();
         return ResponseEntity.status(ErrorCode.INVALID_REQUEST.getStatus()).body(response);
+    }
+
+    /** Redis 연결 장애 시 처리 (Fault Tolerance) */
+    @ExceptionHandler(RedisConnectionFailureException.class)
+    public ResponseEntity<ErrorResponse> handleRedisFailure(RedisConnectionFailureException ex) {
+
+        log.error("[CRITICAL] Redis cluster is unreachable. Authentication flow degraded: {}", ex.getMessage());
+
+        ErrorResponse response = ErrorResponse.builder()
+                .code(ErrorCode.INTERNAL_SERVER_ERROR)
+                .message("인증 서버가 혼잡하여 현재 요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.")
+                .build();
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
     }
 }
