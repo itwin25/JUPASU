@@ -21,7 +21,7 @@ public class Review extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "wine_id", nullable=  false)
     private Wine wine;
 
@@ -35,6 +35,11 @@ public class Review extends BaseEntity {
     @Builder.Default
     @Column(nullable = false)
     private boolean isCounted = false;
+
+    public void updateReview(Float rating, String content) {
+        if (rating != null) this.rating = rating;
+        if (content != null) this.content = content;
+    }
 
 
 
