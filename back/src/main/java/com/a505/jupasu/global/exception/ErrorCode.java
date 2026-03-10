@@ -16,6 +16,10 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 유저입니다."),
     EXISTING_EMAIL(HttpStatus.CONFLICT, "이미 존재하는 이메일입니다"),
     EXISTING_NICKNAME(HttpStatus.CONFLICT, "이미 존재하는 닉네임입니다"),
+    INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "닉네임은 2~20자의 한글, 영어, 숫자만 가능합니다."),
+    INVALID_PASSWORD_FORMAT(HttpStatus.BAD_REQUEST, "비밀번호는 최소 8자, 대문자·숫자·특수문자 각 1개 이상을 포함해야 합니다."),
+    INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
+    PASSWORD_CONFIRM_NOT_MATCHED(HttpStatus.BAD_REQUEST, "입력하신 새 비밀번호와 일치하지 않습니다."),
 
     // 와인 및 도메인 관련 예외
     WINE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 와인입니다."),
