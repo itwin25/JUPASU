@@ -1,7 +1,6 @@
 package com.a505.jupasu.domain.friend.entity;
 
 import com.a505.jupasu.domain.user.entity.User;
-import com.a505.jupasu.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -47,7 +46,7 @@ public class Friend {
     /**
      * 친구를 맺은 날짜
      */
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Builder
@@ -71,6 +70,4 @@ public class Friend {
     public void reject() {
         this.status = FriendStatus.REJECTED;
     }
-
-
 }
