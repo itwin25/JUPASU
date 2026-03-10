@@ -1,4 +1,5 @@
 package com.a505.jupasu.global.exception;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
@@ -33,7 +34,11 @@ public enum ErrorCode {
     OTP_MAX_ATTEMPTS_EXCEEDED(HttpStatus.BAD_REQUEST, "인증 시도 횟수를 초과했습니다. 다시 회원가입을 시도해주세요."),
     SIGNUP_SESSION_EXPIRED(HttpStatus.BAD_REQUEST, "회원가입 세션이 만료되었습니다. 다시 시도해주세요."),
     SIGNUP_EMAIL_SEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "이메일 재전송은 60초 후에 가능합니다."),
-    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "이메일 인증을 먼저 완료해주세요.");
+    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "이메일 인증을 먼저 완료해주세요."),
+
+    // 친구 관련 예외
+    SELF_FRIEND_REQUEST(HttpStatus.BAD_REQUEST, "친구 요청은 타인에게만 가능합니다."),
+    ALREADY_FRIEND_REQUESTED(HttpStatus.BAD_REQUEST, "이미 친구 요청을 보낸 유저 입니다.");
 
     private final HttpStatus status;
     private final String message;

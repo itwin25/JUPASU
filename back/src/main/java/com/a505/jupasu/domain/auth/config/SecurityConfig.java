@@ -31,6 +31,7 @@ public class SecurityConfig {
                         // 회원가입·인증 엔드포인트는 인증 없이 허용
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/users/**").permitAll()
+                        .requestMatchers("/api/friends/**").permitAll()
                         .anyRequest().authenticated()
                 );
 
