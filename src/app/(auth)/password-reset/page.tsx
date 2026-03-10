@@ -3,7 +3,7 @@ import PasswordResetForm from '@/features/auth/components/PasswordResetForm';
 
 export default function PasswordResetPage() {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center px-6 pt-20">
+    <div className="min-h-screen bg-background flex flex-col items-center px-4 pt-30">
       <div className="mb-12">
         <div className="relative h-32 w-32">
           <Image
@@ -11,7 +11,7 @@ export default function PasswordResetPage() {
             alt="JUPASU Logo"
             fill
             className="object-contain"
-            priority
+            priority  
           />
         </div>
       </div>
