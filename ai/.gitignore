@@ -15,3 +15,9 @@ htmlcov/
 # Local files
 ai.db
 *.png
+
+# OCR Data
+data/ocr/images/
+optimized_models/
+reports/
+temp_test_images/
