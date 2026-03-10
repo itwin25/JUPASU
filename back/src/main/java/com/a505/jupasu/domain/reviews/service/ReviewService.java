@@ -3,6 +3,7 @@ package com.a505.jupasu.domain.reviews.service;
 
 import com.a505.jupasu.domain.reviews.dto.ReviewCreateRequest;
 import com.a505.jupasu.domain.reviews.dto.ReviewResponse;
+import com.a505.jupasu.domain.reviews.dto.ReviewUpdateRequest;
 import com.a505.jupasu.domain.reviews.entity.Review;
 import com.a505.jupasu.domain.reviews.repository.ReviewRepository;
 import com.a505.jupasu.domain.user.entity.User;
@@ -27,6 +28,9 @@ public class ReviewService {
     private final WineRepository wineRepository;
     private final UserRepository userRepository;
 
+    /**
+     * 와인별 리뷰 조회
+     */
     @Transactional(readOnly = true)
     public List<ReviewResponse> getWineReviews(Long wineId){
         if(!wineRepository.existsById(wineId)){
@@ -38,6 +42,9 @@ public class ReviewService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 리뷰 등록
+     */
     public Long createReview (Long userId, Long wineId, ReviewCreateRequest request){
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
@@ -59,4 +66,22 @@ public class ReviewService {
 
         return reviewRepository.save(review).getId();
     }
+
+    /**
+     * 리뷰 수정
+     */
+    public void updateReview (Long userId, Long wineId, Long reviewId, ReviewUpdateRequest request) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new CustomException(ErrorCode.REVIEW_NOT_FOUND));
+
+        if(!review.getWine().getId().equals(wineId)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        if(!review.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
+        review.updateReview(request.getRating(), request.getContent());
+    }
+
 }
