@@ -91,7 +91,7 @@ export default function Step3WineReview({ onNext, onPrev }: Step3WineReviewProps
             ))
           ) : (
             <div className="text-center py-10 text-text-main/30 font-bold">
-              검색 결과가 없어요 😥
+              검색 결과가 없어요.
             </div>
           )}
         </div>
