@@ -46,4 +46,14 @@ public class ReviewController {
         reviewService.updateReview(1L, wineId, reviewId, request);
         return ApiResponse.success("리뷰 수정 성공");
     }
+
+    @DeleteMapping("/{wine_id}/review/{review_id}")
+    public ApiResponse<Void> deleteReview(
+            //TODO: 로그인한 사용자 확인
+            @PathVariable("wine_id") Long wineId,
+            @PathVariable("review_id") Long reviewId
+    ) {
+        reviewService.deleteReview(1L, wineId, reviewId);
+        return ApiResponse.success("리뷰 삭제 성공");
+    }
 }
