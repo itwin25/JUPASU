@@ -84,4 +84,20 @@ public class ReviewService {
         review.updateReview(request.getRating(), request.getContent());
     }
 
+    /**
+     * 리뷰 삭제
+     */
+    public void deleteReview (Long userId, Long wineId, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new CustomException(ErrorCode.REVIEW_NOT_FOUND));
+
+        if(!review.getWine().getId().equals(wineId)) {
+            throw new CustomException(ErrorCode.INVALID_REQUEST);
+        }
+        if(!review.getUser().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+        reviewRepository.delete(review);
+    }
+
 }
