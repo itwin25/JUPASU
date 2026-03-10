@@ -62,14 +62,4 @@ def get_settings():
             os.environ["LANGCHAIN_API_KEY"] = settings.LANGSMITH_API_KEY
         os.environ["LANGCHAIN_PROJECT"] = settings.LANGSMITH_PROJECT
         
-        # 디버깅용 로그 출력
-        print(f"\n[DEBUG] LangSmith Tracing: {os.environ.get('LANGCHAIN_TRACING_V2')}")
-        print(f"[DEBUG] LangSmith Project: {os.environ.get('LANGCHAIN_PROJECT')}")
-        if not os.environ.get("LANGCHAIN_API_KEY"):
-            print("[DEBUG] WARNING: LangSmith API Key is MISSING!")
-        else:
-            # 보안을 위해 키는 앞 4자리만 출력
-            key = os.environ.get("LANGCHAIN_API_KEY")
-            print(f"[DEBUG] LangSmith API Key is set: {key[:4]}...")
-        
     return settings
