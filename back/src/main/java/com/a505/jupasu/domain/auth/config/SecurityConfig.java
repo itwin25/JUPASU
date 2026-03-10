@@ -21,17 +21,18 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // CSRF/세션 비활성화
-            .csrf(AbstractHttpConfigurer::disable)
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // 기본 폼 로그인 / HTTP Basic 비활성화
-            .formLogin(AbstractHttpConfigurer::disable)
-            .httpBasic(AbstractHttpConfigurer::disable)
-            .authorizeHttpRequests(auth -> auth
-                // 회원가입·인증 엔드포인트는 인증 없이 허용
-                .requestMatchers("/api/auth/**").permitAll()
-                .anyRequest().authenticated()
-            );
+                // CSRF/세션 비활성화
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 기본 폼 로그인 / HTTP Basic 비활성화
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        // 회원가입·인증 엔드포인트는 인증 없이 허용
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/users/**").permitAll()
+                        .anyRequest().authenticated()
+                );
 
         return http.build();
     }

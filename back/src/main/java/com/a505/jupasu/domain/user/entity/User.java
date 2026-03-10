@@ -137,5 +137,28 @@ public class User {
         this.nickname = nickname;
         this.character = character;
     }
+
+    /**
+     * 사용자의 닉네임 변경
+     * @param nickname 변경할 새 닉네임
+     */
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    /**
+     * 사용자의 캐릭터 키값을 변경
+     * @param character 변경할 캐릭터 식별 문자열
+     */
+    public void updateCharacter(String character) {
+        this.character = character;
+    }
+
+    /**
+     * 비밀번호를 새로운 암호화된 값으로 변경
+     */
+    public void updatePassword(String encodedPassword) {
+        this.passwordHash = encodedPassword;
+    }
 }
 
