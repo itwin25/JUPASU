@@ -20,8 +20,8 @@ public class ReviewResponse {
     public static ReviewResponse from(Review review){
         return ReviewResponse.builder()
                 .reviewId(review.getId())
-//                .userId(review.getUser().getId())
-//                .nickname(review.getUser().getNickname())
+                .userId(review.getUser().getId())
+                .nickname(review.getUser().getNickname())
                 .rating(review.getRating())
                 .content(review.getContent())
                 .createdAt(review.getCreatedAt())

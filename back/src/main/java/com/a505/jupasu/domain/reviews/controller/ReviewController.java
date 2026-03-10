@@ -1,14 +1,13 @@
 package com.a505.jupasu.domain.reviews.controller;
 
 
+import com.a505.jupasu.domain.reviews.dto.ReviewCreateRequest;
 import com.a505.jupasu.domain.reviews.dto.ReviewResponse;
 import com.a505.jupasu.domain.reviews.service.ReviewService;
 import com.a505.jupasu.global.common.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -25,5 +24,14 @@ public class ReviewController {
             @PathVariable("wine_id") Long wineId
     ) {
         return ApiResponse.success("와인 리뷰 조회 성공", reviewService.getWineReviews(wineId));
+    }
+
+    @PostMapping("/{wine_id}/review")
+    public ApiResponse<Long> createReview(
+            //TODO: 로그인 한 사용자 확인
+            @PathVariable("wine_id") Long wineId,
+            @Valid @RequestBody ReviewCreateRequest request
+    ) {
+        return ApiResponse.success("리뷰 생성 성공", reviewService.createReview(1L, wineId, request));
     }
 }
