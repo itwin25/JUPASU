@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Header from '@/components/common/header/Header';
 import PageTitle from '@/components/common/page-title/PageTitle';
 import SectionTitle from '@/components/common/section-title/SectionTitle';
@@ -9,6 +10,18 @@ import SituationSelector from '@/features/onboarding/components/SituationSelecto
 import Button from '@/components/ui/button/Button';
 
 export default function TasteOnboardingPage() {
+  const [tastes, setTastes] = useState<Record<string, number>>({
+    sweet: 5,
+    acid: 5,
+    body: 5,
+    tannin: 5,
+    aroma: 5,
+  });
+
+  const handleTasteChange = (key: string, value: number) => {
+    setTastes((prev) => ({ ...prev, [key]: value }));
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <Header title="취향 분석" />
@@ -20,7 +33,7 @@ export default function TasteOnboardingPage() {
         
         <section>
           <SectionTitle title="선호하는 맛" />
-          <TasteSliderGroup />
+          <TasteSliderGroup tastes={tastes} onChange={handleTasteChange} />
         </section>
 
         <section>
