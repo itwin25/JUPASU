@@ -36,7 +36,7 @@ public class WineScrapService {
         if (existingScrap.isPresent()) {
             wineScrapRepository.delete(existingScrap.get());
             return ScrapToggleResponse.builder()
-                    .isScarpped(false)
+                    .isScrapped(false)
                     .build();
         } else {
             WineScrap newScrap = WineScrap.builder()
@@ -46,7 +46,7 @@ public class WineScrapService {
             wineScrapRepository.save(newScrap);
 
             return ScrapToggleResponse.builder()
-                    .isScarpped(true)
+                    .isScrapped(true)
                     .build();
         }
     }
