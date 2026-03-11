@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        gitLabConnection('A505')
+    }
+
     environment {
         // 운영 서버 정보 (본인의 환경에 맞게 수정)
         PROD_SERVER_IP = "13.124.55.70"
@@ -81,7 +85,11 @@ pipeline {
             echo "작업 종료. 워크스페이스를 정리합니다."
             cleanWs()
         }
+        success {
+            updateGitlabCommitStatus name: 'Jenkins/Build', state: 'success'
+        }
         failure {
+            updateGitlabCommitStatus name: 'Jenkins/Build', state: 'failed'
             echo "빌드 또는 배포에 실패했습니다. 로그를 확인하세요."
         }
     }
