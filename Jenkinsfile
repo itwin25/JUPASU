@@ -25,11 +25,13 @@ pipeline {
 
         // 테스트용
         stage('Check Environment'){
-            sh 'printenv' 
-        
-            // 특정 변수 개별 확인
-            echo "BRANCH_NAME: ${env.BRANCH_NAME}"
-            echo "GIT_BRANCH: ${env.GIT_BRANCH}"
+            steps{
+                sh 'printenv' 
+            
+                // 특정 변수 개별 확인
+                echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+                echo "GIT_BRANCH: ${env.GIT_BRANCH}"
+            }
         }
 
         stage('Build & Test') {
