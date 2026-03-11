@@ -17,6 +17,7 @@ pipeline {
     stages {
         stage('Source Checkout') {
             steps {
+                updateGitlabCommitStatus name: 'Jenkins/Build', state: 'running'
                 // GitLab Branch Source 사용 시 scm 변수로 자동 체크아웃
                 checkout scm
             }
