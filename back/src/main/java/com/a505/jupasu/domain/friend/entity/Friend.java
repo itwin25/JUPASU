@@ -70,4 +70,12 @@ public class Friend {
     public void reject() {
         this.status = FriendStatus.REJECTED;
     }
+
+    /**
+     * 본인을 제외한 나머지 친구 유저를 반환
+     * @param me 현재 로그인한 사용자
+     */
+    public User getOtherUser(User me) {
+        return this.requester.getId().equals(me.getId()) ? this.receiver : this.requester;
+    }
 }

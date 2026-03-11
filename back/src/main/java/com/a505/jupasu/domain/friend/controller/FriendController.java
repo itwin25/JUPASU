@@ -2,6 +2,7 @@ package com.a505.jupasu.domain.friend.controller;
 
 import com.a505.jupasu.domain.friend.dto.request.FriendInviteRequest;
 import com.a505.jupasu.domain.friend.dto.request.FriendResponseRequest;
+import com.a505.jupasu.domain.friend.dto.response.FriendListResponse;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.friend.service.FriendService;
 import com.a505.jupasu.domain.user.entity.User;
@@ -11,6 +12,8 @@ import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/friends")
@@ -52,4 +55,20 @@ public class FriendController {
         String message = request.getStatus() == FriendStatus.ACCEPTED ? "친구 신청을 수락했습니다." : "친구 신청을 거절했습니다.";
         return ApiResponse.success(message);
     }
+
+    /**
+     * 정식 친구 목록 조회
+     *
+     * @return 친구 목록 데이터를 포함한 ApiResponse
+     */
+    @GetMapping
+    public ApiResponse<List<FriendListResponse>> getFriendList() {
+        User loginUser = userRepository.findById(2L)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        List<FriendListResponse> friendList = friendService.getFriendList(loginUser);
+
+        return ApiResponse.success(friendList);
+    }
+
 }
