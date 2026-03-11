@@ -3,9 +3,9 @@
 import { useState, useMemo } from 'react';
 import { Search, SlidersHorizontal, X, Star } from 'lucide-react';
 import Chip from '@/components/ui/chip/Chip';
-import Image from 'next/image';
+import Link from 'next/link';
 import { useModal } from '@/hooks/useModal';
-import Button from '@/components/ui/button/Button';
+import { ROUTE_PATH } from '@/constants/route-path';
 import { cn } from '@/lib/utils';
 
 const WINE_TYPES = ['RED', 'WHITE', 'ROSE', 'DESSERT', 'FORTIFIED'];
@@ -112,7 +112,11 @@ export default function SearchPage() {
       <main className="flex-1 px-4 grid grid-cols-2 gap-3 overflow-y-auto no-scrollbar pt-1 items-start content-start">
         {filteredWines.length > 0 ? (
           filteredWines.map((wine) => (
-            <div key={wine.id} className="bg-white rounded-[20px] border border-primary-100 shadow-sm flex flex-col overflow-hidden">
+            <Link 
+              key={wine.id} 
+              href={ROUTE_PATH.WINE_DETAIL(wine.id)}
+              className="bg-white rounded-[20px] border border-primary-100 shadow-sm flex flex-col overflow-hidden"
+            >
               <div className="w-full aspect-[4/5] bg-gray-100 relative">
                  <div className="absolute top-2 left-2 bg-[#B36262] text-white text-[10px] font-black px-2 py-1 rounded-full z-10">
                     {wine.match}% MATCH
@@ -129,7 +133,7 @@ export default function SearchPage() {
                     <span className="text-xs font-black text-text-main leading-none mt-0.5">₩{wine.price}</span>
                  </div>
               </div>
-            </div>
+            </Link>
           ))
         ) : (
           <div className="col-span-2 py-20 text-center">
