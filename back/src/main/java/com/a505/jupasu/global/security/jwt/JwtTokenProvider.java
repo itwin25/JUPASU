@@ -35,6 +35,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(email)
+                .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -47,10 +48,29 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(email)
+                .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
                 .compact();
+    }
+
+    public Claims getClaims(String token) {
+        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+    }
+
+    public String getJtiBaseOnToken(String token) {
+        return getClaims(token).getId();
+    }
+
+    public String getSubjectBaseOnToken(String token) {
+        return getClaims(token).getSubject();
+    }
+
+    public long getRemainingTime(String token) {
+        Date expiration = getClaims(token).getExpiration();
+        long now = new Date().getTime();
+        return (expiration.getTime() - now);
     }
 
     public boolean validateToken(String token) {
