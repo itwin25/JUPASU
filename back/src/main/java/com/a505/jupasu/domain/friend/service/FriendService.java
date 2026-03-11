@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.friend.service;
 
 import com.a505.jupasu.domain.friend.dto.request.FriendResponseRequest;
+import com.a505.jupasu.domain.friend.dto.response.FriendListResponse;
 import com.a505.jupasu.domain.friend.entity.Friend;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.friend.repository.FriendRepository;
@@ -12,8 +13,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
- * 친구 요청과 관련된 비즈니스 로직을 처리하는 서비스 클래스
+ * 친구와 관련된 비즈니스 로직을 처리하는 서비스 클래스
  */
 @Service
 @RequiredArgsConstructor
@@ -57,6 +61,15 @@ public class FriendService {
         friendRepository.save(friend);
     }
 
+    /**
+     * 친구 요청에 대해 수락 또는 거절 응답을 처리
+     *
+     * @param loginUser 현재 로그인한 사용자
+     * @param request   친구 요청 ID와 응답 상태를 담은 DTO
+     * @throws CustomException 해당 친구 요청을 찾을 수 없는 경우 발생
+     * @throws CustomException 수신자가 본인이 아닌 경우(권한 없음) 발생
+     * @throws CustomException ACCEPTED, REJECTED 외의 다른 값이 들어올 경우 발생
+     */
     @Transactional
     public void respondToFriendRequest(User loginUser, FriendResponseRequest request) {
         // 친구 요청 데이터 조회
@@ -75,5 +88,20 @@ public class FriendService {
         } else {
             throw new CustomException(ErrorCode.INVALID_FRIEND_STATUS);
         }
+    }
+
+    /**
+     * 친구 관계에서 본인을 제외한 상대방 유저 객체를 반환
+     * * @param me 현재 로그인한 사용자 엔티티
+     * @return 관계에 참여한 다른 사용자(상대방) 엔티티
+     */
+    public List<FriendListResponse> getFriendList(User loginUser) {
+        List<Friend> acceptedFriends = friendRepository.findAllByRequesterAndStatusOrReceiverAndStatus(
+                loginUser, FriendStatus.ACCEPTED, loginUser, FriendStatus.ACCEPTED
+        );
+
+        return acceptedFriends.stream()
+                .map(friend -> new FriendListResponse(friend, loginUser))
+                .collect(Collectors.toList());
     }
 }
