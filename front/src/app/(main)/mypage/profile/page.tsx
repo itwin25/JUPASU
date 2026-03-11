@@ -6,6 +6,7 @@ import { ChevronLeft, Camera, LogOut, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
+import { cn } from '@/utils/cn';
 
 const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
 
