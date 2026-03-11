@@ -1,0 +1,100 @@
+services:
+  # Database: PostgreSQL 18 with pgvector extension
+  db:
+    image: pgvector/pgvector:pg18
+    container_name: db-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+
+  # Cache & Session: Redis
+  redis:
+    image: redis:7.4-alpine
+    container_name: cache-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - backend-network
+
+  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    container_name: ai-fastapi
+    restart: always
+    networks:
+      - backend-network
+    depends_on:
+      - db
+    ports:
+      - 8000:8000
+
+  # Backend: Spring Boot 4.0 (Java 21)
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: backend-spring
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      AI_SERVICE_URL: http://ai:8000
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ai:
+        condition: service_started
+    networks:
+      - backend-network
+      - frontend-network
+
+  # Frontend: Next.js (React 19)
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: front-nextjs
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - frontend-network
+
+networks:
+  frontend-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
