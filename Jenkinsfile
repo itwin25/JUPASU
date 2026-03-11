@@ -23,16 +23,16 @@ pipeline {
             }
         }
 
-        // 테스트용
-        stage('Check Environment'){
-            steps{
-                sh 'printenv' 
+        // // 테스트용
+        // stage('Check Environment'){
+        //     steps{
+        //         sh 'printenv' 
             
-                // 특정 변수 개별 확인
-                echo "BRANCH_NAME: ${env.BRANCH_NAME}"
-                echo "GIT_BRANCH: ${env.GIT_BRANCH}"
-            }
-        }
+        //         // 특정 변수 개별 확인
+        //         echo "BRANCH_NAME: ${env.BRANCH_NAME}"
+        //         echo "GIT_BRANCH: ${env.GIT_BRANCH}"
+        //     }
+        // }
 
         stage('Build & Test') {
             parallel {
@@ -57,7 +57,9 @@ pipeline {
 
         // [dev 브랜치 전용] 자동 빌드 및 이미지 생성 검증
         stage('Dev: Build Images') {
-            when { branch 'develop' }
+            when {
+                expression { env.GIT_BRANCH == 'origin/develop' }
+            }
             steps {
                 echo "dev 브랜치: 개발 서버 배포를 시작합니다."
                 sshagent(credentials: ["${SSH_CRED_ID}"]) {
@@ -75,7 +77,9 @@ pipeline {
 
         // [master 브랜치 전용] 자동 배포 (운영 서버 접속 및 실행)
         stage('Master: Production Deploy') {
-            when { branch 'master' }
+            when {
+                expression { env.GIT_BRANCH == 'origin/master' }
+            }
             steps {
                 echo "master 브랜치: 운영 서버 배포를 시작합니다."
                 sshagent(credentials: ["${SSH_CRED_ID}"]) {
