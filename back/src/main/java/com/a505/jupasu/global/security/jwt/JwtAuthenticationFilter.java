@@ -1,6 +1,7 @@
 package com.a505.jupasu.global.security.jwt;
 
 import com.a505.jupasu.global.redis.RedisService;
+import com.a505.jupasu.global.security.auth.CustomUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import com.a505.jupasu.domain.auth.util.AuthUtils;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,6 +22,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisService redisService;
+    private final CustomUserDetailsService customUserDetailsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -39,8 +42,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 2. 인증 객체 저장
             String email = jwtTokenProvider.getSubjectBaseOnToken(token);
+
+            UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+
             UsernamePasswordAuthenticationToken authentication = 
-                new UsernamePasswordAuthenticationToken(email, null, null); 
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
