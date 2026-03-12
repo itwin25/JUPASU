@@ -102,7 +102,7 @@ self.onmessage = async (e: MessageEvent) => {
 
       ocrService = await PaddleOcrService.createInstance({
         ort: ortInstance,
-        detection: { modelBuffer: detModel, limitSideLen: 1280 },
+        detection: { modelBuffer: detModel, limitSideLen: 960 },
         recognition: { modelBuffer: recModel, charactersDictionary: dict },
       });
 

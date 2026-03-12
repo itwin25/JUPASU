@@ -38,9 +38,9 @@ export const useOCR = () => {
     try {
       // 1. 모델 데이터 로드 (캐시 우선)
       const modelPaths = {
-        det: '/models/det_server_v5_web_final.onnx',
-        rec: '/models/rec_server_v5_web_final.onnx',
-        dict: '/models/dict.txt',
+        det: '/models/optimized_final/PP-OCRv5_mobile_det_optimized.onnx',
+        rec: '/models/optimized_final/hfonnx_latin_PP-OCRv5_mobile_rec_optimized.onnx',
+        dict: '/models/optimized_final/dicts/latin_dict.txt',
       };
 
       const loadFile = async (key: string, path: string, isText = false) => {
@@ -54,9 +54,9 @@ export const useOCR = () => {
       };
 
       const [detModel, recModel, dictText] = await Promise.all([
-        loadFile('det_model_v14_blob', modelPaths.det) as Promise<ArrayBuffer>,
-        loadFile('rec_model_v14_blob', modelPaths.rec) as Promise<ArrayBuffer>,
-        loadFile('dict_file_v14', modelPaths.dict, true) as Promise<string>,
+        loadFile('det_model_latin_v15_mobile', modelPaths.det) as Promise<ArrayBuffer>,
+        loadFile('rec_model_latin_v15_mobile', modelPaths.rec) as Promise<ArrayBuffer>,
+        loadFile('dict_file_latin_v16_mobile', modelPaths.dict, true) as Promise<string>,
       ]);
 
       // 2. Worker 생성 및 초기화
@@ -186,20 +186,7 @@ export const useOCR = () => {
             score = Array.isArray(item[1]) ? item[1][1] : 0;
           }
 
-          // ROT-1 복호화
-          let decodedText = '';
-          if (text) {
-            for (let i = 0; i < text.length; i++) {
-              const charCode = text.charCodeAt(i);
-              if (charCode > 65 && charCode <= 90) decodedText += String.fromCharCode(charCode - 1);
-              else if (charCode === 65) decodedText += 'Z';
-              else if (charCode > 97 && charCode <= 122)
-                decodedText += String.fromCharCode(charCode - 1);
-              else if (charCode === 97) decodedText += 'z';
-              else decodedText += text[i];
-            }
-          }
-          return { text: decodedText, score, box };
+          return { text, score, box };
         });
 
         console.log(
