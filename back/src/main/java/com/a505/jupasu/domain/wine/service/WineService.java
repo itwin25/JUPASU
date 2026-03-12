@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.wine.service;
 
 import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
+import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
@@ -8,6 +9,8 @@ import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,17 +25,10 @@ public class WineService {
     private final WineRepository wineRepository;
     private final WineFoodPairingRepository wineFoodPairingRepository;
 
-    public List<WineSearchResponse> searchWines(String keyword) {
-        List<Wine> wines;
-        if (keyword == null || keyword.trim().isEmpty()) {
-            wines = wineRepository.findAll(); // 추후 페이징 처리 권장
-        } else {
-            wines = wineRepository.findByNameKrContainingOrNameEnContainingIgnoreCase(keyword, keyword);
-        }
-
-        return wines.stream()
-                .map(WineSearchResponse::from)
-                .collect(Collectors.toList());
+    public Page<WineSearchResponse> searchWines(WineSearchCondition condition, Pageable pageable) {
+        Page<Wine> wines = wineRepository.searchWines(condition, pageable);
+        // Entity Page -> DTO Page 로 맵핑 (map 메서드가 아주 유용합니다)
+        return wines.map(WineSearchResponse::from);
     }
 
     public WineDetailResponse getWineDetail(Long userId, Long wineId) {

@@ -1,10 +1,15 @@
 package com.a505.jupasu.domain.wine.controller;
 
 import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
+import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
 import com.a505.jupasu.domain.wine.service.WineService;
 import com.a505.jupasu.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,12 +29,12 @@ public class WineController {
      *  추후 필터링 -> elasticSearch 고도화 예정
      */
     @GetMapping
-    public ApiResponse<List<WineSearchResponse>> searchWines(
+    public ApiResponse<Page<WineSearchResponse>> searchWines(
             //TODO: 로그인한 사용자 확인 (Authentication 추가)
-            @RequestParam(required = false) String keyword
+            @ModelAttribute WineSearchCondition condition,
+            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-
-        List<WineSearchResponse> response = wineService.searchWines(keyword);
+        Page<WineSearchResponse> response = wineService.searchWines(condition, pageable);
         return ApiResponse.success("와인 검색 완료", response);
     }
 

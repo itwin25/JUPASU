@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface WineRepository extends JpaRepository<Wine, Long> {
+public interface WineRepository extends JpaRepository<Wine, Long>, WineRepositoryCustom {
     // 키워드가 포함된 와인 검색 (임시 구현)
     List<Wine> findByNameKrContainingOrNameEnContainingIgnoreCase(String nameKr, String nameEn);
 }
