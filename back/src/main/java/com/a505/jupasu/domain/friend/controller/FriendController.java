@@ -35,7 +35,7 @@ public class FriendController {
         User requester = userRepository.findById(5L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        friendService.inviteFriend(requester, request.getReceiverNickname());
+        friendService.inviteFriend(requester, request.getReceiverId());
 
         return ApiResponse.success("친구 요청을 성공적으로 보냈습니다.");
     }
@@ -64,7 +64,7 @@ public class FriendController {
      */
     @GetMapping
     public ApiResponse<List<FriendListResponse>> getFriendList() {
-        User loginUser = userRepository.findById(1L)
+        User loginUser = userRepository.findById(3L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         List<FriendListResponse> friendList = friendService.getFriendList(loginUser);

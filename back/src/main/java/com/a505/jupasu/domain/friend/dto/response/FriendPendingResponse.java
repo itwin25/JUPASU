@@ -11,14 +11,17 @@ import java.time.LocalDateTime;
  */
 @Getter
 public class FriendPendingResponse {
-    private Long friendId;
+    private Long requestId;
+    private Long requesterId;
     private String nickname;
     private String character;
     private LocalDateTime createdAt;
 
     public FriendPendingResponse(Friend friend) {
         User requester = friend.getRequester();
-        this.friendId = friend.getRequestId();
+
+        this.requestId = friend.getRequestId();
+        this.requesterId = requester.getId();
         this.nickname = requester.getNickname();
         this.character = requester.getCharacter();
         this.createdAt = friend.getCreatedAt();
