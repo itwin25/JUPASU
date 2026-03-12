@@ -11,12 +11,13 @@ public final class AuthRedisConstants {
     private AuthRedisConstants() {
     }
 
-    public static final String CODE_PREFIX     = "auth:verify:code:";
-    public static final String ATTEMPTS_PREFIX = "auth:verify:attempts:";
-    public static final String RESEND_PREFIX   = "auth:resend:lock:";
-    public static final String VERIFIED_PREFIX = "auth:verified:email:";
-    public static final String LOCKOUT_PREFIX  = "auth:lockout:account:";
-    public static final String RT_PREFIX       = "auth:rt:";
+    public static final String CODE_PREFIX      = "code:";
+    public static final String ATTEMPTS_PREFIX  = "attempts:";
+    public static final String RESEND_PREFIX    = "resend:lock:";
+    public static final String SIGNUP_VERIFIED_PREFIX = "auth:verified:signup:";
+    public static final String PW_RESET_VERIFIED_PREFIX = "auth:verified:pw-reset:";
+    public static final String LOCKOUT_PREFIX   = "auth:lockout:account:";
+    public static final String RT_PREFIX        = "auth:rt:";
     public static final String BLACKLIST_PREFIX = "auth:blacklist:";
 
     public static final int MAX_OTP_ATTEMPTS = 5;
