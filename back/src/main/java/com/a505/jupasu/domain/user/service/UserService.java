@@ -25,29 +25,23 @@ public class UserService {
     /**
      * 현재 로그인한 사용자의 마이페이지 정보를 조회
      *
+     * @param loginUser 인증된 현재 사용자
      * @return 마이페이지 프로필 및 통계 응답 DTO
-     * @throws CustomException 사용자를 찾을 수 없는 경우 USER_NOT_FOUND 발생
      */
-    public UserMyPageResponse getMyPageInfo() {
-        // TODO: 추후 임시 데이터 교체 예정
-        Long mockUserId = 1L;
-
-        User user = userRepository.findById(mockUserId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-
-        return UserMyPageResponse.from(user);
+    public UserMyPageResponse getMyPageInfo(User loginUser) {
+        return UserMyPageResponse.from(loginUser);
     }
 
     /**
      * 사용자의 마이페이지 프로필 정보를 수정
      *
+     * @param loginUser 인증된 현재 사용자 엔티티
      * @param request 수정할 닉네임, 캐릭터, 비밀번호 정보를 담은 DTO
      * @throws CustomException 사용자를 찾을 수 없거나 중복된 닉네임인 경우 발생
      */
     @Transactional
-    public void updateMyPageInfo(UserUpdateRequest request) {
-        // TODO: 추후 변경 예정
-        User user = userRepository.findById(1L)
+    public void updateMyPageInfo(User loginUser, UserUpdateRequest request) {
+        User user = userRepository.findById(loginUser.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // 닉네임이 변경된 경우에만 중복 검증 및 업데이트 수행
@@ -61,10 +55,6 @@ public class UserService {
             user.updateCharacter(request.getCharacter());
         }
 
-        System.out.println("입력된 비번: " + request.getCurrentPassword());
-        System.out.println("DB에서 온 비번: " + user.getPasswordHash());
-        System.out.println(passwordEncoder.encode(request.getCurrentPassword()));
-        System.out.println("일치 여부: " + passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash()));
         // 비밀번호 업데이트
         if(request.getNewPassword() != null) {
             updatePassword(user, request.getCurrentPassword(), request.getNewPassword(), request.getConfirmNewPassword());
