@@ -50,7 +50,7 @@ export default function ScanPage() {
             </div>
 
             <div className="flex gap-3 mb-12">
-              <Button onClick={startScan} size="full" className="flex-1 gap-3 text-lg h-16">
+              <Button onClick={startScan} size="full" className="flex-1 gap-3 text-[18px]">
                 <Camera size={24} /> 카메라로 스캔
               </Button>
               <button className="w-16 h-16 bg-white border border-primary-100 rounded-3xl flex items-center justify-center text-text-main/30 hover:bg-gray-50 transition-colors">
@@ -104,7 +104,7 @@ export default function ScanPage() {
               <Input label="생산 연도 (Vintage)" defaultValue="2020" />
             </div>
 
-            <Button onClick={() => setStatus('result')} size="full" className="text-lg h-16 shadow-lg">
+            <Button onClick={() => setStatus('result')} size="full" className="text-lg shadow-lg">
               이 정보로 검색하기
             </Button>
           </div>
