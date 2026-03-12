@@ -45,7 +45,9 @@ public enum ErrorCode {
     INVALID_FRIEND_STATUS(HttpStatus.BAD_REQUEST, "잘못된 친구 상태 변경 요청입니다. 수락 또는 거절만 가능합니다."),
 
     // 인증 관련 예외
-    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+    EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "만료된 토큰입니다."),
+    REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 만료되었습니다. 다시 로그인해주세요.");
 
     private final HttpStatus status;
     private final String message;

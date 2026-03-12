@@ -36,6 +36,22 @@ public class AuthController {
     }
 
     /**
+     * POST /api/auth/reissue
+     * 토큰 재발급 (Refresh Token Rotation)
+     */
+    @PostMapping("/reissue")
+    public ApiResponse<SignInResponse> reissue(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String refreshToken = AuthUtils.extractToken(authHeader);
+
+        if (refreshToken == null) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        SignInResponse response = authService.reissue(refreshToken);
+        return ApiResponse.success("토큰이 재발급되었습니다.", response);
+    }
+
+    /**
      * POST /api/auth/check-nickname
      * 닉네임 중복 확인
      */
