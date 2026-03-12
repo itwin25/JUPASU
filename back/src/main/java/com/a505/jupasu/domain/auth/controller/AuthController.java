@@ -6,16 +6,17 @@ import com.a505.jupasu.domain.auth.dto.request.SignupRequest;
 import com.a505.jupasu.domain.auth.dto.request.VerifyOtpRequest;
 import com.a505.jupasu.domain.auth.dto.response.SignInResponse;
 import com.a505.jupasu.domain.auth.service.AuthService;
+import com.a505.jupasu.global.exception.CustomException;
+import com.a505.jupasu.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.a505.jupasu.global.common.ApiResponse;
 import com.a505.jupasu.domain.auth.dto.request.CheckEmailRequest;
 import com.a505.jupasu.domain.auth.dto.request.CheckNicknameRequest;
-import java.util.Map;
+import com.a505.jupasu.domain.auth.util.AuthUtils;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -85,8 +86,26 @@ public class AuthController {
      */
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest request) {
-        authService.signup(request);
+    public ApiResponse<Void> signUp(@Valid @RequestBody SignupRequest request) {
+        authService.signUp(request);
         return ApiResponse.created("회원가입이 완료되었습니다. 로그인해주세요.", null);
+    }
+
+    /**
+     * POST /api/auth/signout
+     * 로그아웃 (Redis에서 Refresh Token 삭제 및 Access Token 블랙리스트 등록)
+     */
+    @PostMapping("/signout")
+    public ApiResponse<Void> signOut(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String accessToken = AuthUtils.extractToken(authHeader);
+        
+        // 가드 클로즈 - 토큰이 없거나 잘못된 형식인 경우
+        if (accessToken == null) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        authService.signOut(accessToken);
+        
+        return ApiResponse.success("로그아웃 되었습니다.");
     }
 }

@@ -13,12 +13,21 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 public class FriendListResponse {
+    private Long friendId;
     private String nickname;
     private String character;
     private LocalDateTime friendSince;
 
+    /**
+     * 엔티티를 DTO로 변환하는 생성자
+     *
+     * @param friend 친구 관계 엔티티
+     * @param me     현재 로그인한 사용자 엔티티 (상대방 판별용)
+     */
     public FriendListResponse(Friend friend, User me) {
         User other = friend.getOtherUser(me);
+
+        this.friendId = friend.getRequestId();
         this.nickname = other.getNickname();
         this.character = other.getCharacter();
         this.friendSince = friend.getCreatedAt();

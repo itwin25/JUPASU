@@ -3,6 +3,7 @@ package com.a505.jupasu.domain.friend.controller;
 import com.a505.jupasu.domain.friend.dto.request.FriendInviteRequest;
 import com.a505.jupasu.domain.friend.dto.request.FriendResponseRequest;
 import com.a505.jupasu.domain.friend.dto.response.FriendListResponse;
+import com.a505.jupasu.domain.friend.dto.response.FriendPendingResponse;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.friend.service.FriendService;
 import com.a505.jupasu.domain.user.entity.User;
@@ -31,7 +32,7 @@ public class FriendController {
      */
     @PostMapping("/invite")
     public ApiResponse<Void> inviteFriend(@RequestBody FriendInviteRequest request) {
-        User requester = userRepository.findById(1L)
+        User requester = userRepository.findById(5L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         friendService.inviteFriend(requester, request.getReceiverNickname());
@@ -47,7 +48,7 @@ public class FriendController {
      */
     @PatchMapping("/accept")
     public ApiResponse<Void> respondFriendRequest(@RequestBody FriendResponseRequest request) {
-        User loginUser = userRepository.findById(2L)
+        User loginUser = userRepository.findById(1L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         friendService.respondToFriendRequest(loginUser, request);
@@ -63,7 +64,7 @@ public class FriendController {
      */
     @GetMapping
     public ApiResponse<List<FriendListResponse>> getFriendList() {
-        User loginUser = userRepository.findById(2L)
+        User loginUser = userRepository.findById(1L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         List<FriendListResponse> friendList = friendService.getFriendList(loginUser);
@@ -71,4 +72,32 @@ public class FriendController {
         return ApiResponse.success(friendList);
     }
 
+    /**
+     * 받은 친구 요청 목록 조회
+     *
+     * @return 요청 목록 데이터를 포함한 ApiResponse
+     */
+    @GetMapping("/pending")
+    public ApiResponse<List<FriendPendingResponse>> getPendingRequests() {
+        User loginUser = userRepository.findById(1L)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return ApiResponse.success(friendService.getPendingFriendList(loginUser));
+    }
+
+    /**
+     * 정식 친구를 삭제하거나 보낸 친구 신청 취소
+     *
+     * @param friendId 삭제할 관계의 ID
+     * @return 성공 메시지를 포함한 ApiResponse
+     */
+    @DeleteMapping("/{friendId}")
+    public ApiResponse<Void> deleteFriend(@PathVariable Long friendId) {
+        User loginUser = userRepository.findById(1L)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        friendService.deleteFriend(loginUser, friendId);
+
+        return ApiResponse.success("친구 관계가 삭제되었습니다.");
+    }
 }

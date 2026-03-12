@@ -30,7 +30,7 @@ public enum ErrorCode {
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 작성한 리뷰입니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
 
-    // OTP / 이메일 인증 관련
+    // OTP / 이메일 인증 관련 예외
     OTP_EXPIRED_OR_INVALID(HttpStatus.BAD_REQUEST, "인증 코드가 유효하지 않거나 만료되었습니다."),
     OTP_INVALID(HttpStatus.BAD_REQUEST, "인증 코드가 올바르지 않습니다."),
     OTP_MAX_ATTEMPTS_EXCEEDED(HttpStatus.BAD_REQUEST, "인증 시도 횟수를 초과했습니다. 다시 회원가입을 시도해주세요."),
@@ -42,7 +42,11 @@ public enum ErrorCode {
     SELF_FRIEND_REQUEST(HttpStatus.BAD_REQUEST, "친구 요청은 타인에게만 가능합니다."),
     ALREADY_FRIEND_REQUESTED(HttpStatus.BAD_REQUEST, "이미 친구 요청을 보낸 유저 입니다."),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청이 존재하지 않습니다."),
-    INVALID_FRIEND_STATUS(HttpStatus.BAD_REQUEST, "잘못된 친구 상태 변경 요청입니다. 수락 또는 거절만 가능합니다.");
+    INVALID_FRIEND_STATUS(HttpStatus.BAD_REQUEST, "잘못된 친구 상태 변경 요청입니다. 수락 또는 거절만 가능합니다."),
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 친구가 존재하지 않습니다."),
+
+    // 인증 관련 예외
+    INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
 
     private final HttpStatus status;
     private final String message;
