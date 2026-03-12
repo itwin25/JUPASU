@@ -23,6 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.12-slim
 
 WORKDIR /app
+RUN mkdir -p /app/logs
 
 # 빌드 스테이지에서 생성된 가상환경(.venv) 복사
 COPY --from=builder /app/.venv /app/.venv
