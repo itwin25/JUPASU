@@ -3,17 +3,26 @@ package com.a505.jupasu.domain.user.service;
 import com.a505.jupasu.domain.friend.entity.Friend;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.friend.repository.FriendRepository;
+import com.a505.jupasu.domain.scrap.repository.WineScrapRepository;
+import com.a505.jupasu.domain.reviews.repository.ReviewRepository;
+
 import com.a505.jupasu.domain.user.dto.request.UserUpdateRequest;
+import com.a505.jupasu.domain.user.dto.request.WithdrawRequest;
 import com.a505.jupasu.domain.user.dto.response.UserMyPageResponse;
 import com.a505.jupasu.domain.user.dto.response.UserSearchResponse;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
+import com.a505.jupasu.domain.auth.util.AuthUtils;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
+import com.a505.jupasu.global.redis.RedisService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.a505.jupasu.domain.auth.util.AuthRedisConstants.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,6 +30,7 @@ import java.util.stream.Collectors;
 /**
  * User 도메인의 비즈니스 로직을 처리하는 서비스 클래스
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -28,7 +38,11 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
+    private final ReviewRepository reviewRepository;
+    private final WineScrapRepository wineScrapRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final RedisService redisService;
+    private final AuthUtils authUtils;
 
     /**
      * 현재 로그인한 사용자의 마이페이지 정보를 조회
@@ -161,5 +175,45 @@ public class UserService {
                 .findFirst()
                 .map(Friend::getStatus) // PENDING 또는 ACCEPTED
                 .orElse(FriendStatus.NONE); // 관계 없음
+    }
+
+    /**
+     * 회원 탈퇴
+     * 유저와 연관된 모든 데이터(친구, 리뷰, 스크랩)를 삭제하고
+     * 보안 토큰 - RT 삭제, AT 블랙리스트 등록
+     *
+     * @param loginUser   인증된 현재 사용자
+     * @param accessToken 현재 사용 중인 Access Token (블랙리스트 등록용)
+     * @param request     비밀번호 확인 정보를 담은 DTO
+     */
+    @Transactional
+    public void withdraw(User loginUser, String accessToken, WithdrawRequest request) {
+        User user = userRepository.findById(loginUser.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 비밀번호 검증
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+        }
+
+        // 1. 연관 데이터 삭제
+        wineScrapRepository.deleteByUser(user);
+        friendRepository.deleteByRequesterOrReceiver(user, user);
+        reviewRepository.deleteByUser(user);
+
+        // 2. Redis 토큰 폐기
+        // Refresh Token 삭제
+        redisService.delete(RT_PREFIX + user.getEmail());
+
+        // Access Token 블랙리스트 등록
+        AuthUtils.TokenInfo tokenInfo = authUtils.parseTokenForLogout(accessToken);
+        if (!tokenInfo.isExpired() && tokenInfo.jti() != null && tokenInfo.remainingTime() > 0) {
+            redisService.set(BLACKLIST_PREFIX + tokenInfo.jti(), "withdraw", tokenInfo.remainingTime() / 1000);
+        }
+
+        // 3. User 삭제
+        userRepository.delete(user);
+
+        log.info("회원 탈퇴 완료: id={}, email={}", user.getId(), user.getEmail());
     }
 }

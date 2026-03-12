@@ -1,13 +1,16 @@
 package com.a505.jupasu.domain.user.controller;
 
 import com.a505.jupasu.domain.user.dto.request.UserUpdateRequest;
+import com.a505.jupasu.domain.user.dto.request.WithdrawRequest;
 import com.a505.jupasu.domain.user.dto.response.UserMyPageResponse;
 import com.a505.jupasu.domain.user.dto.response.UserSearchResponse;
 import com.a505.jupasu.domain.user.service.UserService;
 import com.a505.jupasu.global.common.ApiResponse;
+import jakarta.validation.Valid;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import com.a505.jupasu.global.security.auth.LoginUserCustom;
+import com.a505.jupasu.domain.auth.util.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -70,5 +73,27 @@ public class UserController {
         List<UserSearchResponse> results = userService.searchUsers(nickname, loginUser.getUser());
 
         return  ApiResponse.success(results);
+    }
+
+    /**
+     * 회원 탈퇴 (Hard Delete)
+     *
+     * @param loginUser 인증된 현재 사용자
+     * @param authHeader Authorization 헤더 (Access Token 블랙리스트 처리용)
+     * @param request 비밀번호 확인 정보를 담은 DTO
+     * @return 성공 메시지
+     */
+    @PostMapping("/withdraw")
+    public ApiResponse<Void> withdraw(@AuthenticationPrincipal LoginUserCustom loginUser,
+                                      @RequestHeader(value = "Authorization", required = false) String authHeader,
+                                      @Valid @RequestBody WithdrawRequest request) {
+
+        String accessToken = AuthUtils.extractToken(authHeader);
+        if (accessToken == null) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        userService.withdraw(loginUser.getUser(), accessToken, request);
+        return ApiResponse.success("회원 탈퇴가 완료되었습니다.");
     }
 }
