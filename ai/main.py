@@ -14,6 +14,8 @@ from services.llm.factory import get_llm
 from services.ocr.engine import ocr_engine
 from services.sommelier.sommelier_agent import sommelier_agent
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 # --- Advanced Performance Logger Setup ---
 perf_logger = logging.getLogger("ai_performance")
 perf_logger.setLevel(logging.INFO)
@@ -67,6 +69,10 @@ class ChatResponse(BaseModel):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "agent": "Wine Sommelier Agent Active"}
+
+@app.on_event("startup")
+async def startup():
+    Instrumentator().instrument(app).expose(app)
 
 @app.post("/ai/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):

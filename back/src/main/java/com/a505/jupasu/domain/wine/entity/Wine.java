@@ -21,6 +21,10 @@ public class Wine extends BaseEntity {
 
     private String nameEn;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private WineType type;
+
     private String country;
 
     private String region;
@@ -43,7 +47,9 @@ public class Wine extends BaseEntity {
 
     private Float alcoholDegree;
 
-    private Integer averagePrice;
+    private Integer price;
+
+    private Double averageRating;
 
     @Lob
     private String description;

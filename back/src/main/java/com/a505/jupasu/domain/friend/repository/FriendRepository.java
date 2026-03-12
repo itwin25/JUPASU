@@ -4,6 +4,8 @@ import com.a505.jupasu.domain.friend.entity.Friend;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,4 +23,8 @@ public interface FriendRepository extends JpaRepository<Friend,Long> {
 
     // 특정 상태의 수신자 데이터만 조회
     List<Friend> findAllByReceiverAndStatus(User receiver, FriendStatus status);
+
+    // 특정 유저가 신청자이거나 수신자인 모든 친구 관계를 조회
+    @Query("SELECT f FROM Friend f WHERE f.requester = :user OR f.receiver = :user")
+    List<Friend> findAllByRequesterOrReceiver(@Param("user") User user);
 }

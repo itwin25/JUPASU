@@ -1,0 +1,129 @@
+services:
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitor/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+      # prod 서비스 직접 스크랩 (backend, ai)
+      - frontend-network
+      - backend-network
+      # dev 서비스 직접 스크랩 (backend-dev, ai-dev)
+      - frontend-network-dev
+      - backend-network-dev
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monitoring-grafana
+    restart: unless-stopped
+    ports:
+      - "8090:3000"
+    volumes:
+      -grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - 
+    depends_on:
+      - prometheus
+
+  # ── PostgreSQL Exporter — prod ──────────────────────────────────────────────
+  postgres-exporter-prod:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-prod
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    networks:
+      - monitoring
+      - backend-network
+
+  # ── PostgreSQL Exporter — dev ───────────────────────────────────────────────
+  postgres-exporter-dev:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter-dev
+    restart: always
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER_DEV}:${POSTGRES_PASSWORD_DEV}@db-postgres-dev:5432/${POSTGRES_DB_DEV}?sslmode=disable"
+    networks:
+      - monitoring
+      - backend-network-dev
+
+  # ── Redis Exporter — prod ───────────────────────────────────────────────────
+  redis-exporter-prod:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter-prod
+    restart: always
+    environment:
+      REDIS_ADDR: "redis://cache-redis:6379"
+    networks:
+      - monitoring
+      - backend-network
+
+  # ── Redis Exporter — dev ────────────────────────────────────────────────────
+  redis-exporter-dev:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter-dev
+    restart: always
+    environment:
+      REDIS_ADDR: "redis://cache-redis-dev:6379"
+    networks:
+      - monitoring
+      - backend-network-dev
+
+  # ── Nginx Exporter — prod ───────────────────────────────────────────────────
+  # 사전 조건: nginx.conf에 stub_status 블록 추가 필요 (아래 주석 참고)
+  nginx-exporter-prod:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter-prod
+    restart: always
+    command:
+      - '--nginx.scrape-uri=http://nginx-proxy/nginx_status'
+    networks:
+      - monitoring
+      - frontend-network
+
+  # ── Nginx Exporter — dev ────────────────────────────────────────────────────
+  nginx-exporter-dev:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: nginx-exporter-dev
+    restart: always
+    command:
+      - '--nginx.scrape-uri=http://nginx-dev/nginx_status'
+    networks:
+      - monitoring
+      - frontend-network-dev
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  monitoring:
+    driver: bridge
+
+  # prod 네트워크 (docker-compose.prod.yml 먼저 실행 후 사용 가능)
+  frontend-network:
+    external: true
+  backend-network:
+    external: true
+
+  # dev 네트워크 (docker-compose.dev.yml 먼저 실행 후 사용 가능)
+  frontend-network-dev:
+    external: true
+  backend-network-dev:
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana-data:

@@ -30,3 +30,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.poetry.dependencies]
+prometheus-fastapi-instrumentator = "^6.1.0"
