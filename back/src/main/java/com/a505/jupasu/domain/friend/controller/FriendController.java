@@ -32,7 +32,7 @@ public class FriendController {
      */
     @PostMapping("/invite")
     public ApiResponse<Void> inviteFriend(@RequestBody FriendInviteRequest request) {
-        User requester = userRepository.findById(1L)
+        User requester = userRepository.findById(5L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         friendService.inviteFriend(requester, request.getReceiverNickname());
@@ -48,7 +48,7 @@ public class FriendController {
      */
     @PatchMapping("/accept")
     public ApiResponse<Void> respondFriendRequest(@RequestBody FriendResponseRequest request) {
-        User loginUser = userRepository.findById(3L)
+        User loginUser = userRepository.findById(1L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         friendService.respondToFriendRequest(loginUser, request);
@@ -64,7 +64,7 @@ public class FriendController {
      */
     @GetMapping
     public ApiResponse<List<FriendListResponse>> getFriendList() {
-        User loginUser = userRepository.findById(3L)
+        User loginUser = userRepository.findById(1L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         List<FriendListResponse> friendList = friendService.getFriendList(loginUser);
@@ -79,9 +79,25 @@ public class FriendController {
      */
     @GetMapping("/pending")
     public ApiResponse<List<FriendPendingResponse>> getPendingRequests() {
-        User loginUser = userRepository.findById(3L)
+        User loginUser = userRepository.findById(1L)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         return ApiResponse.success(friendService.getPendingFriendList(loginUser));
+    }
+
+    /**
+     * 정식 친구를 삭제하거나 보낸 친구 신청 취소
+     *
+     * @param friendId 삭제할 관계의 ID
+     * @return 성공 메시지를 포함한 ApiResponse
+     */
+    @DeleteMapping("/{friendId}")
+    public ApiResponse<Void> deleteFriend(@PathVariable Long friendId) {
+        User loginUser = userRepository.findById(1L)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        friendService.deleteFriend(loginUser, friendId);
+
+        return ApiResponse.success("친구 관계가 삭제되었습니다.");
     }
 }
