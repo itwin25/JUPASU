@@ -1,7 +1,11 @@
 package com.a505.jupasu.domain.user.service;
 
+import com.a505.jupasu.domain.friend.entity.Friend;
+import com.a505.jupasu.domain.friend.entity.FriendStatus;
+import com.a505.jupasu.domain.friend.repository.FriendRepository;
 import com.a505.jupasu.domain.user.dto.request.UserUpdateRequest;
 import com.a505.jupasu.domain.user.dto.response.UserMyPageResponse;
+import com.a505.jupasu.domain.user.dto.response.UserSearchResponse;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
 import com.a505.jupasu.global.exception.CustomException;
@@ -10,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * User 도메인의 비즈니스 로직을 처리하는 서비스 클래스
@@ -20,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final FriendRepository friendRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
     /**
@@ -123,5 +131,35 @@ public class UserService {
         if(password == null || !password.matches(passwordRegex)) {
             throw new CustomException(ErrorCode.INVALID_PASSWORD_FORMAT);
         }
+    }
+
+    /**
+     * 닉네임으로 유저를 검색하고, 현재 로그인한 유저와의 친구 상태를 포함하여 반환
+     * * @param nickname    검색 키워드
+     * @param currentUser 현재 로그인한 유저 엔티티
+     * @return 친구 상태가 포함된 검색 결과 리스트
+     */
+    public List<UserSearchResponse> searchUsers(String nickname, User currentUser) {
+        List<User> searchedUsers = userRepository.findByNicknameContainingAndIdNot(nickname, currentUser.getId());
+
+        List<Friend> myRelations = friendRepository.findAllByRequesterOrReceiver(currentUser);
+
+        return searchedUsers.stream()
+                .map(user -> {
+                    FriendStatus status = determineStatus(user, myRelations);
+                    return UserSearchResponse.of(user, status);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 특정 유저와 나의 관계를 정의
+     */
+    private FriendStatus determineStatus(User targetUser, List<Friend> myRelations) {
+        return myRelations.stream()
+                .filter(f -> f.getRequester().equals(targetUser) || f.getReceiver().equals(targetUser))
+                .findFirst()
+                .map(Friend::getStatus) // PENDING 또는 ACCEPTED
+                .orElse(FriendStatus.NONE); // 관계 없음
     }
 }

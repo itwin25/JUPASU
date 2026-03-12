@@ -23,6 +23,7 @@ public enum ErrorCode {
     INVALID_PASSWORD_FORMAT(HttpStatus.BAD_REQUEST, "비밀번호는 최소 8자, 대문자·숫자·특수문자 각 1개 이상을 포함해야 합니다."),
     INVALID_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
     PASSWORD_CONFIRM_NOT_MATCHED(HttpStatus.BAD_REQUEST, "입력하신 새 비밀번호와 일치하지 않습니다."),
+    INVALID_SEARCH_KEYWORD(HttpStatus.BAD_REQUEST, "올바른 검색어를 입력해주세요."),
 
     // 와인 및 도메인 관련 예외
     WINE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 와인입니다."),
