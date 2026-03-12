@@ -19,6 +19,7 @@ services:
       retries: 5
     networks:
       - backend-network
+      - monitoring
 
   # Cache & Session: Redis
   redis:
@@ -29,6 +30,7 @@ services:
       - "6379"
     networks:
       - backend-network
+      - monitoring
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
   ai:
@@ -39,6 +41,7 @@ services:
     restart: always
     networks:
       - backend-network
+      - monitoring
     depends_on:
       db:
         condition: service_healthy
@@ -75,6 +78,7 @@ services:
     networks:
       - backend-network
       - frontend-network
+      - monitoring
 
   # Frontend: Next.js (React 19)
   frontend:
@@ -113,12 +117,15 @@ services:
     networks:
       - frontend-network
       - backend-network
+      - monitoring
 
 networks:
   frontend-network:
     driver: bridge
   backend-network:
     driver: bridge
+  monitoring:
+    external: true
 
 volumes:
   postgres_data:

@@ -1,0 +1,63 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  # ── Prometheus 자체 모니터링 ──────────────────────────────────────────────
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Spring Boot Actuator ──────────────────────────────────────────────────
+  - job_name: 'backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['backend-spring:8080']
+        labels:
+          env: 'prod'
+      - targets: ['backend-spring-dev:8080']
+        labels:
+          env: 'dev'
+
+  # ── FastAPI AI ────────────────────────────────────────────────────────────
+  # 사전 조건: pyproject.toml에 prometheus-client 추가 및 /metrics 엔드포인트 구현 필요
+  - job_name: 'ai'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ai-fastapi:8000']
+        labels:
+          env: 'prod'
+      - targets: ['ai-fastapi-dev:8000']
+        labels:
+          env: 'dev'
+
+  # ── PostgreSQL (postgres_exporter) ────────────────────────────────────────
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter-prod:9187']
+        labels:
+          env: 'prod'
+      - targets: ['postgres-exporter-dev:9187']
+        labels:
+          env: 'dev'
+
+  # ── Redis (redis_exporter) ────────────────────────────────────────────────
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter-prod:9121']
+        labels:
+          env: 'prod'
+      - targets: ['redis-exporter-dev:9121']
+        labels:
+          env: 'dev'
+
+  # ── Nginx (nginx-prometheus-exporter) ────────────────────────────────────
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter-prod:9113']
+        labels:
+          env: 'prod'
+      - targets: ['nginx-exporter-dev:9113']
+        labels:
+          env: 'dev'
