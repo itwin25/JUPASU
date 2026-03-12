@@ -27,4 +27,7 @@ public interface FriendRepository extends JpaRepository<Friend,Long> {
     // 특정 유저가 신청자이거나 수신자인 모든 친구 관계를 조회
     @Query("SELECT f FROM Friend f WHERE f.requester = :user OR f.receiver = :user")
     List<Friend> findAllByRequesterOrReceiver(@Param("user") User user);
+
+    // 탈퇴하는 사용자와 관련된 모든 친구 관계(신청한 것 + 받은 것) 삭제
+    void deleteByRequesterOrReceiver(User requester, User receiver);
 }
