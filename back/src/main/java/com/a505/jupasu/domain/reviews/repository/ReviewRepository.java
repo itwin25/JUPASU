@@ -16,4 +16,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findAllByWineIdOrderByCreatedAtDesc(Long wineId);
 
     boolean existsByUserAndWine(User user, Wine wine);
+
+    // 탈퇴하는 사용자의 모든 리뷰를 삭제
+    void deleteByUser(User user);
 }
