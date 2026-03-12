@@ -115,14 +115,18 @@ networks:
   # prod 네트워크 (docker-compose.prod.yml 먼저 실행 후 사용 가능)
   frontend-network:
     external: true
+    name: jupasu_prod_frontend-network
   backend-network:
     external: true
+    name: jupasu_prod_backend-network
 
   # dev 네트워크 (docker-compose.dev.yml 먼저 실행 후 사용 가능)
   frontend-network-dev:
     external: true
+    name: jupasu_dev_frontend-network-dev
   backend-network-dev:
     external: true
+    name: jupasu_dev_backend-network-dev
 
 volumes:
   prometheus_data:
