@@ -18,4 +18,7 @@ public interface FriendRepository extends JpaRepository<Friend,Long> {
 
     // 사용자와 연관된 특정 상태의 모든 친구 관계를 조회
     List<Friend> findAllByRequesterAndStatusOrReceiverAndStatus(User requester, FriendStatus status1, User receiver, FriendStatus status2);
+
+    // 특정 상태의 수신자 데이터만 조회
+    List<Friend> findAllByReceiverAndStatus(User receiver, FriendStatus status);
 }
