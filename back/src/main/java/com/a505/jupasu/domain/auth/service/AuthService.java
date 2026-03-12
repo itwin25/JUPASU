@@ -11,11 +11,9 @@ import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import com.a505.jupasu.global.redis.RedisService;
 import com.a505.jupasu.global.security.jwt.JwtTokenProvider;
-import java.security.SecureRandom;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,34 +26,19 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class AuthService {
 
-    // Redis Key Prefix
-    private static final String CODE_PREFIX     = "auth:verify:code:";
-    private static final String ATTEMPTS_PREFIX = "auth:verify:attempts:";
-    private static final String RESEND_PREFIX   = "auth:resend:lock:";
-    private static final String VERIFIED_PREFIX = "auth:verified:email:";
-    private static final String LOCKOUT_PREFIX  = "auth:lockout:account:";
-    private static final String RT_PREFIX       = "auth:rt:";
-
-    // Redis Lua Script — 2개 키 원자적 SET
-    private static final RedisScript<Long> STORE_OTP_SCRIPT = RedisScript.of(
-        "redis.call('SETEX', KEYS[1], tonumber(ARGV[1]), ARGV[2]) " +
-        "redis.call('SETEX', KEYS[2], tonumber(ARGV[1]), '0') "    +
-        "return 1",
-        Long.class
-    );
-
-    private static final int MAX_ATTEMPTS = 5;
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-
     private final UserRepository        userRepository;
     private final RedisService          redisService;
     private final StringRedisTemplate   stringRedisTemplate;
     private final BCryptPasswordEncoder passwordEncoder;
     private final EmailService          emailService;
     private final JwtTokenProvider      jwtTokenProvider;
+    private final com.a505.jupasu.domain.auth.util.AuthUtils authUtils;
 
 
-    // 이메일 중복 확인
+    /**
+     * 이메일 중복 확인
+     * @param email
+     */
     public void checkEmailDuplicate(String email) {
         if (userRepository.existsByEmail(email)) {
             throw new CustomException(ErrorCode.EXISTING_EMAIL);
@@ -63,7 +46,10 @@ public class AuthService {
     }
 
 
-    // 닉네임 중복 확인
+    /**
+     * 닉넥임 중복 확인
+     * @param nickname
+     */
     public void checkNicknameDuplicate(String nickname) {
         if (userRepository.existsByNickname(nickname)) {
             throw new CustomException(ErrorCode.EXISTING_NICKNAME);
@@ -71,7 +57,11 @@ public class AuthService {
     }
 
 
-    // POST /api/auth/otp/send — OTP 발송
+    /**
+     * OTP 발송
+     * POST /api/auth/otp/send
+     * @param request
+     */
     public void sendOtp(SendOtpRequest request) {
         // 이미 가입된 이메일인지 체크
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -79,13 +69,13 @@ public class AuthService {
         }
 
         // 재전송 쿨타임(60초) 확인 및 락 설정
-        String resendKey = RESEND_PREFIX + request.getEmail();
+        String resendKey = com.a505.jupasu.domain.auth.util.AuthRedisConstants.RESEND_PREFIX + request.getEmail();
         boolean locked = redisService.setIfAbsent(resendKey, "1", 60);
         if (!locked) {
             throw new CustomException(ErrorCode.SIGNUP_EMAIL_SEND_TOO_SOON);
         }
 
-        String code = generateOtp();
+        String code = authUtils.generateOtp();
 
         // Lua Script로 2개 키 원자적 저장 (code, attempts)
         storeOtpKeys(request.getEmail(), code);
@@ -95,12 +85,16 @@ public class AuthService {
     }
 
 
-    // POST /api/auth/otp/verify — OTP 검증 (DB 저장 안 함)
+    /**
+     * OTP 검증
+     * POST /api/auth/otp/verify
+     * @param request
+     */
     public void verifyOtp(VerifyOtpRequest request) {
         String email       = request.getEmail();
-        String codeKey     = CODE_PREFIX     + email;
-        String attemptsKey = ATTEMPTS_PREFIX + email;
-        String resendKey   = RESEND_PREFIX   + email;
+        String codeKey     = com.a505.jupasu.domain.auth.util.AuthRedisConstants.CODE_PREFIX     + email;
+        String attemptsKey = com.a505.jupasu.domain.auth.util.AuthRedisConstants.ATTEMPTS_PREFIX + email;
+        String resendKey   = com.a505.jupasu.domain.auth.util.AuthRedisConstants.RESEND_PREFIX   + email;
 
         // OTP 존재 확인
         String storedCode = redisService.get(codeKey);
@@ -117,7 +111,7 @@ public class AuthService {
 
         // 코드 검증
         if (!storedCode.equals(request.getCode())) {
-            int remaining = (int) (MAX_ATTEMPTS - (attempts - 1));
+            int remaining = (int) (com.a505.jupasu.domain.auth.util.AuthRedisConstants.MAX_OTP_ATTEMPTS - (attempts - 1));
             throw new CustomException(
                 ErrorCode.OTP_INVALID,
                 "(남은 시도: " + remaining + "회)"
@@ -125,7 +119,7 @@ public class AuthService {
         }
 
         // 인증 성공 → "verified" 플래그 저장 (TTL 30분)
-        redisService.setIfAbsent(VERIFIED_PREFIX + email, "true", 1800);
+        redisService.setIfAbsent(com.a505.jupasu.domain.auth.util.AuthRedisConstants.VERIFIED_PREFIX + email, "true", 1800);
 
         // OTP 관련 키만 정리
         redisService.deletePipelined(List.of(codeKey, attemptsKey, resendKey));
@@ -134,11 +128,15 @@ public class AuthService {
     }
 
 
-    // POST /api/auth/signup — 회원가입 (DB INSERT)
+    /**
+     * 회원 가입 (DB INSERT)
+     * POST /api/auth/signup
+     * @param request
+     */
     @Transactional
-    public void signup(SignupRequest request) {
+    public void signUp(SignupRequest request) {
         String email = request.getEmail();
-        String verifiedKey = VERIFIED_PREFIX + email;
+        String verifiedKey = com.a505.jupasu.domain.auth.util.AuthRedisConstants.VERIFIED_PREFIX + email;
 
         // 이메일 인증 완료 여부 확인
         if (!redisService.exists(verifiedKey)) {
@@ -175,11 +173,16 @@ public class AuthService {
     }
 
 
-    // POST /api/auth/signin — 로그인 (액세스 및 리프레시 토큰 발급)
+    /**
+     * 로그인 - AT, RT 발급
+     * POST /api/auth/signin
+     * @param request
+     * @return
+     */
     @Transactional(readOnly = true)
     public SignInResponse signIn(SignInRequest request) {
         String email = request.getEmail();
-        String lockoutKey = LOCKOUT_PREFIX + email;
+        String lockoutKey = com.a505.jupasu.domain.auth.util.AuthRedisConstants.LOCKOUT_PREFIX + email;
 
         // 계정 잠김 체크 (redis에서 수행)
         String lockoutCountStr = redisService.get(lockoutKey);
@@ -207,21 +210,38 @@ public class AuthService {
         String refreshToken = jwtTokenProvider.createRefreshToken(email);
 
         // Redis에 Refresh Token 저장 (TTL: 7일)
-        redisService.set(RT_PREFIX + email, refreshToken, 604800);
+        redisService.set(com.a505.jupasu.domain.auth.util.AuthRedisConstants.RT_PREFIX + email, refreshToken, 604800);
 
         return SignInResponse.of(accessToken, refreshToken);
+    }
+
+
+    /**
+     * 로그아웃 - AT 블랙리스트 추가, RT 삭제
+     * POST /api/auth/signout
+     * @param accessToken
+     */
+    public void signOut(String accessToken) {
+        // 토큰 파싱 및 검증 (만료된 토큰이어도 이메일 추출)
+        com.a505.jupasu.domain.auth.util.AuthUtils.TokenInfo tokenInfo = authUtils.parseTokenForLogout(accessToken);
+
+        // RT 삭제
+        redisService.delete(com.a505.jupasu.domain.auth.util.AuthRedisConstants.RT_PREFIX + tokenInfo.email());
+
+        // 유효한 토큰인 경우 블랙리스트 추가
+        if (!tokenInfo.isExpired() && tokenInfo.jti() != null && tokenInfo.remainingTime() > 0) {
+            redisService.set(com.a505.jupasu.domain.auth.util.AuthRedisConstants.BLACKLIST_PREFIX + tokenInfo.jti(), "logout", tokenInfo.remainingTime() / 1000);
+        }
+
+        log.info("로그아웃 처리 완료: email={}, isExpired={}", tokenInfo.email(), tokenInfo.isExpired());
     }
 
     // 내부 유틸
     private void storeOtpKeys(String email, String code) {
         stringRedisTemplate.execute(
-            STORE_OTP_SCRIPT,
-            List.of(CODE_PREFIX + email, ATTEMPTS_PREFIX + email),
+            com.a505.jupasu.domain.auth.util.AuthRedisConstants.STORE_OTP_SCRIPT,
+            List.of(com.a505.jupasu.domain.auth.util.AuthRedisConstants.CODE_PREFIX + email, com.a505.jupasu.domain.auth.util.AuthRedisConstants.ATTEMPTS_PREFIX + email),
             "300", code
         );
-    }
-
-    private String generateOtp() {
-        return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
     }
 }
