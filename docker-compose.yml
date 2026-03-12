@@ -17,8 +17,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - backend-network
 
   # Cache & Session: Redis
   redis:
@@ -27,8 +25,6 @@ services:
     restart: always
     ports:
       - "6379:6379"
-    networks:
-      - backend-network
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
   ai:
@@ -37,8 +33,6 @@ services:
       dockerfile: Dockerfile
     container_name: ai-fastapi
     restart: always
-    networks:
-      - backend-network
     depends_on:
       - db
     ports:
@@ -68,9 +62,6 @@ services:
         condition: service_started
       ai:
         condition: service_started
-    networks:
-      - backend-network
-      - frontend-network
 
   # Frontend: Next.js (React 19)
   frontend:
@@ -87,14 +78,6 @@ services:
       - "80:80"
     depends_on:
       - backend
-    networks:
-      - frontend-network
-
-networks:
-  frontend-network:
-    driver: bridge
-  backend-network:
-    driver: bridge
 
 volumes:
   postgres_data:
