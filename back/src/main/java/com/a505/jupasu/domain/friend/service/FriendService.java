@@ -121,4 +121,25 @@ public class FriendService {
                 .map(FriendPendingResponse::new)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * 기존의 친구 관계를 끊거나, 보낸 친구 신청을 취소
+     *
+     * @param loginUser 현재 로그인한 사용자 엔티티
+     * @param friendId  삭제할 친구 관계의 고유 식별자(PK)
+     * @throws CustomException 해당 친구 관계가 존재하지 않을 경우 발생 (FRIEND_REQUEST_NOT_FOUND)
+     * @throws CustomException 삭제 권한이 없는 경우(관계 당사자가 아님) 발생 (ACCESS_DENIED)
+     */
+    @Transactional
+    public void deleteFriend(User loginUser, Long friendId) {
+        Friend friend = friendRepository.findById(friendId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FRIEND_NOT_FOUND));
+
+        if (!friend.getReceiver().getId().equals(loginUser.getId()) &&
+            !friend.getRequester().getId().equals(loginUser.getId())) {
+            throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
+        friendRepository.delete(friend);
+    }
 }

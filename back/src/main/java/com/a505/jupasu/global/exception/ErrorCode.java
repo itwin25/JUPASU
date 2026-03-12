@@ -43,6 +43,7 @@ public enum ErrorCode {
     ALREADY_FRIEND_REQUESTED(HttpStatus.BAD_REQUEST, "이미 친구 요청을 보낸 유저 입니다."),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청이 존재하지 않습니다."),
     INVALID_FRIEND_STATUS(HttpStatus.BAD_REQUEST, "잘못된 친구 상태 변경 요청입니다. 수락 또는 거절만 가능합니다."),
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 친구가 존재하지 않습니다."),
 
     // 인증 관련 예외
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
