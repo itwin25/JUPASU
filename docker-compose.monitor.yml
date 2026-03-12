@@ -23,6 +23,22 @@ services:
       # dev 서비스 직접 스크랩 (backend-dev, ai-dev)
       - frontend-network-dev
       - backend-network-dev
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monitoring-grafana
+    restart: unless-stopped
+    ports:
+      - "8090:3000"
+    volumes:
+      -grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - 
+    depends_on:
+      - prometheus
 
   # ── PostgreSQL Exporter — prod ──────────────────────────────────────────────
   postgres-exporter-prod:
@@ -41,7 +57,7 @@ services:
     container_name: postgres-exporter-dev
     restart: always
     environment:
-      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db-postgres-dev:5432/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER_DEV}:${POSTGRES_PASSWORD_DEV}@db-postgres-dev:5432/${POSTGRES_DB_DEV}?sslmode=disable"
     networks:
       - monitoring
       - backend-network-dev
@@ -110,3 +126,4 @@ networks:
 
 volumes:
   prometheus_data:
+  grafana-data:
