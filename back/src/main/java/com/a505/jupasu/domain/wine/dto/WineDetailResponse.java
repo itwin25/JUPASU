@@ -22,7 +22,8 @@ public class WineDetailResponse {
     // 상세 정보
     private String grapeVariety;
     private Float alcoholDegree;
-    private Integer averagePrice;
+    private Double averageRating;
+    private Integer price;
     private String description;
 
     // 맛 지표 (Taste Profile)
@@ -46,7 +47,8 @@ public class WineDetailResponse {
                 .winery(wine.getWinery())
                 .grapeVariety(wine.getGrapeVariety())
                 .alcoholDegree(wine.getAlcoholDegree())
-                .averagePrice(wine.getAveragePrice())
+                .averageRating(wine.getAverageRating())
+                .price(wine.getPrice())
                 .description(wine.getDescription())
                 .sweetness(wine.getSweetness())
                 .acidity(wine.getAcidity())
