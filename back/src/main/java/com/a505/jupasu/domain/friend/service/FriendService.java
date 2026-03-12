@@ -2,6 +2,7 @@ package com.a505.jupasu.domain.friend.service;
 
 import com.a505.jupasu.domain.friend.dto.request.FriendResponseRequest;
 import com.a505.jupasu.domain.friend.dto.response.FriendListResponse;
+import com.a505.jupasu.domain.friend.dto.response.FriendPendingResponse;
 import com.a505.jupasu.domain.friend.entity.Friend;
 import com.a505.jupasu.domain.friend.entity.FriendStatus;
 import com.a505.jupasu.domain.friend.repository.FriendRepository;
@@ -95,6 +96,7 @@ public class FriendService {
      * * @param me 현재 로그인한 사용자 엔티티
      * @return 관계에 참여한 다른 사용자(상대방) 엔티티
      */
+    @Transactional(readOnly = true)
     public List<FriendListResponse> getFriendList(User loginUser) {
         List<Friend> acceptedFriends = friendRepository.findAllByRequesterAndStatusOrReceiverAndStatus(
                 loginUser, FriendStatus.ACCEPTED, loginUser, FriendStatus.ACCEPTED
@@ -102,6 +104,21 @@ public class FriendService {
 
         return acceptedFriends.stream()
                 .map(friend -> new FriendListResponse(friend, loginUser))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 나에게 도착한 친구 신청 대기(PENDING) 목록을 조회
+     *
+     * @param loginUser 현재 로그인한 사용자(수신자) 엔티티
+     * @return 나에게 신청을 보낸 유저들의 정보와 신청 시각이 담긴 DTO 리스트
+     */
+    @Transactional(readOnly = true)
+    public List<FriendPendingResponse> getPendingFriendList(User loginUser) {
+        List<Friend> pendingRequests = friendRepository.findAllByReceiverAndStatus(loginUser, FriendStatus.PENDING);
+
+        return pendingRequests.stream()
+                .map(FriendPendingResponse::new)
                 .collect(Collectors.toList());
     }
 }
