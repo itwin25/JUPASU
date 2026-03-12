@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 public class FriendListResponse {
+    private Long requestId;
     private Long friendId;
     private String nickname;
     private String character;
@@ -27,7 +28,8 @@ public class FriendListResponse {
     public FriendListResponse(Friend friend, User me) {
         User other = friend.getOtherUser(me);
 
-        this.friendId = friend.getRequestId();
+        this.requestId = friend.getRequestId();
+        this.friendId = friend.getOtherUser(me).getId();
         this.nickname = other.getNickname();
         this.character = other.getCharacter();
         this.friendSince = friend.getCreatedAt();

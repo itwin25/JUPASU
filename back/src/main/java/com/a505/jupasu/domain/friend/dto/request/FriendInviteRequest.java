@@ -9,5 +9,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class FriendInviteRequest {
+    private Long receiverId;
     private String receiverNickname;
 }

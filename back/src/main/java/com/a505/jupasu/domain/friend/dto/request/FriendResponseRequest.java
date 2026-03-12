@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class FriendResponseRequest {
 
-    private Long friendId;
+    private Long requestId;
     private FriendStatus status;
 }
