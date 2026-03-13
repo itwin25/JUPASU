@@ -112,16 +112,16 @@ public class Preference {
     public void updatePreference(Integer sweetness, Integer acidity, Integer body, Integer tannin,
                                  Integer Abv, Integer preferredPriceMin, Integer preferredPriceMax, String preferSummary,
                                  List<WineType> wineTypes, List<WineFlavor> flavors, List<DrinkingSituation> situations) {
-        this.sweetness = sweetness;
-        this.acidity = acidity;
-        this.body = body;
-        this.tannin = tannin;
-        this.Abv = Abv;
-        this.preferredPriceMin = preferredPriceMin;
-        this.preferredPriceMax = preferredPriceMax;
-        this.preferSummary = preferSummary;
-        this.preferredWineTypes = wineTypes;
-        this.preferredFlavors = flavors;
-        this.drinkingSituations = situations;
+        if (sweetness != null) this.sweetness = sweetness;
+        if (acidity != null) this.acidity = acidity;
+        if (body != null) this.body = body;
+        if (tannin != null) this.tannin = tannin;
+        if (Abv != null) this.Abv = Abv;
+        if (preferredPriceMin != null) this.preferredPriceMin = preferredPriceMin;
+        if (preferredPriceMax != null) this.preferredPriceMax = preferredPriceMax;
+        if (preferSummary != null) this.preferSummary = preferSummary;
+        if (wineTypes != null) this.preferredWineTypes = wineTypes;
+        if (flavors != null) this.preferredFlavors = flavors;
+        if (situations != null) this.drinkingSituations = situations;
     }
 }
