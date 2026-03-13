@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jupasu}
+    username: ${SPRING_DATASOURCE_USERNAME:jupasu_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:jupasu_pass}
+
+    driver-class-name: org.postgresql.Driver
+
+  # ✨ 레디스 접속 정보 추가 (인텔리제이 로컬 테스트용 기본값: localhost:6379)
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        default_batch_fetch_size: 100
+
+JWT_SECRET: VGhpc0lzQUR1bW15U2VjcmV0S2V5Rm9yVGVzdGluZ1B1cnBvc2VzMTIzNDU2Nzg5MA==
+MAIL_USERNAME: jupasu476@gmail.com
+MAIL_PASSWORD: xdlssayvecbfctub
