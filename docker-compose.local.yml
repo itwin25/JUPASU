@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: jupasu-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: jupasu-postgres
+    environment:
+      POSTGRES_DB: jupasu
+      POSTGRES_USER: jupasu_user
+      POSTGRES_PASSWORD: jupasu_pass
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: jupasu-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/jupasu
+      SPRING_DATASOURCE_USERNAME: jupasu_user
+      SPRING_DATASOURCE_PASSWORD: jupasu_pass
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      
+      # ✨ 도커로 띄울 때 주입될 환경변수 (추가!)
+      JWT_SECRET: VGhpc0lzQUR1bW15U2VjcmV0S2V5Rm9yVGVzdGluZ1B1cnBvc2VzMTIzNDU2Nzg5MA==
+      MAIL_USERNAME: jupasu476@gmail.com
+      MAIL_PASSWORD: xdlssayvecbfctub
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  postgres_local_data:

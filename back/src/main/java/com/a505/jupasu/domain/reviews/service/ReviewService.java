@@ -13,6 +13,8 @@ import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,29 +34,25 @@ public class ReviewService {
      * 와인별 리뷰 조회
      */
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getWineReviews(Long wineId){
+    public Page<ReviewResponse> getWineReviews(Long wineId, Pageable pageable){
         if(!wineRepository.existsById(wineId)){
             throw new CustomException(ErrorCode.WINE_NOT_FOUND);
         }
 
-        return reviewRepository.findAllByWineIdOrderByCreatedAtDesc(wineId).stream()
-                .map(ReviewResponse::from)
-                .collect(Collectors.toList());
+        return reviewRepository.findAllByWineId(wineId, pageable)
+                .map(ReviewResponse::from);
     }
 
     /**
      * 리뷰 등록
      */
     public Long createReview (Long userId, Long wineId, ReviewCreateRequest request){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-
-        Wine wine = wineRepository.findById(wineId)
-                .orElseThrow(() -> new CustomException(ErrorCode.WINE_NOT_FOUND));
-
-        if (reviewRepository.existsByUserAndWine(user, wine)) {
+        if (reviewRepository.existsByUserIdAndWineId(userId, wineId)) {
             throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
+
+        User user = userRepository.getReferenceById(userId);
+        Wine wine = wineRepository.getReferenceById(wineId);
 
         Review review = Review.builder()
                 .user(user)
