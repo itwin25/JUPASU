@@ -16,6 +16,7 @@ from services.sommelier.sommelier_agent import sommelier_agent
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+
 # --- Advanced Performance Logger Setup ---
 perf_logger = logging.getLogger("ai_performance")
 perf_logger.setLevel(logging.INFO)
@@ -55,6 +56,7 @@ def log_performance_meta(
 
 # --- App Instance ---
 app = FastAPI(title=get_settings().APP_NAME)
+Instrumentator().instrument(app).expose(app)
 
 class ChatRequest(BaseModel):
     user_query: str = Field(..., description="사용자의 질문 또는 명령")
@@ -72,7 +74,7 @@ def health_check():
 
 @app.on_event("startup")
 async def startup():
-    Instrumentator().instrument(app).expose(app)
+    pass
 
 @app.post("/ai/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
