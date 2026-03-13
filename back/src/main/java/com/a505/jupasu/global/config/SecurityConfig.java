@@ -56,6 +56,9 @@ public class SecurityConfig {
                                 // prometheus 모니터링 엔드포인트
                                 "/actuator/prometheus",
                                 "/actuator/health"
+
+                                //swagger 추가
+                                , "/swagger-ui/**", "/v3/api-docs/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
