@@ -51,7 +51,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/users/**",
-                                "/api/friends/**"
+                                "/api/friends/**",
+
+                                // prometheus 모니터링 엔드포인트
+                                "/actuator/prometheus",
+                                "/actuator/health"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
