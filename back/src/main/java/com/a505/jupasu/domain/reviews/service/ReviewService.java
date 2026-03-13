@@ -47,15 +47,13 @@ public class ReviewService {
      * 리뷰 등록
      */
     public Long createReview (Long userId, Long wineId, ReviewCreateRequest request){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        Wine wine = wineRepository.findById(wineId)
-                .orElseThrow(() -> new CustomException(ErrorCode.WINE_NOT_FOUND));
-
-        if (reviewRepository.existsByUserAndWine(user, wine)) {
+        if (reviewRepository.existsByUserIdAndWineId(userId, wineId)) {
             throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
+
+        User user = userRepository.getReferenceById(userId);
+        Wine wine = wineRepository.getReferenceById(wineId);
 
         Review review = Review.builder()
                 .user(user)
