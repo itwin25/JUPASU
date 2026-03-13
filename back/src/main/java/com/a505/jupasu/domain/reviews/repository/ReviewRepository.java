@@ -3,6 +3,8 @@ package com.a505.jupasu.domain.reviews.repository;
 import com.a505.jupasu.domain.reviews.entity.Review;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.wine.entity.Wine;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -13,9 +15,11 @@ import java.util.List;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     @EntityGraph(attributePaths = {"user"})
-    List<Review> findAllByWineIdOrderByCreatedAtDesc(Long wineId);
+    Page<Review> findAllByWineId(Long wineId, Pageable pageable);
 
     boolean existsByUserAndWine(User user, Wine wine);
+
+    boolean existsByUserIdAndWineId(Long userId, Long wineId);
 
     // 탈퇴하는 사용자의 모든 리뷰를 삭제
     void deleteByUser(User user);
