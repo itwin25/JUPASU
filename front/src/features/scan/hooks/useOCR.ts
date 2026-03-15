@@ -36,31 +36,20 @@ export const useOCR = () => {
     const startTime = performance.now();
 
     try {
-      // 1. 모델 데이터 로드 (캐시 우선)
+      const version = Date.now();
+      
+      // 🚀 모델 경로만 설정 (데이터는 워커가 직접 로드)
       const modelPaths = {
-        det: '/models/optimized_final/PP-OCRv5_mobile_det_optimized.onnx',
-        rec: '/models/optimized_final/hfonnx_latin_PP-OCRv5_mobile_rec_optimized.onnx',
-        dict: '/models/optimized_final/dicts/latin_dict.txt',
+        det: `${window.location.origin}/models/mobile/det_mobile.onnx?v=${version}`,
+        rec: `${window.location.origin}/models/mobile/rec_mobile_ko.onnx?v=${version}`,
+        dict: `${window.location.origin}/models/dicts/ko_dict.txt?v=${version}`,
       };
 
-      const loadFile = async (key: string, path: string, isText = false) => {
-        const cached = await modelCache.get(key);
-        if (cached) return cached;
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`${key} 다운로드 실패`);
-        const data = isText ? await response.text() : await response.arrayBuffer();
-        await modelCache.set(key, data);
-        return data;
-      };
-
-      const [detModel, recModel, dictText] = await Promise.all([
-        loadFile('det_model_latin_v15_mobile', modelPaths.det) as Promise<ArrayBuffer>,
-        loadFile('rec_model_latin_v15_mobile', modelPaths.rec) as Promise<ArrayBuffer>,
-        loadFile('dict_file_latin_v16_mobile', modelPaths.dict, true) as Promise<string>,
-      ]);
-
-      // 2. Worker 생성 및 초기화
-      const worker = new Worker(new URL('../worker/ocr.worker.ts', import.meta.url));
+      // 2. Worker 생성
+      const workerUrl = new URL('../worker/ocr.worker.ts', import.meta.url);
+      workerUrl.searchParams.set('v', version.toString());
+      
+      let worker = new Worker(workerUrl);
       workerRef.current = worker;
 
       const initPromise = new Promise<void>((resolve, reject) => {
@@ -76,18 +65,11 @@ export const useOCR = () => {
         worker.addEventListener('message', handler);
       });
 
-      // Transferable: 모델 버퍼 소유권을 Worker로 이전 (복사 비용 0)
-      worker.postMessage(
-        {
-          type: 'INIT',
-          payload: {
-            detModel,
-            recModel,
-            dict: dictText.split('\n'),
-          },
-        },
-        [detModel, recModel],
-      );
+      // 🚀 워커로 경로만 전달 (메인 스레드 메모리 사용량 0MB)
+      worker.postMessage({
+        type: 'INIT',
+        payload: { modelPaths },
+      });
 
       await initPromise;
 
@@ -117,26 +99,35 @@ export const useOCR = () => {
       try {
         const totalStartTime = performance.now();
 
-        let canvas: HTMLCanvasElement;
-        if (image instanceof HTMLImageElement) {
-          canvas = document.createElement('canvas');
-          canvas.width = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Canvas 생성 실패');
-          ctx.drawImage(image, 0, 0);
-        } else {
-          canvas = image;
+        // 1. 이미지 리사이징 (아이폰 사파리 메모리 최적화 - 초저용량 320px)
+        const MAX_DIMENSION = 320;
+        let targetWidth = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
+        let targetHeight = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
+
+        if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+          const ratio = Math.min(MAX_DIMENSION / targetWidth, MAX_DIMENSION / targetHeight);
+          targetWidth = Math.round(targetWidth * ratio);
+          targetHeight = Math.round(targetHeight * ratio);
         }
 
-        // 1. 전처리 (메인 스레드에서 수행 - 현재는 건너뛰기 설정됨)
-        const processedCanvas = preprocessImage(canvas);
-        const dCtx = processedCanvas.getContext('2d', { willReadFrequently: true })!;
-        const dImgData = dCtx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+        let resizeCanvas: HTMLCanvasElement | null = document.createElement('canvas');
+        resizeCanvas.width = targetWidth;
+        resizeCanvas.height = targetHeight;
+        const ctx = resizeCanvas.getContext('2d', { alpha: false });
+        if (!ctx) throw new Error('Canvas 생성 실패');
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-        // 2. Worker에 추론 요청
-        const pixelData = new Uint8Array(dImgData.data);
+        // 2. 전처리
+        let processedCanvas: HTMLCanvasElement | null = preprocessImage(resizeCanvas);
+        const dCtx = processedCanvas.getContext('2d', { willReadFrequently: true })!;
+        let dImgData: ImageData | null = dCtx.getImageData(0, 0, processedCanvas.width, processedCanvas.height);
+
+        // 3. Worker에 추론 요청
+        let pixelData: Uint8Array | null = new Uint8Array(dImgData.data);
         const worker = workerRef.current;
+
+        // ImageData 즉시 해제
+        dImgData = null;
 
         const recognitionPromise = new Promise<any>((resolve, reject) => {
           const handler = (e: MessageEvent) => {
@@ -151,7 +142,8 @@ export const useOCR = () => {
           worker.addEventListener('message', handler);
         });
 
-        // Transferable: 픽셀 데이터 버퍼 소유권을 Worker로 이전 (복사 비용 0)
+        // Transferable: 픽셀 데이터 버퍼 소유권을 Worker로 이전
+        const buffer = pixelData.buffer;
         worker.postMessage(
           {
             type: 'RECOGNIZE',
@@ -161,41 +153,32 @@ export const useOCR = () => {
               data: pixelData,
             },
           },
-          [pixelData.buffer],
+          [buffer],
         );
+
+        // 픽셀 데이터 참조 해제
+        pixelData = null;
 
         const rawResults = await recognitionPromise;
 
-        // 3. 결과 후처리 (복호화 등)
+        // 🚀 [발열 대책] 워커를 종료하지 않고 유지합니다 (Singleton)
+        const debugImageUrl = ''; 
 
-        const itemsToProcess: any[] = Array.isArray(rawResults)
-          ? rawResults
-          : (rawResults as any).lines || [];
-
-        const parsedResults = itemsToProcess.map((item: any) => {
-          let text = '',
-            score = 0,
-            box = [];
-          if (item.text !== undefined) {
-            text = item.text || '';
-            score = item.confidence || item.score || 0;
-            box = item.box || [];
-          } else if (Array.isArray(item) && item.length >= 2) {
-            box = item[0];
-            text = Array.isArray(item[1]) ? item[1][0] : item[1];
-            score = Array.isArray(item[1]) ? item[1][1] : 0;
-          }
-
-          return { text, score, box };
-        });
-
-        console.log(
-          `✅ [인식 종료] 총 소요 시간: ${((performance.now() - totalStartTime) / 1000).toFixed(2)}초`,
-        );
+        // 5. 리소스 정리 (캔버스 버퍼 해제)
+        if (resizeCanvas) {
+          resizeCanvas.width = 0;
+          resizeCanvas.height = 0;
+          resizeCanvas = null;
+        }
+        if (processedCanvas) {
+          processedCanvas.width = 0;
+          processedCanvas.height = 0;
+          processedCanvas = null;
+        }
 
         return {
-          results: parsedResults,
-          debugImage: processedCanvas.toDataURL('image/jpeg'),
+          results: rawResults,
+          debugImage: debugImageUrl,
         };
       } catch (err) {
         console.error('❌ OCR/Worker Error:', err);
@@ -205,5 +188,44 @@ export const useOCR = () => {
     [],
   );
 
-  return { ...state, initOCR, executeOCR };
+  const executeServerOCR = useCallback(async (image: HTMLImageElement | HTMLCanvasElement): Promise<any> => {
+    try {
+      console.log('📡 [Server OCR] 서버 분석 요청 중...');
+      
+      // 1. 이미지를 Blob으로 변환
+      let canvas: HTMLCanvasElement;
+      if (image instanceof HTMLImageElement) {
+        canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext('2d')?.drawImage(image, 0, 0);
+      } else {
+        canvas = image;
+      }
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+      if (!blob) throw new Error('이미지 변환 실패');
+
+      // 2. FormData 생성
+      const formData = new FormData();
+      formData.append('image', blob, 'scan.jpg');
+
+      // 3. 서버 API 호출
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('서버 분석 응답 실패');
+      
+      const data = await response.json();
+      console.log('✅ [Server OCR] 결과 수신:', data);
+      return data;
+    } catch (err) {
+      console.error('❌ Server OCR Error:', err);
+      throw err;
+    }
+  }, []);
+
+  return { ...state, initOCR, executeOCR, executeServerOCR };
 };

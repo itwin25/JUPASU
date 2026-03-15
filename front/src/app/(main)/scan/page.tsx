@@ -19,17 +19,21 @@ export default function ScanPage() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isLoaded, initOCR, executeOCR, error: modelError } = useOCR();
+  // 🚀 executeServerOCR 훅 추가 추출
+  const { isLoaded, initOCR, executeOCR, executeServerOCR, error: modelError } = useOCR();
 
-  // OCR 엔진 초기화
+  // 🚀 [비활성화] 클라이언트(엣지) OCR 엔진 초기화 중단 (서버 연산만 사용하므로 불필요한 모델 다운로드 방지)
+  /*
   useEffect(() => {
     initOCR();
   }, [initOCR]);
+  */
 
-  // 이미지 분석 및 데이터 매핑
+  // 🚀 서버를 사용할지 여부를 인자로 받는 이미지 분석 핸들러
   const handleImageAnalysis = useCallback(
-    async (imageFile: File) => {
-      if (!isLoaded) return;
+    async (imageFile: File, useServer: boolean = true) => {
+      // 클라이언트 로직을 사용하지 않으므로 isLoaded 체크 해제
+      // if (!useServer && !isLoaded) return; 
 
       setStatus('scanning');
 
@@ -48,8 +52,16 @@ export default function ScanPage() {
 
         const img = await imageLoadPromise;
 
-        // 2. OCR 실행
-        await executeOCR(img);
+        // 2. 🚀 OCR 실행 (서버 전용으로 강제)
+        if (useServer) {
+          const serverResult = await executeServerOCR(img);
+          console.log('Server OCR 성공:', serverResult);
+        } else {
+          // 클라이언트 연산 비활성화 상태이므로 경고 출력
+          console.warn('클라이언트 연산이 비활성화되었습니다. 서버 연산으로 대체합니다.');
+          const serverResult = await executeServerOCR(img);
+          console.log('Server OCR 성공 (우회):', serverResult);
+        }
 
         // 3. 데이터 매핑 제거 (사용자가 직접 입력하거나 추후 다른 방식으로 처리)
         setScanData({
@@ -65,13 +77,14 @@ export default function ScanPage() {
         setStatus('idle');
       }
     },
-    [isLoaded, executeOCR],
+    [executeServerOCR], // executeOCR 의존성 제거
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      handleImageAnalysis(file);
+      // 무조건 서버 연산 사용
+      handleImageAnalysis(file, true);
     }
   };
 
@@ -79,17 +92,17 @@ export default function ScanPage() {
     fileInputRef.current?.click();
   };
 
+  const triggerClientUpload = () => {
+    // 🚀 [비활성화] 클라이언트 연산 테스트 버튼
+    alert('현재 엣지 디바이스 연산은 비활성화되어 있습니다.');
+  };
+
+  // 서버 통신만 하므로 모델 로드 에러는 무시
+  /*
   if (modelError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6 text-center">
-        <div className="space-y-4">
-          <p className="font-bold text-red-500">OCR 엔진 로드 실패</p>
-          <p className="text-text-main/60 text-sm">{modelError}</p>
-          <Button onClick={() => window.location.reload()}>새로고침</Button>
-        </div>
-      </div>
-    );
+    return ( ... );
   }
+  */
 
   return (
     <div className="bg-background no-scrollbar flex min-h-screen flex-col">
@@ -159,13 +172,27 @@ export default function ScanPage() {
 
                 <Button
                   onClick={triggerUpload}
-                  disabled={!isLoaded}
+                  // 서버 연산이므로 isLoaded 대기 불필요
+                  disabled={false} 
                   size="full"
                   className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
                 >
-                  {!isLoaded ? <RefreshCw className="animate-spin" /> : <Camera size={24} />}
-                  {isLoaded ? '와인 라벨 스캔하기' : '엔진 준비 중...'}
+                  <Camera size={24} />
+                  와인 라벨 스캔하기
                 </Button>
+
+                {/* 🚀 기존 기기 내부 연산 테스트 버튼 (비활성화 및 숨김) */}
+                {/* 
+                <Button
+                  onClick={triggerClientUpload}
+                  disabled={!isLoaded}
+                  size="full"
+                  variant="outline"
+                  className="h-12 gap-2 rounded-2xl border-dashed border-primary-300 text-sm font-bold text-primary-500 shadow-sm"
+                >
+                  기기 내부 연산 (Client 엣지 테스트)
+                </Button>
+                */}
               </div>
             </div>
           </div>
