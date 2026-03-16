@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.scrap.service;
 
 
+import com.a505.jupasu.domain.scrap.dto.ScrapListResponse;
 import com.a505.jupasu.domain.scrap.dto.ScrapToggleResponse;
 import com.a505.jupasu.domain.scrap.entity.WineScrap;
 import com.a505.jupasu.domain.scrap.repository.WineScrapRepository;
@@ -14,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,5 +52,16 @@ public class WineScrapService {
                     .isScrapped(true)
                     .build();
         }
+    }
+
+    /**
+     * 사용자의 스크랩(찜) 목록을 조회하여 DTO 리스트로 반환
+     * @param user 현재 로그인한 사용자 엔티티
+     * @return 마이페이지 UI 요구사항에 맞춘 스크랩 와인 정보 목록
+     */
+    public List<ScrapListResponse> getMyScrapList(User user) {
+        return wineScrapRepository.findAllByUserWithWine(user).stream()
+                .map(ScrapListResponse::from)
+                .collect(Collectors.toList());
     }
 }
