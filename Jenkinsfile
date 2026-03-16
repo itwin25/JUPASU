@@ -1,16 +1,17 @@
 pipeline {
     agent any
 
-    options {
-        gitLabConnection('A505')
-    }
-
     environment {
+        // [필수 수정] 본인의 Docker Hub ID를 입력하세요
+        DOCKER_USER = "shjh0815@naver.com" 
+        DOCKER_REPO = "${DOCKER_USER}/jupasu"
+        DOCKER_CRED_ID = "docker-hub-credentials"
+        
         // 운영 서버 정보
         PROD_SERVER_IP = "13.124.55.70"
         PROD_SERVER_USER = "ubuntu"
         SSH_CRED_ID = "ssh-agent-key"
-        GIT_CRED_ID = "gitlab-access-token" // Jenkins에 등록한 Username with password ID
+        GIT_CRED_ID = "gitlab-access-token"
         
         DEV_PATH = "/home/ubuntu/jupasu_dev"
         PROD_PATH = "/home/ubuntu/jupasu_prod"
@@ -27,68 +28,66 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
-            parallel {
-                stage('Backend Build') {
-                    steps {
-                        dir('back') {
-                            sh 'chmod +x gradlew'
-                            sh './gradlew clean build -x test'
-                        }
-                    }
-                }
-                stage('Frontend Build') {
-                    steps {
-                        dir('front') {
-                            sh 'npx pnpm install'
-                            sh 'npx pnpm run build'
-                        }
+        stage('Build & Push Images') {
+            steps {
+                script {
+                    // 환경 설정 (브랜치에 따라 태그 분기)
+                    def tag = (env.GIT_BRANCH == 'origin/master') ? "latest" : "dev"
+                    
+                    // Jenkins Docker Pipeline 플러그인이 설치되어 있어야 함
+                    docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CRED_ID}") {
+                        echo "Building and Pushing images for branch: ${env.GIT_BRANCH} (Tag: ${tag})"
+                        
+                        // 1. AI 서비스
+                        def aiImage = docker.build("${DOCKER_REPO}:ai-${tag}", "./ai")
+                        aiImage.push()
+
+                        // 2. Backend 서비스
+                        def backImage = docker.build("${DOCKER_REPO}:back-${tag}", "./back")
+                        backImage.push()
+
+                        // 3. Frontend 서비스
+                        def frontImage = docker.build("${DOCKER_REPO}:front-${tag}", "./front")
+                        frontImage.push()
                     }
                 }
             }
         }
 
-        stage('Dev: Build Images') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/develop' }
-            }
+        stage('Deploy to EC2') {
             steps {
-                echo "develop 브랜치: 개발 서버 배포를 시작합니다."
-                withCredentials([usernamePassword(credentialsId: "${GIT_CRED_ID}", 
-                                                  passwordVariable: 'GIT_TOKEN', 
-                                                  usernameVariable: 'GIT_USER')]) {
-                    sshagent(credentials: ["${SSH_CRED_ID}"]) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ${PROD_SERVER_USER}@${PROD_SERVER_IP} "
-                                cd ${DEV_PATH} &&
-                                git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@${REPO_URL} &&
-                                git pull origin develop &&
-                                sudo docker compose -f docker-compose.dev.yml up -d --build
-                            "
-                        """
-                    }
-                }
-            }
-        }
+                script {
+                    // 환경별 변수 설정
+                    def isMaster = (env.GIT_BRANCH == 'origin/master')
+                    def targetPath = isMaster ? PROD_PATH : DEV_PATH
+                    def composeFile = isMaster ? "docker-compose.prod.yml" : "docker-compose.dev.yml"
+                    def branchName = isMaster ? "master" : "develop"
+                    
+                    echo "Deploying to ${isMaster ? 'Production' : 'Development'} server..."
 
-        stage('Master: Production Deploy') {
-            when {
-                expression { env.GIT_BRANCH == 'origin/master' }
-            }
-            steps {
-                echo "master 브랜치: 운영 서버 배포를 시작합니다."
-                withCredentials([usernamePassword(credentialsId: "${GIT_CRED_ID}", 
-                                                  passwordVariable: 'GIT_TOKEN', 
-                                                  usernameVariable: 'GIT_USER')]) {
-                    sshagent(credentials: ["${SSH_CRED_ID}"]) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ${PROD_SERVER_USER}@${PROD_SERVER_IP} "
-                                cd ${PROD_PATH} &&
-                                git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@${REPO_URL} &&
-                                git pull origin master &&
-                                sudo docker compose -f docker-compose.prod.yml up -d --build
-                            "
-                        """
+                    withCredentials([usernamePassword(credentialsId: "${GIT_CRED_ID}", 
+                                                      passwordVariable: 'GIT_TOKEN', 
+                                                      usernameVariable: 'GIT_USER')]) {
+                        sshagent(credentials: ["${SSH_CRED_ID}"]) {
+                            sh """
+                                ssh -o StrictHostKeyChecking=no ${PROD_SERVER_USER}@${PROD_SERVER_IP} "
+                                    cd ${targetPath} &&
+                                    git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@${REPO_URL} &&
+                                    git pull origin ${branchName} &&
+                                    
+                                    # Docker Hub 로그인 (비공개 저장소 접근 권한 획득)
+                                    echo '${GIT_TOKEN}' | docker login -u '${DOCKER_USER}' --password-stdin &&
+                                    
+                                    # 이미지 정보 업데이트 후 Pull 및 컨테이너 재시작
+                                    export DOCKER_USER=${DOCKER_USER} &&
+                                    docker compose -f ${composeFile} pull &&
+                                    docker compose -f ${composeFile} up -d &&
+                                    
+                                    # 사용하지 않는 이전 이미지 정리
+                                    docker image prune -f
+                                "
+                            """
+                        }
                     }
                 }
             }
