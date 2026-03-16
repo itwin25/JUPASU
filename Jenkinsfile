@@ -31,21 +31,17 @@ pipeline {
         stage('Build & Push Images') {
             steps {
                 script {
-                    // 환경 설정 (브랜치에 따라 태그 분기)
                     def tag = (env.GIT_BRANCH == 'origin/master') ? "latest" : "dev"
                     
                     docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CRED_ID}") {
                         echo "Building and Pushing images for branch: ${env.GIT_BRANCH} (Tag: ${tag})"
                         
-                        // 1. AI 서비스 빌드 및 푸시
                         sh "docker build -t ${DOCKER_REPO}:ai-${tag} ./ai"
                         sh "docker push ${DOCKER_REPO}:ai-${tag}"
 
-                        // 2. Backend 서비스 빌드 및 푸시
                         sh "docker build -t ${DOCKER_REPO}:back-${tag} ./back"
                         sh "docker push ${DOCKER_REPO}:back-${tag}"
 
-                        // 3. Frontend 서비스 빌드 및 푸시
                         sh "docker build -t ${DOCKER_REPO}:front-${tag} ./front"
                         sh "docker push ${DOCKER_REPO}:front-${tag}"
                     }
@@ -56,7 +52,6 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 script {
-                    // 환경별 변수 설정
                     def isMaster = (env.GIT_BRANCH == 'origin/master')
                     def targetPath = isMaster ? PROD_PATH : DEV_PATH
                     def composeFile = isMaster ? "docker-compose.prod.yml" : "docker-compose.dev.yml"
@@ -64,9 +59,11 @@ pipeline {
                     
                     echo "Deploying to ${isMaster ? 'Production' : 'Development'} server..."
 
-                    withCredentials([usernamePassword(credentialsId: "${GIT_CRED_ID}", 
-                                                      passwordVariable: 'GIT_TOKEN', 
-                                                      usernameVariable: 'GIT_USER')]) {
+                    // GitLab 자격 증명과 Docker Hub 자격 증명을 각각 올바르게 불러옵니다.
+                    withCredentials([
+                        usernamePassword(credentialsId: "${GIT_CRED_ID}", passwordVariable: 'GIT_TOKEN', usernameVariable: 'GIT_USER'),
+                        usernamePassword(credentialsId: "${DOCKER_CRED_ID}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_ID')
+                    ]) {
                         sshagent(credentials: ["${SSH_CRED_ID}"]) {
                             sh """
                                 ssh -o StrictHostKeyChecking=no ${PROD_SERVER_USER}@${PROD_SERVER_IP} "
@@ -74,15 +71,13 @@ pipeline {
                                     git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@${REPO_URL} &&
                                     git pull origin ${branchName} &&
                                     
-                                    # Docker Hub 로그인 (비공개 저장소 접근 권한 획득)
-                                    echo '${GIT_TOKEN}' | docker login -u '${DOCKER_USER}' --password-stdin &&
+                                    # Docker Hub 전용 비밀번호로 로그인
+                                    echo '${DOCKER_PASSWORD}' | docker login -u '${DOCKER_ID}' --password-stdin &&
                                     
-                                    # 이미지 정보 업데이트 후 Pull 및 컨테이너 재시작
                                     export DOCKER_USER=${DOCKER_USER} &&
                                     docker compose -f ${composeFile} pull &&
                                     docker compose -f ${composeFile} up -d &&
                                     
-                                    # 사용하지 않는 이전 이미지 정리
                                     docker image prune -f
                                 "
                             """
