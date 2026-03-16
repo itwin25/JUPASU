@@ -15,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 취향 리포트 생성 및 분석 비즈니스 로직을 담당하는 서비스
+ */
 @Service
 @RequiredArgsConstructor
 public class TasteReportService {
@@ -24,6 +27,9 @@ public class TasteReportService {
 
     private static final double PREFERENCE_WEIGHT = 5.0;
 
+    /**
+     * 유저의 온보딩 데이터와 리뷰 히스토리를 결합하여 가중 평균 리포트를 생성
+     */
     @Transactional
     public TasteReportResponse generateReport(User user) {
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
@@ -83,7 +89,9 @@ public class TasteReportService {
         return TasteReportResponse.from(report);
     }
 
-    // 알콜 도수(%)를 1~5점 척도로 변환하는 헬퍼 메서드
+    /**
+     * 와인의 실제 알코올 도수(%)를 차트용 1~5점 척도로 변환하는 헬퍼 메서드
+     */
     private double normalizeAlcohol(Double alcohol) {
         if (alcohol == null) return 3.0;
         if (alcohol < 11) return 1.0;
@@ -93,6 +101,9 @@ public class TasteReportService {
         return 5.0;
     }
 
+    /**
+     * AI API 호출 시 전달할 유저 데이터 텍스트를 생성
+     */
     private String createPromptContext(List<Review> reviews) {
         StringBuilder sb = new StringBuilder();
         sb.append("사용자의 와인 리뷰 히스토리:\n");
@@ -105,7 +116,5 @@ public class TasteReportService {
         }
         return sb.toString();
     }
-
-
 
 }

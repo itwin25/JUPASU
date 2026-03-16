@@ -6,6 +6,10 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * 사용자의 취향 분석 결과를 저장하는 엔티티
+ * 특정 시점의 리뷰 및 선호도 데이터를 기반으로 생성된 리포트 정보를 보관
+ */
 @Entity
 @Getter
 @Builder
