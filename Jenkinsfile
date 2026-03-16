@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         // [필수 수정] 본인의 Docker Hub ID를 입력하세요
-        DOCKER_USER = "your_docker_hub_id" 
-        DOCKER_REPO = "${DOCKER_USER}/wine-project"
+        DOCKER_USER = "shjh0815@naver.com" 
+        DOCKER_REPO = "${DOCKER_USER}/jupasu"
         DOCKER_CRED_ID = "docker-hub-credentials"
         
         // 운영 서버 정보
