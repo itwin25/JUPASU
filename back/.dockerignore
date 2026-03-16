@@ -1,14 +1,9 @@
-# Node.js
-node_modules/
-npm-debug.log
-yarn-error.log
-.pnpm-debug.log
-
-# Next.js build output
-.next/
-out/
+# Java & Gradle
+.gradle/
 build/
-dist/
+bin/
+out/
+target/
 
 # IDE & Config
 .idea/
@@ -21,7 +16,6 @@ dist/
 .git/
 .gitignore
 .gitattributes
-.husky/
 
 # Environment
 .env
@@ -31,3 +25,5 @@ dist/
 # Markdown & Documentation
 README.md
 *.md
+Jenkinsfile
+docker-compose*.yml
