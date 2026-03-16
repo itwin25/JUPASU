@@ -59,6 +59,9 @@ public class SecurityConfig {
 
                                 //swagger 추가
                                 , "/swagger-ui/**", "/v3/api-docs/**"
+
+                                //테스트용 api 추가
+                                , "/api/dummy/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
