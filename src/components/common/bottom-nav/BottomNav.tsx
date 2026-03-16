@@ -16,8 +16,8 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // 챗봇 페이지(/chat)에서는 하단 탭을 표시하지 않음
-  if (pathname === '/chat') return null;
+  // 챗봇 페이지(/chat)와 취향 설정 페이지(/mypage/taste)에서는 하단 탭을 표시하지 않음
+  if (pathname === '/chat' || pathname === '/mypage/taste') return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-primary-100 px-6 pb-safe pt-2 shadow-sm">
