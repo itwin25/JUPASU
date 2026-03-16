@@ -7,13 +7,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
-<<<<<<< HEAD
-import { cn } from '@/utils/cn';
-=======
 import Modal from '@/components/ui/modal/Modal';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
->>>>>>> 85302d7 (feat : 마이페이지 UI 구현)
 
 const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
 
