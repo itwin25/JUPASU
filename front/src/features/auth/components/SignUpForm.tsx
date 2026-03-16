@@ -22,7 +22,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
-  const { requestOtpAction, verifyOtp, signUp } = mutations;
+  const { requestOtpAction: requestOtp, verifyOtp, signUp } = mutations;
 
   const {
     register,
@@ -51,7 +51,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
 
   const handleAuthSend = async () => {
     if (!(await trigger('email'))) return;
-    requestOtpAction.mutate(getValues('email'), {
+    requestOtp.mutate(getValues('email'), {
       onSuccess: () => {
         clearErrors('email');
         setCurrentSubStep(3);
@@ -99,7 +99,9 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           placeholder="와인을 사랑하는 사람"
           {...register('nickname', {
             onChange: (e) => {
-              if (e.target.value.length >= 2 && currentSubStep === 1) setCurrentSubStep(2);
+              if (e.target.value.length >= 2 && currentSubStep === 1) {
+                setCurrentSubStep(2);
+              }
             },
           })}
           error={errors.nickname?.message}
@@ -125,7 +127,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
                 <Button
                   type="button"
                   onClick={handleAuthSend}
-                  isLoading={requestOtpAction.isPending}
+                  isLoading={requestOtp.isPending}
                   variant="secondary"
                   className="h-[56px]"
                 >
