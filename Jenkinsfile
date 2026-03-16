@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         // [필수 수정] 본인의 Docker Hub ID를 입력하세요
-        DOCKER_USER = "shjh0815@naver.com" 
-        DOCKER_REPO = "${DOCKER_USER}/jupasu"
+        DOCKER_USER = "your_docker_hub_id" 
+        DOCKER_REPO = "${DOCKER_USER}/wine-project"
         DOCKER_CRED_ID = "docker-hub-credentials"
         
         // 운영 서버 정보
@@ -34,21 +34,20 @@ pipeline {
                     // 환경 설정 (브랜치에 따라 태그 분기)
                     def tag = (env.GIT_BRANCH == 'origin/master') ? "latest" : "dev"
                     
-                    // Jenkins Docker Pipeline 플러그인이 설치되어 있어야 함
                     docker.withRegistry('https://index.docker.io/v1/', "${DOCKER_CRED_ID}") {
                         echo "Building and Pushing images for branch: ${env.GIT_BRANCH} (Tag: ${tag})"
                         
-                        // 1. AI 서비스
-                        def aiImage = docker.build("${DOCKER_REPO}:ai-${tag}", "./ai")
-                        aiImage.push()
+                        // 1. AI 서비스 빌드 및 푸시
+                        sh "docker build -t ${DOCKER_REPO}:ai-${tag} ./ai"
+                        sh "docker push ${DOCKER_REPO}:ai-${tag}"
 
-                        // 2. Backend 서비스
-                        def backImage = docker.build("${DOCKER_REPO}:back-${tag}", "./back")
-                        backImage.push()
+                        // 2. Backend 서비스 빌드 및 푸시
+                        sh "docker build -t ${DOCKER_REPO}:back-${tag} ./back"
+                        sh "docker push ${DOCKER_REPO}:back-${tag}"
 
-                        // 3. Frontend 서비스
-                        def frontImage = docker.build("${DOCKER_REPO}:front-${tag}", "./front")
-                        frontImage.push()
+                        // 3. Frontend 서비스 빌드 및 푸시
+                        sh "docker build -t ${DOCKER_REPO}:front-${tag} ./front"
+                        sh "docker push ${DOCKER_REPO}:front-${tag}"
                     }
                 }
             }
