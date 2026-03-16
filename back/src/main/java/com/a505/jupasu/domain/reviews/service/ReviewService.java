@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.reviews.service;
 
 
+import com.a505.jupasu.domain.reviews.dto.MyPageReviewResponse;
 import com.a505.jupasu.domain.reviews.dto.ReviewCreateRequest;
 import com.a505.jupasu.domain.reviews.dto.ReviewResponse;
 import com.a505.jupasu.domain.reviews.dto.ReviewUpdateRequest;
@@ -98,5 +99,17 @@ public class ReviewService {
         }
         reviewRepository.delete(review);
     }
+
+    /**
+     * 현재 로그인한 사용자의 리뷰 목록을 조회하여 DTO로 반환
+     * * @param user 현재 인증된 사용자 객체
+     * @return 마이페이지용 리뷰 응답 DTO 리스트
+     */
+    public List<MyPageReviewResponse> getMyReviews(User user) {
+        return reviewRepository.findAllByUserWithWine(user).stream()
+                .map(MyPageReviewResponse::from)
+                .collect(Collectors.toList());
+    }
+
 
 }
