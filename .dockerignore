@@ -1,5 +1,33 @@
-node_modules
-.next
-.git
-.husky
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# IDE & Config
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Version Control
+.git/
+.gitignore
+.gitattributes
+.husky/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Markdown & Documentation
+README.md
 *.md
