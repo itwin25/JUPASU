@@ -1,0 +1,40 @@
+# Python artifacts
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.pytest_cache/
+**/.python-version
+
+# Local Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment secrets (Crucial for security)
+.env
+.env.*
+!.env.example
+
+# Version Control
+.git/
+.gitignore
+.gitattributes
+
+# IDE & Tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project Documentation & Metadata
+README.md
+PROJECT_STRATEGY.md
+SOMMELIER_PIPELINE_SCENARIOS.md
+
+# Data & Cache (Project Specific)
+crawled-results/
+crawled_images.zip
+tests/
+logs/
+.ruff_cache/
