@@ -51,7 +51,7 @@ public class Wine extends BaseEntity {
 
     private Double averageRating;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     private String summary;
