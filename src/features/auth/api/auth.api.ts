@@ -1,6 +1,7 @@
 import { API_PATH } from '@/constants/api-path';
 import { api } from '@/lib/axios';
-import { AuthResponse, SignupRequest } from '@/features/auth/types/auth.types';
+import { AuthResponse, SignupRequest, SigninRequest } from '@/features/auth/types/auth.types';
+import { AxiosResponse } from 'axios';
 
 /**
  * 인증 관련 API 서비스
@@ -45,6 +46,21 @@ export const authApi = {
    */
   signUp: async (request: SignupRequest): Promise<AuthResponse<null>> => {
     const { data } = await api.post<AuthResponse<null>>(API_PATH.AUTH.SIGNUP, request);
+    return data;
+  },
+
+  /**
+   * 로그인
+   */
+  signIn: async (request: SigninRequest): Promise<AxiosResponse<AuthResponse<null>>> => {
+    return await api.post<AuthResponse<null>>(API_PATH.AUTH.SIGNIN, request);
+  },
+
+  /**
+   * 로그아웃
+   */
+  signOut: async (): Promise<AuthResponse<null>> => {
+    const { data } = await api.post<AuthResponse<null>>(API_PATH.AUTH.SIGNOUT);
     return data;
   },
 };

@@ -1,4 +1,5 @@
 import { ErrorCode } from './error.types';
+import { SigninSchema } from '../schemas/auth.schema';
 
 // 요청
 export interface SignupRequest {
@@ -24,8 +25,11 @@ export interface ValidateEmailRequest {
   email: string;
 }
 
-// 응답
+export type SigninRequest = SigninSchema;
+
+// 응답 (공통)
 export interface AuthResponse<T = null> {
+  headers?: Record<string, string>;
   data: T;
   message: string;
   status: number;
