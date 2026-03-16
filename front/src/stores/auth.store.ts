@@ -1,21 +1,29 @@
 import { create } from 'zustand';
-import { UserInfo, AuthStatus } from '@/types/user.types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { UserInfo } from '@/types/user.types';
+import { authToken } from '@/features/auth/utils/auth-token';
 
 interface AuthState {
   user: UserInfo | null;
-  status: AuthStatus;
-  setUser: (user: UserInfo | null) => void;
-  setStatus: (status: AuthStatus) => void;
-  logout: () => void;
+  isAuthenticated: boolean;
+  setAuth: (user: UserInfo) => void;
+  clearAuth: () => void;
 }
 
-/**
- * 전역 인증 상태 스토어
- */
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  status: 'idle',
-  setUser: (user) => set({ user, status: user ? 'authenticated' : 'unauthenticated' }),
-  setStatus: (status) => set({ status }),
-  logout: () => set({ user: null, status: 'unauthenticated' }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      setAuth: (user) => set({ user, isAuthenticated: true }),
+      clearAuth: () => {
+        authToken.remove();
+        set({ user: null, isAuthenticated: false });
+      },
+    }),
+    {
+      name: 'jupasu-auth-storage',
+      storage: createJSONStorage(() => localStorage),
+    },
+  ),
+);

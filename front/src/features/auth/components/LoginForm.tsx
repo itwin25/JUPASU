@@ -4,15 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import Input from '@/components/ui/input/Input';
-import Button from '@/components/ui/button/Button';
-import { useLoginMutation } from '../hooks/useLoginMutation';
+// import Button from '@/components/ui/button/Button';
+// import { useLoginMutation } from '../hooks/useLoginMutation';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { mutate: login, isPending } = useLoginMutation();
+  // const { mutate: login, isPending } = useLoginMutation();
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,9 +30,9 @@ export default function LoginForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (validateEmail(email)) {
-      login({ email, password });
+      // login({ email, password });
     }
   };
 
@@ -71,21 +71,24 @@ export default function LoginForm() {
             }
           />
           <div className="flex justify-end">
-            <Link href="/password-reset" className="text-sm font-medium text-[#B36262] hover:text-[#880606]">
+            <Link
+              href="/password-reset"
+              className="text-sm font-medium text-[#B36262] hover:text-[#880606]"
+            >
               비밀번호를 잊으셨나요?
             </Link>
           </div>
         </div>
       </div>
-      
-      <div className="pt-4 space-y-6">
-        <Button type="submit" size="full" isLoading={isPending} className="text-lg shadow-sm">
+
+      <div className="space-y-6 pt-4">
+        {/* <Button type="submit" size="full" isLoading={isPending} className="text-lg shadow-sm">
           로그인
-        </Button>
-        
-        <div className="text-center text-sm font-medium text-text-main/60">
+        </Button> */}
+
+        <div className="text-text-main/60 text-center text-sm font-medium">
           계정이 없으신가요?{' '}
-          <Link href="/signup" className="text-[#B36262] hover:text-[#880606] font-bold">
+          <Link href="/signup" className="font-bold text-[#B36262] hover:text-[#880606]">
             회원가입
           </Link>
         </div>
