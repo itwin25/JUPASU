@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/auth.store'; // 작성하신 Zustand 스토어 경로
 import { UserInfo } from '@/types/user.types';
 
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const { isAuthenticated, user, clearAuth, hydrateAuth } = useAuthStore();
 
   const [isMounted, setIsMounted] = useState(false);
@@ -36,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     clearAuth();
-    window.location.href = '/initial';
+    router.push('/initial');
   };
 
   if (!isMounted) {
