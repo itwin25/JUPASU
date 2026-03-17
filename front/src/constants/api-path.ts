@@ -19,16 +19,26 @@ export const API_PATH = {
     LIST: '/wines',
     DETAIL: (id: number | string) => `/wines/${id}`,
     RECOMMEND: '/wines/recommend',
+    SCRAPS: '/wines/scraps',
   },
   USER: {
     PROFILE: '/users/profile',
     ONBOARDING: '/users/onboarding',
     ME: '/users/me',
+    REVIEWS: '/users/reviews',
     WITHDRAW: '/users/withdraw',
   },
+  FRIEND: {
+    LIST: '/friends',
+    PENDING: '/friends/pending',
+    INVITE: '/friends/invite',
+    ACCEPT: '/friends/accept',
+    DETAIL: (requestId: number | string) => `/friends/${requestId}`,
+  },
   REVIEW: {
-    LIST: '/reviews',
-    CREATE: '/reviews',
-    DETAIL: (id: number | string) => `/reviews/${id}`,
+    LIST: (wineId: number | string) => `/reviews/${wineId}`,
+    CREATE: (wineId: number | string) => `/reviews/${wineId}/review`,
+    DETAIL: (wineId: number | string, reviewId: number | string) =>
+      `/reviews/${wineId}/review/${reviewId}`,
   },
 } as const;

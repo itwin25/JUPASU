@@ -1,6 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reviewApi } from '../api/review.api';
 import { QUERY_KEY } from '@/constants/query-key';
+import { DeleteReviewRequest, UpdateReviewRequest } from '../types/review.types';
+
+export function useMyReviewsQuery() {
+  return useQuery({
+    queryKey: QUERY_KEY.REVIEW.MY,
+    queryFn: reviewApi.getMyReviews,
+  });
+}
 
 export function useWineReviewsQuery(wineId: string | number) {
   return useQuery({
@@ -21,13 +29,23 @@ export function useCreateReviewMutation() {
 }
 
 export function useUpdateReviewMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, content }: { id: string | number; content: string }) => reviewApi.update(id, content),
+    mutationFn: (data: UpdateReviewRequest) => reviewApi.update(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) });
+    },
   });
 }
 
 export function useDeleteReviewMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: reviewApi.delete,
+    mutationFn: (data: DeleteReviewRequest) => reviewApi.delete(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) });
+    },
   });
 }
