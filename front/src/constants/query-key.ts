@@ -12,6 +12,7 @@ export const QUERY_KEY = {
   },
   USER: {
     PROFILE: ['user', 'profile'],
+    ME: ['user', 'me'],
   },
   REVIEW: {
     LIST: (wineId?: number | string) => ['review', 'list', wineId],

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import { authToken } from '@/features/auth/utils/auth-token';
 
 /**
@@ -14,9 +14,9 @@ export const api = axios.create({
 
 // 요청 인터셉터: 토큰 자동 추가
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = authToken.getAccess();
-    if (token) {
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -24,7 +24,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// 응답 인터셉터: 헤더 토큰 추출 및 401 처리
+// 응답 인터셉터: 헤더 토큰 추출 및 401 에러 시 토큰 재발급 로직
 api.interceptors.response.use(
   (response) => {
     const authHeader = response.headers['authorization'];

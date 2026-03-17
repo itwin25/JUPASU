@@ -34,7 +34,7 @@ services:
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
   ai:
-    image: ${DOCKER_USER}/wine-project:ai-dev
+    image: ${DOCKER_USER}/jupasu:ai-dev
     container_name: ai-fastapi-dev
     restart: always
     networks:
@@ -48,7 +48,7 @@ services:
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
-    image: ${DOCKER_USER}/wine-project:back-dev
+    image: ${DOCKER_USER}/jupasu:back-dev
     container_name: backend-spring-dev
     restart: always
     environment:
@@ -77,7 +77,7 @@ services:
 
   # Frontend: Next.js (React 19)
   frontend:
-    image: ${DOCKER_USER}/wine-project:front-dev
+    image: ${DOCKER_USER}/jupasu:front-dev
     container_name: front-nextjs-dev
     restart: always
     environment:
