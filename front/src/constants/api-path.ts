@@ -3,8 +3,8 @@
  */
 export const API_PATH = {
   AUTH: {
-    LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
+    LOGIN: '/auth/signin',
+    LOGOUT: '/auth/signout',
     SIGNUP: '/auth/signup',
     ME: '/auth/me',
   },
@@ -16,6 +16,8 @@ export const API_PATH = {
   USER: {
     PROFILE: '/users/profile',
     ONBOARDING: '/users/onboarding',
+    ME: '/users/me',
+    WITHDRAW: '/users/withdraw',
   },
   REVIEW: {
     LIST: '/reviews',
