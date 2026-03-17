@@ -39,10 +39,12 @@ export default function ProfileEditPage() {
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const resolvedNickname = nickname ?? profile?.nickname ?? '';
-  const resolvedAvatar =
-    currentAvatar ??
-    (profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg');
+  const profileNickname = profile ? profile.nickname : '';
+  const profileCharacter =
+    profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg';
+
+  const resolvedNickname = nickname ?? profileNickname;
+  const resolvedAvatar = currentAvatar ?? profileCharacter;
 
   const handleUpdateProfile = async () => {
     const shouldChangePassword =
