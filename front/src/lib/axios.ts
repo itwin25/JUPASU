@@ -1,5 +1,11 @@
 import axios, { InternalAxiosRequestConfig } from 'axios';
 import { authToken } from '@/features/auth/utils/auth-token';
+import { useAuthStore } from '@/stores/auth.store';
+
+/**
+ * 전역 리다이렉트 플래그 (Redirect Storm 방지)
+ */
+let isRedirecting = false;
 
 /**
  * 공통 Axios 인스턴스 (인증 및 RTR 처리)
@@ -44,7 +50,10 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // 401 에러이고 아직 재시도하지 않은 경우
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 단, 로그인 요청 자체가 401인 경우(계정 정보 불일치 등)는 토큰 재발급 로직을 타지 않음
+    const isSigninRequest = originalRequest.url?.includes('/auth/signin');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isSigninRequest) {
       originalRequest._retry = true;
 
       try {
@@ -72,8 +81,19 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // 갱신 실패 시 로그아웃 처리
-        authToken.remove();
+        // 갱신 실패 시 (리프레시 토큰 만료 등) 보안 처리
+        if (!isRedirecting) {
+          isRedirecting = true;
+
+          // 1. 토큰 및 스토어 정보 삭제
+          authToken.remove();
+          useAuthStore.getState().clearAuth();
+
+          // 2. 로그인 페이지로 강제 이동 (세션 만료 에러 코드 포함)
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login?error=session_expired';
+          }
+        }
         return Promise.reject(refreshError);
       }
     }

@@ -25,9 +25,11 @@ export default function LoginForm({ errorCode }: LoginFormProps) {
 
   // 리다이렉트 에러용 토스트 (로그인 후 이용해주세요)
   useEffect(() => {
-    if (errorCode === 'login_required' && !toastShown.current) {
-      addToast('로그인 후 이용해주세요.', 'info');
-      toastShown.current = true;
+    if (!toastShown.current) {
+      if (errorCode === 'login_required') {
+        addToast('로그인 후 이용해주세요.', 'info');
+        toastShown.current = true;
+      }
     }
   }, [errorCode, addToast]);
 
@@ -35,10 +37,10 @@ export default function LoginForm({ errorCode }: LoginFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<SigninSchema>({
     resolver: zodResolver(signinSchema),
-    mode: 'onBlur', // 포커스 아웃 시 검사 수행
+    mode: 'onChange', // 실시간 검증으로 버튼 활성화 상태 제어
   });
 
   // 폼 제출 핸들러
@@ -65,7 +67,11 @@ export default function LoginForm({ errorCode }: LoginFormProps) {
             type={showPassword ? 'text' : 'password'}
             placeholder="********"
             {...register('password')}
-            error={errors.password?.message}
+            error={
+              errors.password?.message === '비밀번호를 입력해주세요.'
+                ? errors.password.message
+                : undefined
+            }
             required
             suffix={
               <button
@@ -93,6 +99,7 @@ export default function LoginForm({ errorCode }: LoginFormProps) {
         <Button
           type="submit"
           size="full"
+          disabled={!isValid}
           isLoading={signinMutation.isPending}
           className="text-lg shadow-sm"
         >
