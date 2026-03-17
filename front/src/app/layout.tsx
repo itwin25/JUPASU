@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: '주(酒)파수 | 와인 추천 및 탐색 서비스',
-  description: '나만의 와인 취향을 찾아가는 여정, 주(酒)파수',
+  title: 'JUPASU',
+  description: 'AI Wine Sommelier Service',
 };
 
 export default function RootLayout({
