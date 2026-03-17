@@ -18,6 +18,13 @@ import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useSignout } from '@/features/auth/hooks';
 import {
+  useDeleteFriendMutation,
+  useFriendListQuery,
+  useInviteFriendMutation,
+  usePendingFriendListQuery,
+  useRespondFriendRequestMutation,
+} from '@/features/friend/hooks/useFriendQueries';
+import {
   useDeleteReviewMutation,
   useMyReviewsQuery,
   useUpdateReviewMutation,
@@ -48,13 +55,15 @@ type WishlistItem = {
 
 type FriendItem = {
   id: number;
+  requestId?: number;
+  friendId?: number;
   name: string;
   winesTasted: number;
   avatar: string;
 };
 
 type SearchFriendItem = FriendItem & {
-  status: 'friend' | 'pending';
+  status: 'friend' | 'pending' | 'idle';
 };
 
 const INITIAL_REVIEWS: ReviewItem[] = [
@@ -123,6 +132,11 @@ const PAGINATION = [1, 2, 3, 4, 5];
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
 
+function resolveCharacterImage(character?: string) {
+  if (!character) return '/dog1.svg';
+  return character.startsWith('/') ? character : `/${character}`;
+}
+
 function Pagination() {
   return (
     <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
@@ -149,6 +163,8 @@ function Pagination() {
 
 export default function MyPage() {
   const { data: myReviews = [] } = useMyReviewsQuery();
+  const { data: friendListData } = useFriendListQuery();
+  const { data: pendingFriendListData } = usePendingFriendListQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
@@ -165,10 +181,16 @@ export default function MyPage() {
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
   >({});
   const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
+  const [sentInviteIds, setSentInviteIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
+  const inviteFriendMutation = useInviteFriendMutation();
+  const respondFriendRequestMutation = useRespondFriendRequestMutation();
+  const deleteFriendMutation = useDeleteFriendMutation();
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
+  const friendList = friendListData ?? [];
+  const pendingFriendList = pendingFriendListData ?? [];
   const mappedReviews = useMemo<ReviewItem[]>(
     () =>
       myReviews.map((review) => {
@@ -195,12 +217,51 @@ export default function MyPage() {
     (review) => !deletedReviewIds.includes(review.id),
   );
   const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
+  const visibleFriends = useMemo<FriendItem[]>(
+    () =>
+      friendListData
+        ? friendList.map((friend) => ({
+            id: friend.friendId,
+            requestId: friend.requestId,
+            friendId: friend.friendId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIENDS,
+    [friendList, friendListData],
+  );
+  const visiblePendingFriends = useMemo<FriendItem[]>(
+    () =>
+      pendingFriendListData
+        ? pendingFriendList.map((friend) => ({
+            id: friend.requesterId,
+            requestId: friend.requestId,
+            friendId: friend.requesterId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIEND_REQUESTS,
+    [pendingFriendList, pendingFriendListData],
+  );
 
   const filteredFriendResults = useMemo(() => {
-    if (!friendSearchQuery.trim()) return SEARCH_RESULTS;
+    const friendIds = new Set(visibleFriends.map((friend) => friend.friendId ?? friend.id));
+    const pendingIds = new Set([
+      ...visiblePendingFriends.map((friend) => friend.friendId ?? friend.id),
+      ...sentInviteIds,
+    ]);
+
+    const searchResults = SEARCH_RESULTS.map((friend) => ({
+      ...friend,
+      status: friendIds.has(friend.id) ? 'friend' : pendingIds.has(friend.id) ? 'pending' : 'idle',
+    }));
+
+    if (!friendSearchQuery.trim()) return searchResults;
     const query = friendSearchQuery.toLowerCase();
-    return SEARCH_RESULTS.filter((friend) => friend.name.toLowerCase().includes(query));
-  }, [friendSearchQuery]);
+    return searchResults.filter((friend) => friend.name.toLowerCase().includes(query));
+  }, [friendSearchQuery, sentInviteIds, visibleFriends, visiblePendingFriends]);
 
   const handleLogout = () => {
     handleSignout();
@@ -256,6 +317,40 @@ export default function MyPage() {
       setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
     }
     setDeletingReviewId(null);
+  };
+
+  const handleInviteFriend = async (friend: SearchFriendItem) => {
+    if (friend.status !== 'idle') return;
+    const receiverIdMap: Record<number, number> = {
+      21: 5,
+      22: 3,
+      23: 4,
+    };
+    const receiverId = receiverIdMap[friend.id] ?? friend.id;
+
+    await inviteFriendMutation.mutateAsync({
+      receiverId,
+      receiverNickname: friend.name,
+    });
+    setSentInviteIds((prev) => [...prev, receiverId]);
+  };
+
+  const handleFriendRequestResponse = async (
+    requestId: number | undefined,
+    status: 'ACCEPTED' | 'REJECTED',
+  ) => {
+    if (!requestId) return;
+
+    await respondFriendRequestMutation.mutateAsync({
+      requestId,
+      status,
+    });
+  };
+
+  const handleDeleteFriend = async (requestId: number | undefined) => {
+    if (!requestId) return;
+
+    await deleteFriendMutation.mutateAsync(requestId);
   };
 
   return (
@@ -342,7 +437,7 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
-              <p className="text-lg font-black text-[#B36262]">{FRIENDS.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{visibleFriends.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
@@ -715,7 +810,7 @@ export default function MyPage() {
                 onClick={() => setFriendTab('requests')}
                 className="rounded-full bg-[#C57070] px-3 py-1.5 text-[11px] font-black text-white"
               >
-                친구 요청 ({FRIEND_REQUESTS.length})
+                친구 요청 ({visiblePendingFriends.length})
               </button>
             </div>
 
@@ -738,9 +833,11 @@ export default function MyPage() {
             </button>
 
             <div>
-              <p className="text-text-main/45 mb-3 text-sm font-medium">친구 {FRIENDS.length}명</p>
+              <p className="text-text-main/45 mb-3 text-sm font-medium">
+                친구 {visibleFriends.length}명
+              </p>
               <div className="max-h-[18rem] space-y-2.5 overflow-y-auto pr-1">
-                {FRIENDS.map((friend) => (
+                {visibleFriends.map((friend) => (
                   <div
                     key={friend.id}
                     className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-2.5"
@@ -765,7 +862,10 @@ export default function MyPage() {
                       <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
                         프로필
                       </button>
-                      <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                      <button
+                        onClick={() => handleDeleteFriend(friend.requestId)}
+                        className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                      >
                         삭제
                       </button>
                     </div>
@@ -778,7 +878,7 @@ export default function MyPage() {
 
         {friendTab === 'requests' && (
           <div className="space-y-2.5">
-            {FRIEND_REQUESTS.map((friend) => (
+            {visiblePendingFriends.map((friend) => (
               <div
                 key={friend.id}
                 className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
@@ -790,10 +890,16 @@ export default function MyPage() {
                   <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'ACCEPTED')}
+                    className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]"
+                  >
                     수락
                   </button>
-                  <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'REJECTED')}
+                    className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                  >
                     거절
                   </button>
                 </div>
@@ -834,12 +940,14 @@ export default function MyPage() {
                     </div>
                   </div>
                   <button
+                    onClick={() => handleInviteFriend(friend)}
                     className={cn(
                       'rounded-full px-3.5 py-1 text-[10px] font-black',
                       friend.status === 'friend'
                         ? 'bg-[#8B8B8B] text-white'
                         : 'bg-[#F6EAEA] text-[#B17672]',
                     )}
+                    disabled={friend.status !== 'idle'}
                   >
                     {friend.status === 'friend' ? '친구' : '친구 요청'}
                   </button>

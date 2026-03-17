@@ -27,6 +27,13 @@ export const API_PATH = {
     REVIEWS: '/users/reviews',
     WITHDRAW: '/users/withdraw',
   },
+  FRIEND: {
+    LIST: '/friends',
+    PENDING: '/friends/pending',
+    INVITE: '/friends/invite',
+    ACCEPT: '/friends/accept',
+    DETAIL: (requestId: number | string) => `/friends/${requestId}`,
+  },
   REVIEW: {
     LIST: (wineId: number | string) => `/reviews/${wineId}`,
     CREATE: (wineId: number | string) => `/reviews/${wineId}/review`,

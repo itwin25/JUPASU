@@ -14,6 +14,10 @@ export const QUERY_KEY = {
     PROFILE: ['user', 'profile'],
     ME: ['user', 'me'],
   },
+  FRIEND: {
+    LIST: ['friend', 'list'],
+    PENDING: ['friend', 'pending'],
+  },
   REVIEW: {
     LIST: (wineId?: number | string) => ['review', 'list', wineId],
     MY: ['review', 'my'],
