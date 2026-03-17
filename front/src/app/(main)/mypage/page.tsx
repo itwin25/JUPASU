@@ -295,14 +295,14 @@ export default function MyPage() {
     [pendingFriendList, pendingFriendListData],
   );
 
-  const filteredFriendResults = useMemo(() => {
+  const filteredFriendResults = useMemo<SearchFriendItem[]>(() => {
     const friendIds = new Set(visibleFriends.map((friend) => friend.friendId ?? friend.id));
     const pendingIds = new Set([
       ...visiblePendingFriends.map((friend) => friend.friendId ?? friend.id),
       ...sentInviteIds,
     ]);
 
-    const searchResults = SEARCH_RESULTS.map((friend) => ({
+    const searchResults: SearchFriendItem[] = SEARCH_RESULTS.map((friend) => ({
       ...friend,
       status: friendIds.has(friend.id) ? 'friend' : pendingIds.has(friend.id) ? 'pending' : 'idle',
     }));
