@@ -1,0 +1,29 @@
+# Java & Gradle
+.gradle/
+build/
+bin/
+out/
+target/
+
+# IDE & Config
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Version Control
+.git/
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Markdown & Documentation
+README.md
+*.md
+Jenkinsfile
+docker-compose*.yml

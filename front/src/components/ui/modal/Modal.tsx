@@ -13,15 +13,29 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
+  hideDefaultFooter?: boolean;
+  centerTitle?: boolean;
+  hideCloseButton?: boolean;
 }
 
-export default function Modal({ isOpen, onClose, title, children, footer, className }: ModalProps) {
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  footer,
+  className,
+  hideDefaultFooter = false,
+  centerTitle = false,
+  hideCloseButton = false,
+}: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
+
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -31,41 +45,60 @@ export default function Modal({ isOpen, onClose, title, children, footer, classN
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 md:p-4">
-      {/* Overlay - 부드러운 오버레이 */}
-      <div 
-        className="absolute inset-0 bg-black/30 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-300" 
+      <div
+        className="animate-in fade-in absolute inset-0 bg-black/30 backdrop-blur-[2px] duration-300"
         onClick={onClose}
       />
-      
-      {/* Content - 큰 radius와 여백 */}
-      <div 
+
+      <div
         className={cn(
-          "relative w-full max-w-sm rounded-[2rem] bg-background p-8 shadow-2xl animate-in fade-in zoom-in duration-300",
-          className
+          'bg-background animate-in fade-in zoom-in relative w-full max-w-sm rounded-[2rem] p-8 shadow-2xl duration-300',
+          className,
         )}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-text-main tracking-tight">{title}</h2>
-          <Button variant="icon" onClick={onClose} className="border-none shadow-none -mr-2 bg-transparent">
-            <X size={24} className="text-text-main/40" />
-          </Button>
-        </div>
+        {(title || !hideCloseButton) && (
+          <div
+            className={cn(
+              'mb-6 flex items-center',
+              centerTitle ? 'justify-center' : 'justify-between',
+            )}
+          >
+            {title && (
+              <h2
+                className={cn(
+                  'text-text-main text-xl font-bold tracking-tight',
+                  centerTitle && 'flex-1 text-center',
+                )}
+              >
+                {title}
+              </h2>
+            )}
+            {!hideCloseButton && (
+              <Button
+                variant="icon"
+                onClick={onClose}
+                className={cn(
+                  '-mr-2 border-none bg-transparent shadow-none',
+                  centerTitle && 'absolute top-8 right-8',
+                )}
+              >
+                <X size={24} className="text-text-main/40" />
+              </Button>
+            )}
+          </div>
+        )}
 
-        <div className="text-text-main/80 text-base leading-relaxed mb-8">
-          {children}
-        </div>
+        <div className="text-text-main/80 mb-8 text-base leading-relaxed">{children}</div>
 
         {footer ? (
-          <div className="flex flex-col gap-3">
-            {footer}
-          </div>
-        ) : (
+          <div className="flex flex-col gap-3">{footer}</div>
+        ) : !hideDefaultFooter ? (
           <Button variant="primary" size="full" onClick={onClose} className="rounded-2xl">
             확인
           </Button>
-        )}
+        ) : null}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Camera, Upload, ChevronLeft, Search, Star, X } from 'lucide-react';
+import Link from 'next/link';
+import { Camera, Upload, ChevronLeft, ChevronRight, Search, Star, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 
@@ -49,7 +50,7 @@ export default function ScanPage() {
             </div>
 
             <div className="flex gap-3 mb-12">
-              <Button onClick={startScan} size="full" className="flex-1 gap-3 text-lg h-16">
+              <Button onClick={startScan} size="full" className="flex-1 gap-3 text-[18px]">
                 <Camera size={24} /> 카메라로 스캔
               </Button>
               <button className="w-16 h-16 bg-white border border-primary-100 rounded-3xl flex items-center justify-center text-text-main/30 hover:bg-gray-50 transition-colors">
@@ -103,42 +104,51 @@ export default function ScanPage() {
               <Input label="생산 연도 (Vintage)" defaultValue="2020" />
             </div>
 
-            <Button onClick={() => setStatus('result')} size="full" className="text-lg h-16 shadow-lg">
+            <Button onClick={() => setStatus('result')} size="full" className="text-lg shadow-lg">
               이 정보로 검색하기
             </Button>
           </div>
         )}
 
         {status === 'result' && (
-          <div className="flex flex-col space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex flex-col space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-18">
              {/* Main Result Card */}
-             <div className="bg-white rounded-[40px] p-6 border border-primary-100 shadow-sm flex gap-5 items-center">
-                <div className="w-24 h-24 bg-gray-100 rounded-3xl shrink-0" />
-                <div className="flex-1 space-y-1 relative">
-                   <h3 className="font-black text-xl leading-tight">Chateau Margaux 2018</h3>
-                   <p className="text-sm text-text-main/40 font-medium">Bordeaux Red</p>
-                   <div className="flex items-center gap-4 pt-2">
-                      <div className="flex items-center gap-1 text-[#FF8A00] font-black">
-                        <Star size={16} fill="#FF8A00" /> 4.8
-                      </div>
-                      <span className="font-black text-lg text-[#B36262]">₩120,000</span>
+             <div className="bg-white border border-primary-100 rounded-[20px] p-3 flex items-center gap-5">
+                {/* Left: Wine Image Area */}
+                <div className="w-22 h-24 bg-[#EBE6DF] rounded-[15px] flex items-center justify-center shrink-0">
+                   <span className="text-2xl">🍷</span>
+                </div>
+                
+                {/* Center & Right: Content */}
+                <div className="flex-1 min-w-0 flex items-center justify-between">
+                   <div className="space-y-1">
+                     <h3 className="text-[14px] font-black text-text-main leading-tight">Chateau Margaux 2018</h3>
+                     <p className="text-[12px] font-bold text-text-main/40 leading-tight">Bordeaux Red</p>
+                     <div className="flex items-center gap-4 pt-2">
+                        <div className="flex items-center gap-1 text-[#FF8A00] font-black text-sm">
+                           <Star size={12} fill="#FF8A00" /> 4.8
+                        </div>
+                        <span className="text-[14px] font-black text-[#B36262]">₩120,000</span>
+                     </div>
                    </div>
-                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-[10px] font-black text-[#B36262]">
-                      95%
+
+                   {/* Match Circle */}
+                   <div className="w-10 h-10 rounded-full bg-[#B36262]/5 flex items-center justify-center border border-[#B36262]/10 shrink-0">
+                      <span className="text-[10px] font-black text-[#B36262]">95%</span>
                    </div>
                 </div>
              </div>
 
              {/* Taste Profile */}
              <div className="space-y-4">
-                <h4 className="text-lg font-black text-text-main italic">맛 프로필</h4>
-                <div className="bg-white rounded-[40px] p-8 border border-primary-100 shadow-sm space-y-4">
+                <h4 className="text-lg font-black text-text-main uppercase tracking-tight">맛 프로필</h4>
+                <div className="bg-white rounded-[20px] p-8 border border-primary-100 shadow-sm space-y-5">
                    {['BODY', 'SWEET', 'ACID', 'TANNIN'].map((label) => (
                       <div key={label} className="flex items-center justify-between">
-                         <span className="text-xs font-black text-text-main/60">{label}</span>
-                         <div className="flex gap-1.5">
+                         <span className="text-sm font-black text-text-main/60 tracking-wider uppercase">{label}</span>
+                         <div className="flex gap-2">
                             {[1, 2, 3, 4, 5].map((d) => (
-                               <div key={d} className={`w-2.5 h-2.5 rotate-45 ${d <= 4 ? 'bg-[#B36262]' : 'bg-primary-100'}`} />
+                               <div key={d} className={`w-2.5 h-2.5 rotate-45 transition-colors ${d <= 4 ? 'bg-[#B36262]' : 'bg-[#EBE6DF]'}`} />
                             ))}
                          </div>
                       </div>
@@ -147,32 +157,48 @@ export default function ScanPage() {
              </div>
 
              {/* Recommendation Banner */}
-             <div className="bg-[#FFE5E5] rounded-[32px] p-6 flex items-center gap-4 border border-[#B36262]/10">
-                <div className="w-12 h-12 bg-[#B36262]/30 rounded-full shrink-0" />
+             <div className="bg-[#FFE5E5] rounded-[20px] p-6 flex items-center gap-5 border border-[#B36262]/5">
+                <div className="w-14 h-14 bg-[#B36262]/20 rounded-full flex items-center justify-center shrink-0">
+                   <div className="w-10 h-10 bg-[#B36262]/40 rounded-full" />
+                </div>
                 <p className="text-sm font-bold text-text-main leading-relaxed">
-                   이런 와인을 찾으셨군요! 비슷한 와인도 함께 추천해드릴게요!
+                   이런 와인을 찾으셨군요!<br />비슷한 와인도 함께 추천해드릴게요!
                 </p>
              </div>
 
              {/* Similar Wines */}
              <div className="space-y-4">
-                <h4 className="text-lg font-black text-text-main italic">비슷한 와인 추천</h4>
-                <div className="space-y-4">
+                <h4 className="text-lg font-black text-text-main uppercase tracking-tight">비슷한 와인 추천</h4>
+                <div className="flex flex-col gap-4">
                    {[1, 2].map((i) => (
-                      <div key={i} className="bg-white p-5 rounded-[40px] border border-primary-100 shadow-sm flex gap-4 items-center">
-                         <div className="w-16 h-16 bg-gray-100 rounded-2xl shrink-0" />
-                         <div className="flex-1 space-y-0.5">
-                            <h5 className="font-black text-base">Chateau Margaux 2018</h5>
-                            <p className="text-xs text-text-main/40">Bordeaux Red</p>
-                            <div className="flex items-center gap-3 pt-1">
-                               <div className="flex items-center gap-1 text-[#FF8A00] font-black text-xs">
-                                 <Star size={12} fill="#FF8A00" /> 4.8
+                      <Link key={i} href="/wines/1" className="bg-white border border-primary-100 rounded-[20px] p-3 flex items-center gap-3 active:scale-[0.98] transition-all group">
+                         {/* Left: Wine Image Area */}
+                         <div className="w-20 h-20 bg-[#EBE6DF] rounded-[20px] flex items-center justify-center shrink-0">
+                            <span className="text-2xl opacity-50">🍷</span>
+                         </div>
+                         
+                         {/* Center: Content */}
+                         <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center justify-between">
+                               <h4 className="text-[14px] font-black text-text-main truncate">Chateau Margaux 2018</h4>
+                               <div className="bg-[#B36262]/5 px-1 py-0.3 rounded-lg border border-[#B36262]/10 shrink-0">
+                                  <span className="text-[8px] font-black text-[#B36262]">95%</span>
                                </div>
-                               <span className="font-black text-sm text-[#B36262]">₩120,000</span>
+                            </div>
+                            <p className="text-xs font-bold text-text-main/40">Bordeaux Red</p>
+                            <div className="flex items-center gap-4 pt-1">
+                               <div className="flex items-center gap-1 text-[#FF8A00] font-black text-xs">
+                                  <Star size={12} fill="#FF8A00" /> 4.8
+                               </div>
+                               <span className="text-[12px] font-black text-[#B36262]">₩120,000</span>
                             </div>
                          </div>
-                         <div className="text-[10px] font-black text-[#B36262] bg-primary-100 px-2 py-1 rounded-md">95%</div>
-                      </div>
+
+                         {/* Right: Chevron */}
+                         <div className="text-text-main/20 group-hover:text-text-main/40 transition-colors">
+                            <ChevronRight size={16} />
+                         </div>
+                      </Link>
                    ))}
                 </div>
              </div>

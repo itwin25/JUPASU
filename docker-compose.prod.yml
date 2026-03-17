@@ -34,9 +34,7 @@ services:
 
   # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
   ai:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
+    image: ${DOCKER_USER}/jupasu:ai-latest
     container_name: ai-fastapi
     restart: always
     networks:
@@ -50,9 +48,7 @@ services:
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
-    build:
-      context: ./back
-      dockerfile: Dockerfile
+    image: ${DOCKER_USER}/jupasu:back-latest
     container_name: backend-spring
     restart: always
     environment:
@@ -82,11 +78,7 @@ services:
 
   # Frontend: Next.js (React 19)
   frontend:
-    build:
-      context: ./front
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    image: ${DOCKER_USER}/jupasu:front-latest
     container_name: front-nextjs
     restart: always
     environment:
