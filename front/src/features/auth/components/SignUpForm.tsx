@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { UseMutationResult } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { AxiosError } from 'axios';
@@ -9,20 +10,49 @@ import { AxiosError } from 'axios';
 import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
 import { signupSchema, SignupSchema } from '@/features/auth/schemas/auth.schema';
-import { useSignup } from '@/features/auth/hooks/useSignup';
-import { AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { AuthErrorResponse, AuthResponse, SignupRequest } from '@/features/auth/types/auth.types';
+
+type SignUpMutations = {
+  requestOtpAction: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    string,
+    unknown
+  >;
+  verifyOtp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    { email: string; code: string },
+    unknown
+  >;
+  signUp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    SignupRequest,
+    unknown
+  >;
+};
 
 interface SignUpFormProps {
+  mutations: SignUpMutations;
+  setNickname: (nickname: string) => void;
+  nicknameMessage?: string;
+  isValidatingNickname: boolean;
+  isNicknameAvailable: boolean;
   onSuccess: () => void;
 }
 
-export default function SignUpForm({ onSuccess }: SignUpFormProps) {
+export default function SignUpForm({
+  mutations,
+  setNickname,
+  nicknameMessage,
+  isValidatingNickname,
+  isNicknameAvailable,
+  onSuccess,
+}: SignUpFormProps) {
   const [currentSubStep, setCurrentSubStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-
-  const { setNickname, nicknameMessage, isValidatingNickname, isNicknameAvailable, mutations } =
-    useSignup();
 
   const { requestOtpAction: requestOtp, verifyOtp, signUp } = mutations;
 
