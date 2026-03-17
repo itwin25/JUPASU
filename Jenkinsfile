@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    options {
+        gitLabConnection('A505')
+    }
+
     environment {
         // [필수 수정] 본인의 Docker Hub ID를 입력하세요
         DOCKER_USER = "rasitnp" 
