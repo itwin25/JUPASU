@@ -17,10 +17,27 @@ import {
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useSignout } from '@/features/auth/hooks';
+import {
+  useDeleteFriendMutation,
+  useFriendListQuery,
+  useInviteFriendMutation,
+  usePendingFriendListQuery,
+  useRespondFriendRequestMutation,
+} from '@/features/friend/hooks/useFriendQueries';
+import {
+  useDeleteReviewMutation,
+  useMyReviewsQuery,
+  useUpdateReviewMutation,
+} from '@/features/review/hooks/useWineReviewsQuery';
+import {
+  useWineScrapListQuery,
+  useWineScrapMutation,
+} from '@/features/wine/hooks/useWineListQuery';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
   id: number;
+  wineId?: number;
   author: string;
   wineName: string;
   subtitle: string;
@@ -32,6 +49,8 @@ type ReviewItem = {
 
 type WishlistItem = {
   id: number;
+  wineId?: number;
+  scrapId?: number;
   name: string;
   subtitle: string;
   rating: number;
@@ -42,13 +61,15 @@ type WishlistItem = {
 
 type FriendItem = {
   id: number;
+  requestId?: number;
+  friendId?: number;
   name: string;
   winesTasted: number;
   avatar: string;
 };
 
 type SearchFriendItem = FriendItem & {
-  status: 'friend' | 'pending';
+  status: 'friend' | 'pending' | 'idle';
 };
 
 const INITIAL_REVIEWS: ReviewItem[] = [
@@ -117,6 +138,35 @@ const PAGINATION = [1, 2, 3, 4, 5];
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
 
+function resolveCharacterImage(character?: string) {
+  if (!character) return '/dog1.svg';
+  return character.startsWith('/') ? character : `/${character}`;
+}
+
+function getCountryCode(country?: string) {
+  switch (country?.toLowerCase()) {
+    case 'france':
+      return 'FR';
+    case 'italy':
+      return 'IT';
+    case 'spain':
+      return 'ES';
+    case 'new zealand':
+      return 'NZ';
+    case 'usa':
+    case 'united states':
+      return 'US';
+    case 'chile':
+      return 'CL';
+    case 'argentina':
+      return 'AR';
+    case 'australia':
+      return 'AU';
+    default:
+      return country?.slice(0, 2).toUpperCase() ?? '--';
+  }
+}
+
 function Pagination() {
   return (
     <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
@@ -142,6 +192,10 @@ function Pagination() {
 }
 
 export default function MyPage() {
+  const { data: myReviews = [] } = useMyReviewsQuery();
+  const { data: scrapListData } = useWineScrapListQuery();
+  const { data: friendListData } = useFriendListQuery();
+  const { data: pendingFriendListData } = usePendingFriendListQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
@@ -154,15 +208,109 @@ export default function MyPage() {
   const [editedContent, setEditedContent] = useState('');
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [reviewOverrides, setReviewOverrides] = useState<
+    Record<number, Pick<ReviewItem, 'content' | 'rating'>>
+  >({});
+  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
+  const [sentInviteIds, setSentInviteIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
-  const editingReview = reviews.find((review) => review.id === editingReviewId) ?? null;
+  const inviteFriendMutation = useInviteFriendMutation();
+  const respondFriendRequestMutation = useRespondFriendRequestMutation();
+  const deleteFriendMutation = useDeleteFriendMutation();
+  const updateReviewMutation = useUpdateReviewMutation();
+  const deleteReviewMutation = useDeleteReviewMutation();
+  const wineScrapMutation = useWineScrapMutation();
+  const friendList = friendListData ?? [];
+  const pendingFriendList = pendingFriendListData ?? [];
+  const wishlistItems = useMemo<WishlistItem[]>(
+    () =>
+      scrapListData
+        ? scrapListData.map((item) => ({
+            id: item.scrapId,
+            wineId: item.wineId,
+            scrapId: item.scrapId,
+            name: item.wineName,
+            subtitle: item.wineType,
+            rating: item.averageRating,
+            price: `₩${item.price.toLocaleString('ko-KR')}`,
+            countryFlag: getCountryCode(item.country),
+            match: `${item.matchRate}%`,
+          }))
+        : WISHLIST_ITEMS,
+    [scrapListData],
+  );
+  const mappedReviews = useMemo<ReviewItem[]>(
+    () =>
+      myReviews.map((review) => {
+        const override = reviewOverrides[review.reviewId];
+        const createdDate = new Date(review.createdAt);
+
+        return {
+          id: review.reviewId,
+          wineId: review.wineId,
+          author: review.nickname,
+          wineName: review.wineName,
+          subtitle: '작성한 리뷰',
+          rating: override?.rating ?? review.rating,
+          content: override?.content ?? review.content,
+          date: Number.isNaN(createdDate.getTime())
+            ? ''
+            : createdDate.toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
+          avatar: '/dog1.svg',
+        };
+      }),
+    [myReviews, reviewOverrides],
+  );
+  const visibleReviews = (myReviews.length > 0 ? mappedReviews : reviews).filter(
+    (review) => !deletedReviewIds.includes(review.id),
+  );
+  const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
+  const visibleFriends = useMemo<FriendItem[]>(
+    () =>
+      friendListData
+        ? friendList.map((friend) => ({
+            id: friend.friendId,
+            requestId: friend.requestId,
+            friendId: friend.friendId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIENDS,
+    [friendList, friendListData],
+  );
+  const visiblePendingFriends = useMemo<FriendItem[]>(
+    () =>
+      pendingFriendListData
+        ? pendingFriendList.map((friend) => ({
+            id: friend.requesterId,
+            requestId: friend.requestId,
+            friendId: friend.requesterId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIEND_REQUESTS,
+    [pendingFriendList, pendingFriendListData],
+  );
 
   const filteredFriendResults = useMemo(() => {
-    if (!friendSearchQuery.trim()) return SEARCH_RESULTS;
+    const friendIds = new Set(visibleFriends.map((friend) => friend.friendId ?? friend.id));
+    const pendingIds = new Set([
+      ...visiblePendingFriends.map((friend) => friend.friendId ?? friend.id),
+      ...sentInviteIds,
+    ]);
+
+    const searchResults = SEARCH_RESULTS.map((friend) => ({
+      ...friend,
+      status: friendIds.has(friend.id) ? 'friend' : pendingIds.has(friend.id) ? 'pending' : 'idle',
+    }));
+
+    if (!friendSearchQuery.trim()) return searchResults;
     const query = friendSearchQuery.toLowerCase();
-    return SEARCH_RESULTS.filter((friend) => friend.name.toLowerCase().includes(query));
-  }, [friendSearchQuery]);
+    return searchResults.filter((friend) => friend.name.toLowerCase().includes(query));
+  }, [friendSearchQuery, sentInviteIds, visibleFriends, visiblePendingFriends]);
 
   const handleLogout = () => {
     handleSignout();
@@ -181,23 +329,83 @@ export default function MyPage() {
     setEditedRating(0);
   };
 
-  const saveReview = () => {
+  const saveReview = async () => {
     if (!editingReview) return;
+    const trimmedContent = editedContent.trim();
+    if (!trimmedContent || editedRating === 0) return;
 
-    setReviews((prev) =>
-      prev.map((review) =>
-        review.id === editingReview.id
-          ? { ...review, content: editedContent.trim(), rating: editedRating }
-          : review,
-      ),
-    );
+    if (myReviews.length > 0 && editingReview.wineId) {
+      await updateReviewMutation.mutateAsync({
+        wineId: editingReview.wineId,
+        reviewId: editingReview.id,
+        rating: editedRating,
+        content: trimmedContent,
+      });
+    } else {
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === editingReview.id
+            ? { ...review, content: trimmedContent, rating: editedRating }
+            : review,
+        ),
+      );
+    }
     closeReviewEditModal();
   };
 
-  const deleteReview = () => {
+  const deleteReview = async () => {
     if (deletingReviewId === null) return;
-    setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    const deletingReview = visibleReviews.find((review) => review.id === deletingReviewId) ?? null;
+
+    if (myReviews.length > 0 && deletingReview?.wineId) {
+      await deleteReviewMutation.mutateAsync({
+        wineId: deletingReview.wineId,
+        reviewId: deletingReview.id,
+      });
+    } else {
+      setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    }
     setDeletingReviewId(null);
+  };
+
+  const handleInviteFriend = async (friend: SearchFriendItem) => {
+    if (friend.status !== 'idle') return;
+    const receiverIdMap: Record<number, number> = {
+      21: 5,
+      22: 3,
+      23: 4,
+    };
+    const receiverId = receiverIdMap[friend.id] ?? friend.id;
+
+    await inviteFriendMutation.mutateAsync({
+      receiverId,
+      receiverNickname: friend.name,
+    });
+    setSentInviteIds((prev) => [...prev, receiverId]);
+  };
+
+  const handleFriendRequestResponse = async (
+    requestId: number | undefined,
+    status: 'ACCEPTED' | 'REJECTED',
+  ) => {
+    if (!requestId) return;
+
+    await respondFriendRequestMutation.mutateAsync({
+      requestId,
+      status,
+    });
+  };
+
+  const handleDeleteFriend = async (requestId: number | undefined) => {
+    if (!requestId) return;
+
+    await deleteFriendMutation.mutateAsync(requestId);
+  };
+
+  const handleToggleWishlist = async (wineId: number | undefined) => {
+    if (!wineId) return;
+
+    await wineScrapMutation.mutateAsync(wineId);
   };
 
   return (
@@ -270,11 +478,11 @@ export default function MyPage() {
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">8</p>
+              <p className="text-lg font-black text-[#B36262]">{wishlistItems.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{reviews.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{visibleReviews.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
@@ -284,7 +492,7 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
-              <p className="text-lg font-black text-[#B36262]">{FRIENDS.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{visibleFriends.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
@@ -417,7 +625,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {WISHLIST_ITEMS.map((item) => (
+          {wishlistItems.map((item) => (
             <div
               key={item.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
@@ -433,7 +641,9 @@ export default function MyPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 pt-0.5">
-                      <span className="text-xs">{item.countryFlag}</span>
+                      <span className="text-text-main/55 text-[10px] font-black">
+                        {item.countryFlag}
+                      </span>
                       <span className="text-[10px] font-black text-[#C87E7A]">{item.match}</span>
                     </div>
                   </div>
@@ -442,7 +652,10 @@ export default function MyPage() {
                       <span className="text-[11px] font-black text-[#D89A4F]">★ {item.rating}</span>
                       <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
                     </div>
-                    <button className="text-[#CC5C57]">
+                    <button
+                      onClick={() => handleToggleWishlist(item.wineId)}
+                      className="text-[#CC5C57]"
+                    >
                       <Heart size={16} fill="currentColor" />
                     </button>
                   </div>
@@ -466,7 +679,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {reviews.map((review) => (
+          {visibleReviews.map((review) => (
             <div
               key={review.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
@@ -657,7 +870,7 @@ export default function MyPage() {
                 onClick={() => setFriendTab('requests')}
                 className="rounded-full bg-[#C57070] px-3 py-1.5 text-[11px] font-black text-white"
               >
-                친구 요청 ({FRIEND_REQUESTS.length})
+                친구 요청 ({visiblePendingFriends.length})
               </button>
             </div>
 
@@ -680,9 +893,11 @@ export default function MyPage() {
             </button>
 
             <div>
-              <p className="text-text-main/45 mb-3 text-sm font-medium">친구 {FRIENDS.length}명</p>
+              <p className="text-text-main/45 mb-3 text-sm font-medium">
+                친구 {visibleFriends.length}명
+              </p>
               <div className="max-h-[18rem] space-y-2.5 overflow-y-auto pr-1">
-                {FRIENDS.map((friend) => (
+                {visibleFriends.map((friend) => (
                   <div
                     key={friend.id}
                     className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-2.5"
@@ -707,7 +922,10 @@ export default function MyPage() {
                       <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
                         프로필
                       </button>
-                      <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                      <button
+                        onClick={() => handleDeleteFriend(friend.requestId)}
+                        className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                      >
                         삭제
                       </button>
                     </div>
@@ -720,7 +938,7 @@ export default function MyPage() {
 
         {friendTab === 'requests' && (
           <div className="space-y-2.5">
-            {FRIEND_REQUESTS.map((friend) => (
+            {visiblePendingFriends.map((friend) => (
               <div
                 key={friend.id}
                 className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
@@ -732,10 +950,16 @@ export default function MyPage() {
                   <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'ACCEPTED')}
+                    className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]"
+                  >
                     수락
                   </button>
-                  <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'REJECTED')}
+                    className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                  >
                     거절
                   </button>
                 </div>
@@ -776,12 +1000,14 @@ export default function MyPage() {
                     </div>
                   </div>
                   <button
+                    onClick={() => handleInviteFriend(friend)}
                     className={cn(
                       'rounded-full px-3.5 py-1 text-[10px] font-black',
                       friend.status === 'friend'
                         ? 'bg-[#8B8B8B] text-white'
                         : 'bg-[#F6EAEA] text-[#B17672]',
                     )}
+                    disabled={friend.status !== 'idle'}
                   >
                     {friend.status === 'friend' ? '친구' : '친구 요청'}
                   </button>
