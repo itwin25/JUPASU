@@ -24,6 +24,7 @@ export const API_PATH = {
     PROFILE: '/users/profile',
     ONBOARDING: '/users/onboarding',
     ME: '/users/me',
+    WITHDRAW: '/users/withdraw',
   },
   REVIEW: {
     LIST: '/reviews',

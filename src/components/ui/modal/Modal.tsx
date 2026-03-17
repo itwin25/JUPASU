@@ -14,6 +14,8 @@ interface ModalProps {
   footer?: React.ReactNode;
   className?: string;
   hideDefaultFooter?: boolean;
+  centerTitle?: boolean;
+  hideCloseButton?: boolean;
 }
 
 export default function Modal({
@@ -24,6 +26,8 @@ export default function Modal({
   footer,
   className,
   hideDefaultFooter = false,
+  centerTitle = false,
+  hideCloseButton = false,
 }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -42,28 +46,49 @@ export default function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 md:p-4">
       <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-[2px] animate-in fade-in duration-300"
+        className="animate-in fade-in absolute inset-0 bg-black/30 backdrop-blur-[2px] duration-300"
         onClick={onClose}
       />
 
       <div
         className={cn(
-          'relative w-full max-w-sm rounded-[2rem] bg-background p-8 shadow-2xl animate-in fade-in zoom-in duration-300',
+          'bg-background animate-in fade-in zoom-in relative w-full max-w-sm rounded-[2rem] p-8 shadow-2xl duration-300',
           className,
         )}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-tight text-text-main">{title}</h2>
-          <Button
-            variant="icon"
-            onClick={onClose}
-            className="-mr-2 border-none bg-transparent shadow-none"
+        {(title || !hideCloseButton) && (
+          <div
+            className={cn(
+              'mb-6 flex items-center',
+              centerTitle ? 'justify-center' : 'justify-between',
+            )}
           >
-            <X size={24} className="text-text-main/40" />
-          </Button>
-        </div>
+            {title && (
+              <h2
+                className={cn(
+                  'text-text-main text-xl font-bold tracking-tight',
+                  centerTitle && 'flex-1 text-center',
+                )}
+              >
+                {title}
+              </h2>
+            )}
+            {!hideCloseButton && (
+              <Button
+                variant="icon"
+                onClick={onClose}
+                className={cn(
+                  '-mr-2 border-none bg-transparent shadow-none',
+                  centerTitle && 'absolute top-8 right-8',
+                )}
+              >
+                <X size={24} className="text-text-main/40" />
+              </Button>
+            )}
+          </div>
+        )}
 
-        <div className="mb-8 text-base leading-relaxed text-text-main/80">{children}</div>
+        <div className="text-text-main/80 mb-8 text-base leading-relaxed">{children}</div>
 
         {footer ? (
           <div className="flex flex-col gap-3">{footer}</div>

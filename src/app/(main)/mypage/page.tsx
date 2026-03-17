@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
-import { useAuthStore } from '@/stores/auth.store';
+import { useSignout } from '@/features/auth/hooks';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
@@ -158,8 +158,12 @@ export default function MyPage() {
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
+<<<<<<< front/src/app/(main)/mypage/page.tsx
   const router = useRouter();
   const logout = useAuthStore((state) => state.clearAuth);
+=======
+  const { handleSignout } = useSignout();
+>>>>>>> front/src/app/(main)/mypage/page.tsx
   const editingReview = reviews.find((review) => review.id === editingReviewId) ?? null;
 
   const filteredFriendResults = useMemo(() => {
@@ -169,8 +173,7 @@ export default function MyPage() {
   }, [friendSearchQuery]);
 
   const handleLogout = () => {
-    logout();
-    router.push('/login');
+    handleSignout();
   };
 
   const openReviewEditModal = (review: ReviewItem) => {
@@ -254,6 +257,7 @@ export default function MyPage() {
         <section className="border-primary-100 rounded-[1.5rem] border bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
+<<<<<<< front/src/app/(main)/mypage/page.tsx
               <Image
                 src={profile?.character ? `/${profile.character}.svg` : '/dog1.svg'}
                 alt="프로필 이미지"
@@ -265,6 +269,12 @@ export default function MyPage() {
               <h2 className="text-text-main text-lg font-black">
                 {isLoading ? '로딩 중...' : profile?.nickname || '사용자'}
               </h2>
+=======
+              <Image src="/dog1.svg" alt="프로필 이미지" fill className="object-cover" />
+            </div>
+            <div>
+              <h2 className="text-text-main text-lg font-black">와인수인</h2>
+>>>>>>> front/src/app/(main)/mypage/page.tsx
               <p className="text-text-main/45 mt-1 text-sm font-medium">
                 오늘도 취향을 한 잔씩 쌓는 중
               </p>
@@ -274,19 +284,32 @@ export default function MyPage() {
           <div className="mt-5 rounded-[1.25rem] bg-[#F9F7F2] p-3">
             <div className="h-3 rounded-full bg-white">
               <div
+<<<<<<< front/src/app/(main)/mypage/page.tsx
                 className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262] transition-all duration-500"
                 style={{ width: `${Math.min(((profile?.reviewCount || 0) / 10) * 100, 100)}%` }}
+=======
+                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262]"
+                style={{ width: '15%' }}
+>>>>>>> front/src/app/(main)/mypage/page.tsx
               />
             </div>
           </div>
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
+<<<<<<< front/src/app/(main)/mypage/page.tsx
               <p className="text-lg font-black text-[#B36262]">{profile?.wishlistCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
               <p className="text-lg font-black text-[#B36262]">{profile?.reviewCount ?? 0}</p>
+=======
+              <p className="text-lg font-black text-[#B36262]">8</p>
+              <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
+            </button>
+            <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
+              <p className="text-lg font-black text-[#B36262]">{reviews.length}</p>
+>>>>>>> front/src/app/(main)/mypage/page.tsx
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
@@ -296,7 +319,11 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
+<<<<<<< front/src/app/(main)/mypage/page.tsx
               <p className="text-lg font-black text-[#B36262]">{profile?.friendCount ?? 0}</p>
+=======
+              <p className="text-lg font-black text-[#B36262]">{FRIENDS.length}</p>
+>>>>>>> front/src/app/(main)/mypage/page.tsx
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>

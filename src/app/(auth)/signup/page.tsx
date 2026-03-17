@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { ChevronLeft } from 'lucide-react';
-import Step1Form from '@/features/auth/components/Step1Form';
+import SignUpForm from '@/features/auth/components/SignUpForm';
 import Step2Taste from '@/features/onboarding/components/Step2Taste';
 import Step3WineReview from '@/features/onboarding/components/Step3WineReview';
 import { useSignup } from '@/features/auth/hooks/useSignup';
@@ -56,7 +56,7 @@ export default function SignupPage() {
 
       {/* Step Content */}
       <main className="mx-auto w-full max-w-md flex-1">
-        {step === 1 && <Step1Form mutations={mutations} onSuccess={handleStep1Success} />}
+        {step === 1 && <SignUpForm mutations={mutations} onSuccess={handleStep1Success} />}
         {step === 2 && (
           <Step2Taste
             data={onboardingData}
