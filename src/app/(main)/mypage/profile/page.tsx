@@ -1,52 +1,140 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Camera, ChevronLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Input from '@/components/ui/input/Input';
+import { Camera, ChevronLeft, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
+import Input from '@/components/ui/input/Input';
 import Modal from '@/components/ui/modal/Modal';
-import { useAuthStore } from '@/stores/auth.store';
+import { useLogoutMutation } from '@/features/auth/hooks/useLoginMutation';
+import {
+  useUpdateProfileMutation,
+  useUserProfile,
+  useWithdrawMutation,
+} from '@/features/user/hooks/useUserQueries';
+import { authToken } from '@/lib/auth-token';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth.store';
 
 const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
 
 export default function ProfileEditPage() {
+  const router = useRouter();
+  const logoutStore = useAuthStore((state) => state.logout);
+
+  const { data: profile, isLoading } = useUserProfile();
+  const updateProfileMutation = useUpdateProfileMutation();
+  const logoutMutation = useLogoutMutation();
+  const withdrawMutation = useWithdrawMutation();
+
+  const [nickname, setNickname] = useState('');
   const [currentAvatar, setCurrentAvatar] = useState('dog1.svg');
+  const [passwords, setPasswords] = useState({
+    current: '',
+    new: '',
+    confirm: '',
+  });
+  const [withdrawPassword, setWithdrawPassword] = useState('');
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const router = useRouter();
-  const logout = useAuthStore((state) => state.logout);
+  useEffect(() => {
+    if (!profile) return;
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
+    setNickname(profile.nickname);
+    if (AVATARS.includes(profile.character)) {
+      setCurrentAvatar(profile.character);
+    }
+  }, [profile]);
+
+  const handleUpdateProfile = async () => {
+    const shouldChangePassword =
+      Boolean(passwords.current.trim()) ||
+      Boolean(passwords.new.trim()) ||
+      Boolean(passwords.confirm.trim());
+
+    if (shouldChangePassword) {
+      if (!passwords.current || !passwords.new || !passwords.confirm) {
+        alert('비밀번호 변경 항목을 모두 입력해주세요.');
+        return;
+      }
+
+      if (passwords.new !== passwords.confirm) {
+        alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+        return;
+      }
+    }
+
+    try {
+      await updateProfileMutation.mutateAsync({
+        nickname,
+        character: currentAvatar,
+        currentPassword: shouldChangePassword ? passwords.current : undefined,
+        newPassword: shouldChangePassword ? passwords.new : undefined,
+        confirmNewPassword: shouldChangePassword ? passwords.confirm : undefined,
+      });
+
+      setPasswords({ current: '', new: '', confirm: '' });
+      alert('정보가 수정되었습니다.');
+      router.push('/mypage');
+    } catch {
+      alert('수정 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleDeleteAccount = () => {
-    setIsDeleteConfirmOpen(false);
-    logout();
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+    } catch {
+      // Ignore and clear client state anyway.
+    } finally {
+      authToken.remove();
+      logoutStore();
+      router.push('/login');
+    }
   };
+
+  const handleDeleteAccount = async () => {
+    if (!withdrawPassword.trim()) {
+      alert('계정 삭제를 위해 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    try {
+      await withdrawMutation.mutateAsync({ password: withdrawPassword });
+      setIsDeleteConfirmOpen(false);
+      setWithdrawPassword('');
+      authToken.remove();
+      logoutStore();
+      router.push('/login');
+    } catch {
+      alert('회원 탈퇴 처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background pb-10">
-      <header className="sticky top-0 z-10 flex items-center bg-background/80 px-4 py-4 backdrop-blur-md">
+    <div className="bg-background flex min-h-screen flex-col pb-10">
+      <header className="bg-background/80 sticky top-0 z-10 flex items-center px-4 py-4 backdrop-blur-md">
         <Link
           href="/mypage"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-primary-100 bg-white shadow-sm"
+          className="border-primary-100 flex h-9 w-9 items-center justify-center rounded-full border bg-white shadow-sm"
         >
           <ChevronLeft size={20} className="text-text-main" />
         </Link>
-        <h1 className="mr-9 flex-1 text-center text-base font-black text-text-main">내 정보 수정</h1>
+        <h1 className="text-text-main mr-9 flex-1 text-center text-base font-black">
+          내 정보 수정
+        </h1>
       </header>
 
       <main className="flex-1 space-y-8 px-4">
         <div className="relative flex justify-center pt-2">
-          <div className="relative h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-primary-100 shadow-md">
+          <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
             <Image src={`/${currentAvatar}`} alt="Avatar" fill className="object-cover" />
           </div>
           <button
@@ -58,50 +146,67 @@ export default function ProfileEditPage() {
         </div>
 
         <section className="space-y-4">
-          <h3 className="text-base font-black text-text-main">기본 정보</h3>
-          <Input label="닉네임" defaultValue="와인수인" className="rounded-[1rem] px-4 py-3 text-sm" />
+          <h3 className="text-text-main text-base font-black">기본 정보</h3>
+          <Input
+            label="닉네임"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            className="rounded-[1rem] px-4 py-3 text-sm"
+          />
         </section>
 
         <section className="space-y-4">
-          <h3 className="text-base font-black text-text-main">비밀번호 변경</h3>
+          <h3 className="text-text-main text-base font-black">비밀번호 변경</h3>
           <div className="space-y-3">
             <Input
               label="현재 비밀번호"
               type="password"
               placeholder="현재 비밀번호 입력"
+              value={passwords.current}
+              onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
               className="rounded-[1rem] px-4 py-3 text-sm"
             />
             <Input
               label="새 비밀번호"
               type="password"
               placeholder="8자 이상 새 비밀번호 입력"
+              value={passwords.new}
+              onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
               className="rounded-[1rem] px-4 py-3 text-sm"
             />
             <Input
               label="새 비밀번호 확인"
               type="password"
               placeholder="새 비밀번호 다시 입력"
+              value={passwords.confirm}
+              onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
               className="rounded-[1rem] px-4 py-3 text-sm"
             />
           </div>
         </section>
 
-        <Button size="full" className="mt-3 h-12 rounded-[1.2rem] bg-[#B36262] text-sm font-black text-white shadow-md">
+        <Button
+          size="full"
+          onClick={handleUpdateProfile}
+          isLoading={updateProfileMutation.isPending}
+          className="mt-3 h-12 rounded-[1.2rem] bg-[#B36262] text-sm font-black text-white shadow-md"
+        >
           수정 완료
         </Button>
 
         <section className="mt-4 space-y-3 rounded-[1.5rem] border border-[#B36262]/10 bg-[#FFF5F5] p-4">
-          <h4 className="text-xs font-black uppercase tracking-wider text-[#B36262]">계정 관리</h4>
+          <h4 className="text-xs font-black tracking-wider text-[#B36262] uppercase">계정 관리</h4>
           <div className="flex gap-2.5">
             <button
               onClick={handleLogout}
-              className="flex h-10 flex-1 items-center justify-center rounded-[1rem] border border-primary-100 bg-white text-[13px] font-bold text-text-main/60"
+              disabled={logoutMutation.isPending}
+              className="border-primary-100 text-text-main/60 flex h-10 flex-1 items-center justify-center rounded-[1rem] border bg-white text-[13px] font-bold disabled:opacity-50"
             >
-              로그아웃
+              {logoutMutation.isPending ? '처리 중...' : '로그아웃'}
             </button>
             <button
               onClick={() => setIsDeleteConfirmOpen(true)}
-              className="flex h-10 flex-1 items-center justify-center rounded-[1rem] border border-primary-100 bg-white text-[13px] font-bold text-text-main/60"
+              className="border-primary-100 text-text-main/60 flex h-10 flex-1 items-center justify-center rounded-[1rem] border bg-white text-[13px] font-bold"
             >
               계정 삭제
             </button>
@@ -110,10 +215,10 @@ export default function ProfileEditPage() {
       </main>
 
       {isAvatarPickerOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-[20rem] space-y-6 rounded-[1.75rem] bg-white p-5 animate-in zoom-in duration-300">
+        <div className="animate-in fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 duration-300">
+          <div className="animate-in zoom-in w-full max-w-[20rem] space-y-6 rounded-[1.75rem] bg-white p-5 duration-300">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-black text-text-main">프로필 이미지 선택</h2>
+              <h2 className="text-text-main text-base font-black">프로필 이미지 선택</h2>
               <button onClick={() => setIsAvatarPickerOpen(false)}>
                 <X size={20} />
               </button>
@@ -128,7 +233,9 @@ export default function ProfileEditPage() {
                   }}
                   className={cn(
                     'relative aspect-square overflow-hidden rounded-[1rem] border-[3px] transition-all',
-                    currentAvatar === avatar ? 'scale-105 border-[#B36262]' : 'border-transparent bg-primary-100/30',
+                    currentAvatar === avatar
+                      ? 'scale-105 border-[#B36262]'
+                      : 'bg-primary-100/30 border-transparent',
                   )}
                 >
                   <Image src={`/${avatar}`} alt={avatar} fill className="object-cover" />
@@ -141,31 +248,51 @@ export default function ProfileEditPage() {
 
       <Modal
         isOpen={isDeleteConfirmOpen}
-        onClose={() => setIsDeleteConfirmOpen(false)}
+        onClose={() => {
+          setIsDeleteConfirmOpen(false);
+          setWithdrawPassword('');
+        }}
         title="계정 삭제"
+        centerTitle
+        hideCloseButton
         className="w-[calc(100vw-2rem)] max-w-[18.5rem] rounded-[1.55rem] bg-[#F7F5F1] px-3.5 py-4"
         footer={
-          <div className="flex gap-2">
+          <div className="flex gap-2 px-1">
             <Button
               variant="secondary"
-              size="full"
-              onClick={() => setIsDeleteConfirmOpen(false)}
-              className="rounded-[1rem]"
+              size="sm"
+              onClick={() => {
+                setIsDeleteConfirmOpen(false);
+                setWithdrawPassword('');
+              }}
+              className="flex-1 rounded-[1rem] py-2.5"
             >
               취소
             </Button>
             <Button
-              size="full"
+              size="sm"
               onClick={handleDeleteAccount}
-              className="rounded-[1rem] bg-[#D65F69] hover:bg-[#C44B56]"
+              isLoading={withdrawMutation.isPending}
+              className="flex-1 rounded-[1rem] bg-[#D65F69] py-2.5 hover:bg-[#C44B56]"
             >
               확인
             </Button>
           </div>
         }
       >
-        <div className="py-2 text-center">
-          <p className="text-sm font-bold text-text-main/75">계정을 삭제하시겠습니까?</p>
+        <div className="space-y-3 py-2">
+          <div className="text-center">
+            <p className="text-text-main/75 text-sm font-bold">계정을 삭제하시겠습니까?</p>
+            <p className="text-text-main/50 mt-1 text-xs">삭제된 데이터는 복구되지 않습니다.</p>
+          </div>
+          <Input
+            label="비밀번호 확인"
+            type="password"
+            placeholder="계정 삭제를 위해 비밀번호 입력"
+            value={withdrawPassword}
+            onChange={(e) => setWithdrawPassword(e.target.value)}
+            className="rounded-[1rem] px-4 py-3 text-sm"
+          />
         </div>
       </Modal>
     </div>
