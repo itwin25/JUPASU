@@ -2,58 +2,48 @@ package com.a505.jupasu.domain.wine.dto;
 
 import com.a505.jupasu.domain.wine.entity.Wine;
 import lombok.Builder;
-import lombok.Getter;
 
 import java.util.List;
 
-@Getter
 @Builder
-public class WineDetailResponse {
-    private Long wineId;
-    private String nameKr;
-    private String nameEn;
-    private String imageUrl;
-
-    // Origin (생산지 정보)
-    private String country;
-    private String region;
-    private String winery;
-
-    // 상세 정보
-    private String grapeVariety;
-    private Float alcoholDegree;
-    private Double averageRating;
-    private Integer price;
-    private String description;
-
-    // 맛 지표 (Taste Profile)
-    private Float sweetness;
-    private Float acidity;
-    private Float body;
-    private Float tannin;
-
-    // 부가 정보
-    private Integer matchRate; // 취향 적중률 (%)
-    private List<String> pairingFoods; // 어울리는 음식 목록
-
+public record WineDetailResponse(
+        Long wineId,
+        String nameKr,
+        String nameEn,
+        String imageUrl,
+        String country,
+        String region,
+        String winery,
+        String grapeVariety,
+        Float alcoholDegree,
+        Double averageRating,
+        Integer price,
+        String description,
+        Float sweetness,
+        Float acidity,
+        Float body,
+        Float tannin,
+        Integer matchRate,
+        List<String> pairingFoods
+) {
     public static WineDetailResponse of(Wine wine, Integer matchRate, List<String> pairingFoods) {
         return WineDetailResponse.builder()
                 .wineId(wine.getId())
                 .nameKr(wine.getNameKr())
                 .nameEn(wine.getNameEn())
                 .imageUrl(wine.getImageUrl())
-                .country(wine.getCountry())
-                .region(wine.getRegion())
-                .winery(wine.getWinery())
+                .country(wine.getOrigin() != null ? wine.getOrigin().getCountry() : null)
+                .region(wine.getOrigin() != null ? wine.getOrigin().getRegion() : null)
+                .winery(wine.getOrigin() != null ? wine.getOrigin().getWinery() : null)
                 .grapeVariety(wine.getGrapeVariety())
                 .alcoholDegree(wine.getAlcoholDegree())
-                .averageRating(wine.getAverageRating())
-                .price(wine.getPrice())
+                .averageRating(wine.getPriceAndRating() != null ? wine.getPriceAndRating().getAverageRating() : 0.0)
+                .price(wine.getPriceAndRating() != null ? wine.getPriceAndRating().getPrice() : 0)
                 .description(wine.getDescription())
-                .sweetness(wine.getSweetness())
-                .acidity(wine.getAcidity())
-                .body(wine.getBody())
-                .tannin(wine.getTannin())
+                .sweetness(wine.getTasteProfile() != null ? wine.getTasteProfile().getSweetness() : 0.0f)
+                .acidity(wine.getTasteProfile() != null ? wine.getTasteProfile().getAcidity() : 0.0f)
+                .body(wine.getTasteProfile() != null ? wine.getTasteProfile().getBody() : 0.0f)
+                .tannin(wine.getTasteProfile() != null ? wine.getTasteProfile().getTannin() : 0.0f)
                 .matchRate(matchRate)
                 .pairingFoods(pairingFoods)
                 .build();
