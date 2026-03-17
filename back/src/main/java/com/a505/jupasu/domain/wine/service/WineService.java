@@ -13,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,8 +27,18 @@ public class WineService {
     private final WineFoodPairingRepository wineFoodPairingRepository;
 
     public Page<WineSearchResponse> searchWines(WineSearchCondition condition, Pageable pageable) {
-        Page<Wine> wines = wineRepository.searchWines(condition, pageable);
-        // Entity Page -> DTO Page 로 맵핑 (map 메서드가 아주 유용합니다)
+        List<Long> matchingIds = null;
+
+        // ⭐️ getKeyword() -> keyword() 로 변경
+        if (StringUtils.hasText(condition.keyword())) {
+            matchingIds = wineRepository.findMatchingIdsByKeyword(condition.keyword());
+
+            if (matchingIds.isEmpty()) {
+                return Page.empty(pageable);
+            }
+        }
+
+        Page<Wine> wines = wineRepository.searchWines(condition, matchingIds, pageable);
         return wines.map(WineSearchResponse::from);
     }
 
