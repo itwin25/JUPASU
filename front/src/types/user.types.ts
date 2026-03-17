@@ -9,6 +9,8 @@ export interface UserInfo {
   friendCount: number;
 }
 
+export type UserMyPageResponse = UserInfo;
+
 /**
  * 프로필 수정 요청 타입
  */

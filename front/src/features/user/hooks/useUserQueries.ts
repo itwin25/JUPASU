@@ -5,7 +5,7 @@ import { userApi } from '../api/user.api';
 export function useUserProfile() {
   return useQuery({
     queryKey: QUERY_KEY.USER.ME,
-    queryFn: userApi.getUserProfile,
+    queryFn: userApi.getMyPageProfile,
   });
 }
 

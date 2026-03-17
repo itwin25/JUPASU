@@ -16,6 +16,7 @@ import {
 } from '@/features/user/hooks/useUserQueries';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
+import { UserInfo } from '@/types/user.types';
 
 const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
 
@@ -23,7 +24,7 @@ export default function ProfileEditPage() {
   const router = useRouter();
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
-  const { data: profile, isLoading } = useUserProfile();
+  const { data: profile, isLoading } = useUserProfile() as { data: UserInfo; isLoading: boolean };
   const updateProfileMutation = useUpdateProfileMutation();
   const { handleSignout, isLoading: isSignoutLoading } = useSignout();
   const withdrawMutation = useWithdrawMutation();
