@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,7 +16,7 @@ import {
 } from 'lucide-react';
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
-import { useAuthStore } from '@/stores/auth.store';
+import { useSignout } from '@/features/auth/hooks';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
@@ -120,7 +119,7 @@ const modalClassName =
 
 function Pagination() {
   return (
-    <div className="flex items-center justify-center gap-3 pt-5 text-xs text-text-main/45">
+    <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
       <button className="text-text-main/20">
         <ChevronLeft size={20} />
       </button>
@@ -156,8 +155,7 @@ export default function MyPage() {
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
-  const router = useRouter();
-  const logout = useAuthStore((state) => state.logout);
+  const { handleSignout } = useSignout();
   const editingReview = reviews.find((review) => review.id === editingReviewId) ?? null;
 
   const filteredFriendResults = useMemo(() => {
@@ -167,8 +165,7 @@ export default function MyPage() {
   }, [friendSearchQuery]);
 
   const handleLogout = () => {
-    logout();
-    router.push('/login');
+    handleSignout();
   };
 
   const openReviewEditModal = (review: ReviewItem) => {
@@ -204,36 +201,36 @@ export default function MyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-30 flex items-center justify-between bg-background/85 px-5 py-5 backdrop-blur-md">
-        <h1 className="text-2xl font-black text-text-main">My Page</h1>
+    <div className="bg-background min-h-screen pb-24">
+      <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
+        <h1 className="text-text-main text-2xl font-black">My Page</h1>
         <button
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-text-main transition-colors hover:bg-primary-100/30"
+          className="text-text-main hover:bg-primary-100/30 flex h-10 w-10 items-center justify-center rounded-full transition-colors"
         >
           {isMenuOpen ? <X size={24} /> : <Settings size={24} />}
         </button>
 
         {isMenuOpen && (
-          <div className="absolute right-5 top-[3.75rem] z-40 w-40 rounded-[1rem] border border-primary-100 bg-white p-1 shadow-xl">
+          <div className="border-primary-100 absolute top-[3.75rem] right-5 z-40 w-40 rounded-[1rem] border bg-white p-1 shadow-xl">
             <div className="flex flex-col">
               <Link
                 href="/mypage/profile"
-                className="flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors hover:bg-primary-100/30"
+                className="hover:bg-primary-100/30 flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className="text-[13px] font-bold text-text-main">프로필 수정</span>
+                <span className="text-text-main text-[13px] font-bold">프로필 수정</span>
               </Link>
 
               <Link
                 href="/mypage/taste"
-                className="flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors hover:bg-primary-100/30"
+                className="hover:bg-primary-100/30 flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className="text-[13px] font-bold text-text-main">취향 분석 보기</span>
+                <span className="text-text-main text-[13px] font-bold">취향 분석 보기</span>
               </Link>
 
-              <div className="mx-3 my-1 h-px bg-primary-100" />
+              <div className="bg-primary-100 mx-3 my-1 h-px" />
 
               <button
                 onClick={handleLogout}
@@ -249,31 +246,36 @@ export default function MyPage() {
       {isMenuOpen && <div className="fixed inset-0 z-20" onClick={() => setIsMenuOpen(false)} />}
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4">
-        <section className="rounded-[1.5rem] border border-primary-100 bg-white p-4 shadow-sm">
+        <section className="border-primary-100 rounded-[1.5rem] border bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="relative h-16 w-16 overflow-hidden rounded-full bg-primary-100">
+            <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
               <Image src="/dog1.svg" alt="프로필 이미지" fill className="object-cover" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-text-main">와인수인</h2>
-              <p className="mt-1 text-sm font-medium text-text-main/45">오늘도 취향을 한 잔씩 쌓는 중</p>
+              <h2 className="text-text-main text-lg font-black">와인수인</h2>
+              <p className="text-text-main/45 mt-1 text-sm font-medium">
+                오늘도 취향을 한 잔씩 쌓는 중
+              </p>
             </div>
           </div>
 
           <div className="mt-5 rounded-[1.25rem] bg-[#F9F7F2] p-3">
             <div className="h-3 rounded-full bg-white">
-              <div className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262]" style={{ width: '15%' }} />
+              <div
+                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262]"
+                style={{ width: '15%' }}
+              />
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 divide-x divide-primary-100">
+          <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
               <p className="text-lg font-black text-[#B36262]">8</p>
-              <p className="mt-1 text-[11px] font-bold text-text-main/45">위시리스트</p>
+              <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
               <p className="text-lg font-black text-[#B36262]">{reviews.length}</p>
-              <p className="mt-1 text-[11px] font-bold text-text-main/45">리뷰</p>
+              <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
               onClick={() => {
@@ -283,99 +285,124 @@ export default function MyPage() {
               className="py-2 text-center"
             >
               <p className="text-lg font-black text-[#B36262]">{FRIENDS.length}</p>
-              <p className="mt-1 text-[11px] font-bold text-text-main/45">친구</p>
+              <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
         </section>
 
         <section>
-          <h3 className="px-4 text-[1.2rem] font-black text-text-main">AI 나의 취향 리포트</h3>
+          <h3 className="text-text-main px-4 text-[1.2rem] font-black">AI 나의 취향 리포트</h3>
 
-          <div className="mt-3 rounded-[1.5rem] border border-primary-100 bg-white p-4 shadow-sm">
+          <div className="border-primary-100 mt-3 rounded-[1.5rem] border bg-white p-4 shadow-sm">
             <div className="bg-white px-1 py-1">
-            <p className="text-center text-[11px] font-black leading-relaxed text-text-main">
-              와인초보님은 &apos;상큼하고 가벼운&apos; 화이트 와인 취향이에요!
-            </p>
-
-            <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
-              <svg viewBox="0 0 240 240" className="h-full w-full">
-                <g stroke="#D9D4CF" strokeWidth="1.2" fill="none">
-                  <polygon points="120,30 195,84 166,173 74,173 45,84" />
-                  <polygon points="120,48 180,91 157,162 83,162 60,91" />
-                  <polygon points="120,66 165,99 148,151 92,151 75,99" />
-                  <polygon points="120,84 150,106 139,140 101,140 90,106" />
-                  <polygon points="120,102 135,113 130,129 110,129 105,113" />
-                  <line x1="120" y1="120" x2="120" y2="30" />
-                  <line x1="120" y1="120" x2="195" y2="84" />
-                  <line x1="120" y1="120" x2="166" y2="173" />
-                  <line x1="120" y1="120" x2="74" y2="173" />
-                  <line x1="120" y1="120" x2="45" y2="84" />
-                </g>
-                <polygon
-                  points="120,73 171,98 157,157 86,163 61,97"
-                  fill="rgba(196, 91, 91, 0.16)"
-                  stroke="#C75B5B"
-                  strokeWidth="4"
-                  strokeLinejoin="round"
-                />
-              </svg>
-
-              <span className="absolute left-1/2 top-0 -translate-x-1/2 text-[10px] font-medium text-text-main/55">탄닌</span>
-              <span className="absolute right-[2px] top-[72px] text-[10px] font-medium text-text-main/55">산미</span>
-              <span className="absolute right-[34px] bottom-[28px] text-[10px] font-medium text-text-main/55">바디</span>
-              <span className="absolute left-[34px] bottom-[28px] text-[10px] font-medium text-text-main/55">당도</span>
-              <span className="absolute left-[0px] top-[72px] text-[10px] font-medium text-text-main/55">도수</span>
-              <button className="absolute bottom-[26px] right-[2px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white">
-                ?
-              </button>
-            </div>
-
-            <div className="mt-1 flex justify-center">
-              <span className="rounded-full bg-[#F6EAE6] px-4 py-1.5 text-[10px] font-black text-[#C98674]">
-                과일향 러버 타입
-              </span>
-            </div>
-
-            <div className="mt-4 flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F6EAE6] text-[16px]">
-                🧑🏻
-              </div>
-              <p className="text-[12px] font-medium leading-5 text-text-main/80">
-                과일향이 풍부하고 당도가 적절한 와인을 산미가 살아있는 와인에 높은 점수를 주셨어요. 탄닌이 강하지 않은 미디엄 바디 스타일을 선호하는 편이에요.
+              <p className="text-text-main text-center text-[11px] leading-relaxed font-black">
+                와인초보님은 &apos;상큼하고 가벼운&apos; 화이트 와인 취향이에요!
               </p>
-            </div>
 
-            <div className="mt-4 space-y-3">
-              <button
-                onClick={() => setIsBestOpen((prev) => !prev)}
-                className="w-full rounded-[1rem] border border-[#E9D5D1] bg-white px-4 py-3 text-left"
-              >
-                <div className="flex items-center gap-2 text-[#B17672]">
-                  <span className={cn('text-xs transition-transform', isBestOpen ? 'rotate-0' : 'rotate-180')}>⌃</span>
-                  <p className="text-[11px] font-black uppercase">Best</p>
-                </div>
-                {isBestOpen && (
-                  <p className="mt-2 text-[11px] font-medium leading-5 text-text-main/65">
-                    피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
-                  </p>
-                )}
-              </button>
+              <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
+                <svg viewBox="0 0 240 240" className="h-full w-full">
+                  <g stroke="#D9D4CF" strokeWidth="1.2" fill="none">
+                    <polygon points="120,30 195,84 166,173 74,173 45,84" />
+                    <polygon points="120,48 180,91 157,162 83,162 60,91" />
+                    <polygon points="120,66 165,99 148,151 92,151 75,99" />
+                    <polygon points="120,84 150,106 139,140 101,140 90,106" />
+                    <polygon points="120,102 135,113 130,129 110,129 105,113" />
+                    <line x1="120" y1="120" x2="120" y2="30" />
+                    <line x1="120" y1="120" x2="195" y2="84" />
+                    <line x1="120" y1="120" x2="166" y2="173" />
+                    <line x1="120" y1="120" x2="74" y2="173" />
+                    <line x1="120" y1="120" x2="45" y2="84" />
+                  </g>
+                  <polygon
+                    points="120,73 171,98 157,157 86,163 61,97"
+                    fill="rgba(196, 91, 91, 0.16)"
+                    stroke="#C75B5B"
+                    strokeWidth="4"
+                    strokeLinejoin="round"
+                  />
+                </svg>
 
-              <button
-                onClick={() => setIsWorstOpen((prev) => !prev)}
-                className="w-full rounded-[1rem] border border-[#E9D5D1] bg-white px-4 py-3 text-left"
-              >
-                <div className="flex items-center gap-2 text-[#B17672]">
-                  <span className={cn('text-xs transition-transform', isWorstOpen ? 'rotate-0' : 'rotate-180')}>⌃</span>
-                  <p className="text-[11px] font-black uppercase">Worst</p>
+                <span className="text-text-main/55 absolute top-0 left-1/2 -translate-x-1/2 text-[10px] font-medium">
+                  탄닌
+                </span>
+                <span className="text-text-main/55 absolute top-[72px] right-[2px] text-[10px] font-medium">
+                  산미
+                </span>
+                <span className="text-text-main/55 absolute right-[34px] bottom-[28px] text-[10px] font-medium">
+                  바디
+                </span>
+                <span className="text-text-main/55 absolute bottom-[28px] left-[34px] text-[10px] font-medium">
+                  당도
+                </span>
+                <span className="text-text-main/55 absolute top-[72px] left-[0px] text-[10px] font-medium">
+                  도수
+                </span>
+                <button className="absolute right-[2px] bottom-[26px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white">
+                  ?
+                </button>
+              </div>
+
+              <div className="mt-1 flex justify-center">
+                <span className="rounded-full bg-[#F6EAE6] px-4 py-1.5 text-[10px] font-black text-[#C98674]">
+                  과일향 러버 타입
+                </span>
+              </div>
+
+              <div className="mt-4 flex items-start gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F6EAE6] text-[16px]">
+                  🧑🏻
                 </div>
-                {isWorstOpen && (
-                  <p className="mt-2 text-[11px] font-medium leading-5 text-text-main/65">
-                    피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
-                  </p>
-                )}
-              </button>
-            </div>
+                <p className="text-text-main/80 text-[12px] leading-5 font-medium">
+                  과일향이 풍부하고 당도가 적절한 와인을 산미가 살아있는 와인에 높은 점수를
+                  주셨어요. 탄닌이 강하지 않은 미디엄 바디 스타일을 선호하는 편이에요.
+                </p>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <button
+                  onClick={() => setIsBestOpen((prev) => !prev)}
+                  className="w-full rounded-[1rem] border border-[#E9D5D1] bg-white px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2 text-[#B17672]">
+                    <span
+                      className={cn(
+                        'text-xs transition-transform',
+                        isBestOpen ? 'rotate-0' : 'rotate-180',
+                      )}
+                    >
+                      ⌃
+                    </span>
+                    <p className="text-[11px] font-black uppercase">Best</p>
+                  </div>
+                  {isBestOpen && (
+                    <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
+                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                    </p>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => setIsWorstOpen((prev) => !prev)}
+                  className="w-full rounded-[1rem] border border-[#E9D5D1] bg-white px-4 py-3 text-left"
+                >
+                  <div className="flex items-center gap-2 text-[#B17672]">
+                    <span
+                      className={cn(
+                        'text-xs transition-transform',
+                        isWorstOpen ? 'rotate-0' : 'rotate-180',
+                      )}
+                    >
+                      ⌃
+                    </span>
+                    <p className="text-[11px] font-black uppercase">Worst</p>
+                  </div>
+                  {isWorstOpen && (
+                    <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
+                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                    </p>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -388,17 +415,22 @@ export default function MyPage() {
         hideDefaultFooter
         className={modalClassName}
       >
-        <div className="mb-4 h-px bg-primary-100/80" />
+        <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
           {WISHLIST_ITEMS.map((item) => (
-            <div key={item.id} className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm">
+            <div
+              key={item.id}
+              className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
+            >
               <div className="flex gap-2.5">
                 <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="truncate text-sm font-black text-text-main">{item.name}</h4>
-                      <p className="mt-0.5 text-[11px] font-medium text-text-main/45">{item.subtitle}</p>
+                      <h4 className="text-text-main truncate text-sm font-black">{item.name}</h4>
+                      <p className="text-text-main/45 mt-0.5 text-[11px] font-medium">
+                        {item.subtitle}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1 pt-0.5">
                       <span className="text-xs">{item.countryFlag}</span>
@@ -432,17 +464,20 @@ export default function MyPage() {
         hideDefaultFooter
         className={modalClassName}
       >
-        <div className="mb-4 h-px bg-primary-100/80" />
+        <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
           {reviews.map((review) => (
-            <div key={review.id} className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm">
+            <div
+              key={review.id}
+              className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2.5">
                   <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#7D4E3A]">
                     <Image src={review.avatar} alt={review.author} fill className="object-cover" />
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-[13px] font-black text-text-main">{review.author}</h4>
+                    <h4 className="text-text-main text-[13px] font-black">{review.author}</h4>
                     <div className="mt-0.5 flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
                         <Star
@@ -458,17 +493,19 @@ export default function MyPage() {
 
                 <div className="relative">
                   <button
-                    onClick={() => setActiveReviewMenuId((prev) => (prev === review.id ? null : review.id))}
-                    className="rounded-full p-1 text-text-main"
+                    onClick={() =>
+                      setActiveReviewMenuId((prev) => (prev === review.id ? null : review.id))
+                    }
+                    className="text-text-main rounded-full p-1"
                   >
                     <MoreHorizontal size={16} />
                   </button>
 
                   {activeReviewMenuId === review.id && (
-                    <div className="absolute right-0 top-7 z-10 w-24 rounded-[0.9rem] border border-primary-100 bg-white p-1 shadow-xl">
+                    <div className="border-primary-100 absolute top-7 right-0 z-10 w-24 rounded-[0.9rem] border bg-white p-1 shadow-xl">
                       <button
                         onClick={() => openReviewEditModal(review)}
-                        className="w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold text-text-main transition-colors hover:bg-primary-100/40"
+                        className="text-text-main hover:bg-primary-100/40 w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold transition-colors"
                       >
                         수정하기
                       </button>
@@ -486,7 +523,9 @@ export default function MyPage() {
                 </div>
               </div>
 
-              <p className="mt-2.5 text-[13px] font-medium leading-relaxed text-text-main">{review.content}</p>
+              <p className="text-text-main mt-2.5 text-[13px] leading-relaxed font-medium">
+                {review.content}
+              </p>
               <div className="mt-1.5 flex justify-end">
                 <span className="text-[11px] font-medium text-[#B97B79]">{review.date}</span>
               </div>
@@ -505,24 +544,33 @@ export default function MyPage() {
       >
         {editingReview ? (
           <div className="space-y-4">
-            <div className="rounded-[1.2rem] border border-primary-100 bg-white p-2.5 shadow-sm">
+            <div className="border-primary-100 rounded-[1.2rem] border bg-white p-2.5 shadow-sm">
               <div className="flex items-center gap-2.5">
                 <div className="h-14 w-10 shrink-0 rounded-[0.75rem] bg-[#DDD2C1]" />
                 <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-sm font-black text-text-main">{editingReview.wineName}</h4>
-                  <p className="mt-0.5 text-xs font-medium text-text-main/35">{editingReview.subtitle}</p>
+                  <h4 className="text-text-main truncate text-sm font-black">
+                    {editingReview.wineName}
+                  </h4>
+                  <p className="text-text-main/35 mt-0.5 text-xs font-medium">
+                    {editingReview.subtitle}
+                  </p>
                 </div>
-                <span className="rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black text-text-main/35">
+                <span className="text-text-main/35 rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black">
                   수정 중
                 </span>
               </div>
             </div>
 
             <div>
-              <h5 className="text-[15px] font-black text-text-main">별점</h5>
+              <h5 className="text-text-main text-[15px] font-black">별점</h5>
               <div className="mt-2.5 flex justify-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <button key={star} type="button" onClick={() => setEditedRating(star)} className="p-0.5">
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setEditedRating(star)}
+                    className="p-0.5"
+                  >
                     <Star
                       size={30}
                       fill={star <= editedRating ? '#D89A4F' : '#E9E2D8'}
@@ -534,28 +582,28 @@ export default function MyPage() {
             </div>
 
             <div>
-              <h5 className="text-[15px] font-black text-text-main">리뷰 내용</h5>
+              <h5 className="text-text-main text-[15px] font-black">리뷰 내용</h5>
               <div className="relative mt-2.5">
                 <textarea
                   value={editedContent}
                   onChange={(event) => setEditedContent(event.target.value.slice(0, 500))}
-                  className="h-28 w-full resize-none rounded-[1.2rem] border border-primary-100 bg-white p-3.5 text-[13px] font-medium leading-relaxed text-text-main outline-none transition-colors focus:border-primary-500"
+                  className="border-primary-100 text-text-main focus:border-primary-500 h-28 w-full resize-none rounded-[1.2rem] border bg-white p-3.5 text-[13px] leading-relaxed font-medium transition-colors outline-none"
                   placeholder="리뷰 내용을 입력해 주세요."
                 />
-                <span className="absolute bottom-4 right-4 text-[10px] font-bold text-text-main/30">
+                <span className="text-text-main/30 absolute right-4 bottom-4 text-[10px] font-bold">
                   {editedContent.length}/500
                 </span>
               </div>
             </div>
 
-              <Button
-                size="full"
-                onClick={saveReview}
-                disabled={editedContent.trim().length < 5 || editedRating === 0}
-                className="h-11 rounded-[1rem] bg-[#B37474] text-sm font-black hover:bg-[#9E6666]"
-              >
-                리뷰 수정하기
-              </Button>
+            <Button
+              size="full"
+              onClick={saveReview}
+              disabled={editedContent.trim().length < 5 || editedRating === 0}
+              className="h-11 rounded-[1rem] bg-[#B37474] text-sm font-black hover:bg-[#9E6666]"
+            >
+              리뷰 수정하기
+            </Button>
           </div>
         ) : null}
       </Modal>
@@ -567,10 +615,19 @@ export default function MyPage() {
         className="w-[calc(100vw-2rem)] max-w-[18.5rem] rounded-[1.55rem] bg-[#F7F5F1] px-3.5 py-4"
         footer={
           <div className="flex gap-2">
-            <Button variant="secondary" size="full" onClick={() => setDeletingReviewId(null)} className="rounded-[1rem]">
+            <Button
+              variant="secondary"
+              size="full"
+              onClick={() => setDeletingReviewId(null)}
+              className="rounded-[1rem]"
+            >
               취소
             </Button>
-            <Button size="full" onClick={deleteReview} className="rounded-[1rem] bg-[#D65F69] hover:bg-[#C44B56]">
+            <Button
+              size="full"
+              onClick={deleteReview}
+              className="rounded-[1rem] bg-[#D65F69] hover:bg-[#C44B56]"
+            >
               삭제
             </Button>
           </div>
@@ -580,14 +637,16 @@ export default function MyPage() {
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F6EAEA] text-[#D65F69]">
             <Trash2 size={20} />
           </div>
-          <p className="text-sm font-bold text-text-main/75">삭제하시겠습니까?</p>
+          <p className="text-text-main/75 text-sm font-bold">삭제하시겠습니까?</p>
         </div>
       </Modal>
 
       <Modal
         isOpen={activeModal === 'friends'}
         onClose={() => setActiveModal(null)}
-        title={friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'}
+        title={
+          friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'
+        }
         hideDefaultFooter
         className={modalClassName}
       >
@@ -611,15 +670,17 @@ export default function MyPage() {
                   +
                 </div>
                 <div>
-                  <p className="text-sm font-black text-text-main">친구 추가하기</p>
-                  <p className="mt-0.5 text-[11px] font-medium text-text-main/40">닉네임이나 코드로 검색해 보세요</p>
+                  <p className="text-text-main text-sm font-black">친구 추가하기</p>
+                  <p className="text-text-main/40 mt-0.5 text-[11px] font-medium">
+                    닉네임이나 코드로 검색해 보세요
+                  </p>
                 </div>
               </div>
               <ChevronRight size={18} className="text-[#B17672]" />
             </button>
 
             <div>
-              <p className="mb-3 text-sm font-medium text-text-main/45">친구 {FRIENDS.length}명</p>
+              <p className="text-text-main/45 mb-3 text-sm font-medium">친구 {FRIENDS.length}명</p>
               <div className="max-h-[18rem] space-y-2.5 overflow-y-auto pr-1">
                 {FRIENDS.map((friend) => (
                   <div
@@ -628,18 +689,25 @@ export default function MyPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
-                        <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
+                        <Image
+                          src={friend.avatar}
+                          alt={friend.name}
+                          fill
+                          className="object-cover"
+                        />
                       </div>
                       <div>
-                        <p className="text-[13px] font-black text-text-main">{friend.name}</p>
-                        <p className="text-[11px] font-medium text-text-main/45">{friend.winesTasted}종 시음</p>
+                        <p className="text-text-main text-[13px] font-black">{friend.name}</p>
+                        <p className="text-text-main/45 text-[11px] font-medium">
+                          {friend.winesTasted}종 시음
+                        </p>
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
                         프로필
                       </button>
-                      <button className="rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black text-text-main/55">
+                      <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
                         삭제
                       </button>
                     </div>
@@ -661,13 +729,13 @@ export default function MyPage() {
                   <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
                     <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
                   </div>
-                  <p className="text-[13px] font-black text-text-main">{friend.name}</p>
+                  <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                 </div>
                 <div className="flex gap-2">
                   <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
                     수락
                   </button>
-                  <button className="rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black text-text-main/55">
+                  <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
                     거절
                   </button>
                 </div>
@@ -683,9 +751,9 @@ export default function MyPage() {
                 value={friendSearchQuery}
                 onChange={(event) => setFriendSearchQuery(event.target.value)}
                 placeholder="친구 ID 입력..."
-                className="h-11 w-full rounded-full border border-[#DDD4C8] bg-[#FBFAF7] pl-4 pr-12 text-[13px] font-medium text-text-main outline-none placeholder:text-text-main/35"
+                className="text-text-main placeholder:text-text-main/35 h-11 w-full rounded-full border border-[#DDD4C8] bg-[#FBFAF7] pr-12 pl-4 text-[13px] font-medium outline-none"
               />
-              <button className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#B17672] text-white">
+              <button className="absolute top-1/2 right-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#B17672] text-white">
                 <Search size={16} />
               </button>
             </div>
@@ -701,14 +769,18 @@ export default function MyPage() {
                       <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
                     </div>
                     <div>
-                      <p className="text-[13px] font-black text-text-main">{friend.name}</p>
-                      <p className="text-[11px] font-medium text-text-main/45">{friend.winesTasted}종 시음</p>
+                      <p className="text-text-main text-[13px] font-black">{friend.name}</p>
+                      <p className="text-text-main/45 text-[11px] font-medium">
+                        {friend.winesTasted}종 시음
+                      </p>
                     </div>
                   </div>
                   <button
                     className={cn(
                       'rounded-full px-3.5 py-1 text-[10px] font-black',
-                      friend.status === 'friend' ? 'bg-[#8B8B8B] text-white' : 'bg-[#F6EAEA] text-[#B17672]',
+                      friend.status === 'friend'
+                        ? 'bg-[#8B8B8B] text-white'
+                        : 'bg-[#F6EAEA] text-[#B17672]',
                     )}
                   >
                     {friend.status === 'friend' ? '친구' : '친구 요청'}
