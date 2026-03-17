@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -23,4 +25,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     // 탈퇴하는 사용자의 모든 리뷰를 삭제
     void deleteByUser(User user);
+
+    // 특정 유저가 작성한 와인 리뷰 조회
+    @Query("select r from Review r join fetch r.wine w where r.user = :user order by r.createdAt desc")
+    List<Review> findAllByUserWithWine(@Param("user") User user);
 }
