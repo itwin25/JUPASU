@@ -10,11 +10,26 @@ import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
 import { signinSchema, SigninSchema } from '@/features/auth/schemas/auth.schema'; // 💡 SigninSchema와 동일한지 확인 필요
 import { useSignin } from '../hooks/useSignin';
+import { useToastStore } from '@/stores/toast.store';
+import { useEffect, useRef } from 'react';
 
-export default function LoginForm() {
+interface LoginFormProps {
+  errorCode?: string;
+}
+
+export default function LoginForm({ errorCode }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-
   const { signinMutation } = useSignin();
+  const addToast = useToastStore((state) => state.addToast);
+  const toastShown = useRef(false);
+
+  // 리다이렉트 에러용 토스트 (로그인 후 이용해주세요)
+  useEffect(() => {
+    if (errorCode === 'login_required' && !toastShown.current) {
+      addToast('로그인 후 이용해주세요.', 'info');
+      toastShown.current = true;
+    }
+  }, [errorCode, addToast]);
 
   // React Hook Form 초기화
   const {
@@ -30,7 +45,6 @@ export default function LoginForm() {
   const onSubmit = (data: SigninSchema) => {
     signinMutation.mutate(data);
   };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
       <div className="space-y-4">
