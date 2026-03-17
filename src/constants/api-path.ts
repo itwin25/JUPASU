@@ -19,6 +19,7 @@ export const API_PATH = {
     LIST: '/wines',
     DETAIL: (id: number | string) => `/wines/${id}`,
     RECOMMEND: '/wines/recommend',
+    SCRAPS: '/wines/scraps',
   },
   USER: {
     PROFILE: '/users/profile',
