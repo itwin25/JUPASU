@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,13 +8,12 @@ import { Camera, ChevronLeft, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import Modal from '@/components/ui/modal/Modal';
-import { useLogoutMutation } from '@/features/auth/hooks/useLoginMutation';
+import { useSignout } from '@/features/auth/hooks/useSignout';
 import {
   useUpdateProfileMutation,
   useUserProfile,
   useWithdrawMutation,
 } from '@/features/user/hooks/useUserQueries';
-import { authToken } from '@/lib/auth-token';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -22,15 +21,15 @@ const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.s
 
 export default function ProfileEditPage() {
   const router = useRouter();
-  const logoutStore = useAuthStore((state) => state.logout);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
 
   const { data: profile, isLoading } = useUserProfile();
   const updateProfileMutation = useUpdateProfileMutation();
-  const logoutMutation = useLogoutMutation();
+  const { handleSignout, isLoading: isSignoutLoading } = useSignout();
   const withdrawMutation = useWithdrawMutation();
 
-  const [nickname, setNickname] = useState('');
-  const [currentAvatar, setCurrentAvatar] = useState('dog1.svg');
+  const [nickname, setNickname] = useState<string | null>(null);
+  const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
@@ -40,14 +39,10 @@ export default function ProfileEditPage() {
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    if (!profile) return;
-
-    setNickname(profile.nickname);
-    if (AVATARS.includes(profile.character)) {
-      setCurrentAvatar(profile.character);
-    }
-  }, [profile]);
+  const resolvedNickname = nickname ?? profile?.nickname ?? '';
+  const resolvedAvatar =
+    currentAvatar ??
+    (profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg');
 
   const handleUpdateProfile = async () => {
     const shouldChangePassword =
@@ -69,8 +64,8 @@ export default function ProfileEditPage() {
 
     try {
       await updateProfileMutation.mutateAsync({
-        nickname,
-        character: currentAvatar,
+        nickname: resolvedNickname,
+        character: resolvedAvatar,
         currentPassword: shouldChangePassword ? passwords.current : undefined,
         newPassword: shouldChangePassword ? passwords.new : undefined,
         confirmNewPassword: shouldChangePassword ? passwords.confirm : undefined,
@@ -84,16 +79,8 @@ export default function ProfileEditPage() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logoutMutation.mutateAsync();
-    } catch {
-      // Ignore and clear client state anyway.
-    } finally {
-      authToken.remove();
-      logoutStore();
-      router.push('/login');
-    }
+  const handleLogout = () => {
+    handleSignout();
   };
 
   const handleDeleteAccount = async () => {
@@ -106,8 +93,7 @@ export default function ProfileEditPage() {
       await withdrawMutation.mutateAsync({ password: withdrawPassword });
       setIsDeleteConfirmOpen(false);
       setWithdrawPassword('');
-      authToken.remove();
-      logoutStore();
+      clearAuth();
       router.push('/login');
     } catch {
       alert('회원 탈퇴 처리 중 오류가 발생했습니다.');
@@ -135,7 +121,7 @@ export default function ProfileEditPage() {
       <main className="flex-1 space-y-8 px-4">
         <div className="relative flex justify-center pt-2">
           <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
-            <Image src={`/${currentAvatar}`} alt="Avatar" fill className="object-cover" />
+            <Image src={`/${resolvedAvatar}`} alt="Avatar" fill className="object-cover" />
           </div>
           <button
             onClick={() => setIsAvatarPickerOpen(true)}
@@ -149,7 +135,7 @@ export default function ProfileEditPage() {
           <h3 className="text-text-main text-base font-black">기본 정보</h3>
           <Input
             label="닉네임"
-            value={nickname}
+            value={resolvedNickname}
             onChange={(e) => setNickname(e.target.value)}
             className="rounded-[1rem] px-4 py-3 text-sm"
           />
@@ -199,10 +185,10 @@ export default function ProfileEditPage() {
           <div className="flex gap-2.5">
             <button
               onClick={handleLogout}
-              disabled={logoutMutation.isPending}
+              disabled={isSignoutLoading}
               className="border-primary-100 text-text-main/60 flex h-10 flex-1 items-center justify-center rounded-[1rem] border bg-white text-[13px] font-bold disabled:opacity-50"
             >
-              {logoutMutation.isPending ? '처리 중...' : '로그아웃'}
+              {isSignoutLoading ? '처리 중...' : '로그아웃'}
             </button>
             <button
               onClick={() => setIsDeleteConfirmOpen(true)}
@@ -233,7 +219,7 @@ export default function ProfileEditPage() {
                   }}
                   className={cn(
                     'relative aspect-square overflow-hidden rounded-[1rem] border-[3px] transition-all',
-                    currentAvatar === avatar
+                    resolvedAvatar === avatar
                       ? 'scale-105 border-[#B36262]'
                       : 'bg-primary-100/30 border-transparent',
                   )}
