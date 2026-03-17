@@ -9,6 +9,7 @@ export const QUERY_KEY = {
     LIST: (params: unknown) => ['wine', 'list', params],
     DETAIL: (id: number | string) => ['wine', 'detail', id],
     RECOMMEND: ['wine', 'recommend'],
+    SCRAPS: ['wine', 'scraps'],
   },
   USER: {
     PROFILE: ['user', 'profile'],

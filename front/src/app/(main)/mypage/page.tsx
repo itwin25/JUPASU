@@ -29,6 +29,10 @@ import {
   useMyReviewsQuery,
   useUpdateReviewMutation,
 } from '@/features/review/hooks/useWineReviewsQuery';
+import {
+  useWineScrapListQuery,
+  useWineScrapMutation,
+} from '@/features/wine/hooks/useWineListQuery';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
@@ -45,6 +49,8 @@ type ReviewItem = {
 
 type WishlistItem = {
   id: number;
+  wineId?: number;
+  scrapId?: number;
   name: string;
   subtitle: string;
   rating: number;
@@ -137,6 +143,30 @@ function resolveCharacterImage(character?: string) {
   return character.startsWith('/') ? character : `/${character}`;
 }
 
+function getCountryCode(country?: string) {
+  switch (country?.toLowerCase()) {
+    case 'france':
+      return 'FR';
+    case 'italy':
+      return 'IT';
+    case 'spain':
+      return 'ES';
+    case 'new zealand':
+      return 'NZ';
+    case 'usa':
+    case 'united states':
+      return 'US';
+    case 'chile':
+      return 'CL';
+    case 'argentina':
+      return 'AR';
+    case 'australia':
+      return 'AU';
+    default:
+      return country?.slice(0, 2).toUpperCase() ?? '--';
+  }
+}
+
 function Pagination() {
   return (
     <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
@@ -163,6 +193,7 @@ function Pagination() {
 
 export default function MyPage() {
   const { data: myReviews = [] } = useMyReviewsQuery();
+  const { data: scrapListData } = useWineScrapListQuery();
   const { data: friendListData } = useFriendListQuery();
   const { data: pendingFriendListData } = usePendingFriendListQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -189,8 +220,26 @@ export default function MyPage() {
   const deleteFriendMutation = useDeleteFriendMutation();
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
+  const wineScrapMutation = useWineScrapMutation();
   const friendList = friendListData ?? [];
   const pendingFriendList = pendingFriendListData ?? [];
+  const wishlistItems = useMemo<WishlistItem[]>(
+    () =>
+      scrapListData
+        ? scrapListData.map((item) => ({
+            id: item.scrapId,
+            wineId: item.wineId,
+            scrapId: item.scrapId,
+            name: item.wineName,
+            subtitle: item.wineType,
+            rating: item.averageRating,
+            price: `₩${item.price.toLocaleString('ko-KR')}`,
+            countryFlag: getCountryCode(item.country),
+            match: `${item.matchRate}%`,
+          }))
+        : WISHLIST_ITEMS,
+    [scrapListData],
+  );
   const mappedReviews = useMemo<ReviewItem[]>(
     () =>
       myReviews.map((review) => {
@@ -353,6 +402,12 @@ export default function MyPage() {
     await deleteFriendMutation.mutateAsync(requestId);
   };
 
+  const handleToggleWishlist = async (wineId: number | undefined) => {
+    if (!wineId) return;
+
+    await wineScrapMutation.mutateAsync(wineId);
+  };
+
   return (
     <div className="bg-background min-h-screen pb-24">
       <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
@@ -423,7 +478,7 @@ export default function MyPage() {
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">8</p>
+              <p className="text-lg font-black text-[#B36262]">{wishlistItems.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
@@ -570,7 +625,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {WISHLIST_ITEMS.map((item) => (
+          {wishlistItems.map((item) => (
             <div
               key={item.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
@@ -586,7 +641,9 @@ export default function MyPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 pt-0.5">
-                      <span className="text-xs">{item.countryFlag}</span>
+                      <span className="text-text-main/55 text-[10px] font-black">
+                        {item.countryFlag}
+                      </span>
                       <span className="text-[10px] font-black text-[#C87E7A]">{item.match}</span>
                     </div>
                   </div>
@@ -595,7 +652,10 @@ export default function MyPage() {
                       <span className="text-[11px] font-black text-[#D89A4F]">★ {item.rating}</span>
                       <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
                     </div>
-                    <button className="text-[#CC5C57]">
+                    <button
+                      onClick={() => handleToggleWishlist(item.wineId)}
+                      className="text-[#CC5C57]"
+                    >
                       <Heart size={16} fill="currentColor" />
                     </button>
                   </div>
