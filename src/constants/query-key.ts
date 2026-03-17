@@ -16,6 +16,7 @@ export const QUERY_KEY = {
   },
   REVIEW: {
     LIST: (wineId?: number | string) => ['review', 'list', wineId],
+    MY: ['review', 'my'],
     DETAIL: (id: number | string) => ['review', 'detail', id],
   },
 } as const;

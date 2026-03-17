@@ -9,6 +9,16 @@ export interface Review {
   images?: string[];
 }
 
+export interface MyPageReview {
+  reviewId: number;
+  nickname: string;
+  wineId: number;
+  wineName: string;
+  rating: number;
+  content: string;
+  createdAt: string;
+}
+
 export interface CreateReviewRequest {
   wineId: number;
   rating: number;
