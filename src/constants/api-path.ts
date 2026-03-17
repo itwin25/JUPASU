@@ -28,8 +28,9 @@ export const API_PATH = {
     WITHDRAW: '/users/withdraw',
   },
   REVIEW: {
-    LIST: '/reviews',
-    CREATE: '/reviews',
-    DETAIL: (id: number | string) => `/reviews/${id}`,
+    LIST: (wineId: number | string) => `/reviews/${wineId}`,
+    CREATE: (wineId: number | string) => `/reviews/${wineId}/review`,
+    DETAIL: (wineId: number | string, reviewId: number | string) =>
+      `/reviews/${wineId}/review/${reviewId}`,
   },
 } as const;

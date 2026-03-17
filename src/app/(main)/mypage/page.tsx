@@ -17,11 +17,16 @@ import {
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useSignout } from '@/features/auth/hooks';
-import { useMyReviewsQuery } from '@/features/review/hooks/useWineReviewsQuery';
+import {
+  useDeleteReviewMutation,
+  useMyReviewsQuery,
+  useUpdateReviewMutation,
+} from '@/features/review/hooks/useWineReviewsQuery';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
   id: number;
+  wineId?: number;
   author: string;
   wineName: string;
   subtitle: string;
@@ -162,6 +167,8 @@ export default function MyPage() {
   const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
+  const updateReviewMutation = useUpdateReviewMutation();
+  const deleteReviewMutation = useDeleteReviewMutation();
   const mappedReviews = useMemo<ReviewItem[]>(
     () =>
       myReviews.map((review) => {
@@ -170,6 +177,7 @@ export default function MyPage() {
 
         return {
           id: review.reviewId,
+          wineId: review.wineId,
           author: review.nickname,
           wineName: review.wineName,
           subtitle: '작성한 리뷰',
@@ -211,22 +219,23 @@ export default function MyPage() {
     setEditedRating(0);
   };
 
-  const saveReview = () => {
+  const saveReview = async () => {
     if (!editingReview) return;
+    const trimmedContent = editedContent.trim();
+    if (!trimmedContent || editedRating === 0) return;
 
-    if (myReviews.length > 0) {
-      setReviewOverrides((prev) => ({
-        ...prev,
-        [editingReview.id]: {
-          content: editedContent.trim(),
-          rating: editedRating,
-        },
-      }));
+    if (myReviews.length > 0 && editingReview.wineId) {
+      await updateReviewMutation.mutateAsync({
+        wineId: editingReview.wineId,
+        reviewId: editingReview.id,
+        rating: editedRating,
+        content: trimmedContent,
+      });
     } else {
       setReviews((prev) =>
         prev.map((review) =>
           review.id === editingReview.id
-            ? { ...review, content: editedContent.trim(), rating: editedRating }
+            ? { ...review, content: trimmedContent, rating: editedRating }
             : review,
         ),
       );
@@ -234,10 +243,15 @@ export default function MyPage() {
     closeReviewEditModal();
   };
 
-  const deleteReview = () => {
+  const deleteReview = async () => {
     if (deletingReviewId === null) return;
-    if (myReviews.length > 0) {
-      setDeletedReviewIds((prev) => [...prev, deletingReviewId]);
+    const deletingReview = visibleReviews.find((review) => review.id === deletingReviewId) ?? null;
+
+    if (myReviews.length > 0 && deletingReview?.wineId) {
+      await deleteReviewMutation.mutateAsync({
+        wineId: deletingReview.wineId,
+        reviewId: deletingReview.id,
+      });
     } else {
       setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
     }

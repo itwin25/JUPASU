@@ -25,3 +25,15 @@ export interface CreateReviewRequest {
   content: string;
   images?: string[];
 }
+
+export interface UpdateReviewRequest {
+  wineId: number;
+  reviewId: number;
+  rating: number;
+  content: string;
+}
+
+export interface DeleteReviewRequest {
+  wineId: number;
+  reviewId: number;
+}
