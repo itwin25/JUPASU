@@ -1,13 +1,7 @@
 import { api } from '@/lib/axios';
 import { API_PATH } from '@/constants/api-path';
 
-import {
-  UserInfo,
-  UpdateProfileRequest,
-  WithdrawRequest,
-  UserProfileResponse,
-  UserMyPageResponse
-} from '@/types/user.types';
+import { UpdateProfileRequest, WithdrawRequest, UserMyPageResponse } from '@/types/user.types';
 
 export const userApi = {
   /**
