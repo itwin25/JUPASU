@@ -22,3 +22,16 @@ export interface WineListParams {
   type?: WineType;
   sort?: string;
 }
+
+export interface ScrapWine {
+  wineId: number;
+  scrapId: number;
+  wineName: string;
+  wineType: string;
+  averageRating: number;
+  price: number;
+  matchRate: number;
+  country: string;
+  imageUrl: string;
+  isScraped: boolean;
+}
