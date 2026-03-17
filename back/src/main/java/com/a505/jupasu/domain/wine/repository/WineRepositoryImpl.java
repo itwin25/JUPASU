@@ -29,19 +29,20 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<Wine> searchWines(WineSearchCondition condition, Pageable pageable) {
+    public Page<Wine> searchWines(WineSearchCondition condition, List<Long> matchingIds, Pageable pageable) {
 
         BooleanBuilder builder = new BooleanBuilder();
 
-        // 키워드 유사도 검색조건 추가
-        builder.and(keywordSimilarity(condition.getKeyword()));
+        if (matchingIds != null) {
+            builder.and(wine.id.in(matchingIds));
+        }
 
         // 필터링
-        builder.and(typeEq(condition.getType()));
-        builder.and(priceGoe(condition.getMinPrice()));
-        builder.and(priceLoe(condition.getMaxPrice()));
-        builder.and(ratingGoe(condition.getMinRate()));
-        builder.and(countryEq(condition.getCountry()));
+        builder.and(typeEq(condition.type()));
+        builder.and(priceGoe(condition.minPrice()));
+        builder.and(priceLoe(condition.maxPrice()));
+        builder.and(ratingGoe(condition.minRate()));
+        builder.and(countryEq(condition.country()));
 
         OrderSpecifier<?> [] orderSpecifiers = getOrderSpecifier(pageable);
 
@@ -53,11 +54,10 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
                 .offset(pageable.getPageSize());
 
         // 동적 정렬
-        if (StringUtils.hasText(condition.getKeyword())) {
+        if (StringUtils.hasText(condition.keyword())) {
             NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
-                    "function('word_similarity', {0}, {1})", condition.getKeyword(), wine.nameKr);
+                    "function('word_similarity', {0}, {1})", condition.keyword(), wine.nameKr);
 
-            // 유사도를 1순위로 정렬하고, 그 뒤에 페이징 정렬 조건들을 적용
             query.orderBy(similarity.desc());
             for (OrderSpecifier<?> orderSpecifier : orderSpecifiers) {
                 query.orderBy(orderSpecifier);
@@ -110,25 +110,25 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
      * 와인 가격 범위 검사
      */
     private BooleanExpression priceGoe(Integer minPrice) {
-        return minPrice != null ? wine.price.goe(minPrice) : null;
+        return minPrice != null ? wine.priceAndRating.price.goe(minPrice) : null;
     }
 
     private BooleanExpression priceLoe(Integer maxPrice) {
-        return maxPrice != null ? wine.price.loe(maxPrice) : null;
+        return maxPrice != null ? wine.priceAndRating.price.loe(maxPrice) : null;
     }
 
     /**
      * 와인 평균 평점 범위 검사
      */
     private BooleanExpression ratingGoe(Double minRate) {
-        return minRate != null ? wine.averageRating.goe(minRate) : null;
+        return minRate != null ? wine.priceAndRating.averageRating.goe(minRate) : null;
     }
 
     /**
      * 와인 원산지 검사
      */
     private BooleanExpression countryEq (String country) {
-        return StringUtils.hasText(country) ? wine.country.eq(country) : null;
+        return StringUtils.hasText(country) ? wine.origin.country.eq(country) : null;
     }
 
     //===================================================
@@ -155,14 +155,14 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
                 case "price":
                     orderSpecifiers.add(new OrderSpecifier<>(
                             direction,
-                            wine.price,
+                            wine.priceAndRating.price,
                             OrderSpecifier.NullHandling.NullsLast
                     ));
                     break;
                 case "rating":
                     orderSpecifiers.add(new OrderSpecifier<>(
                             direction,
-                            wine.averageRating,
+                            wine.priceAndRating.averageRating,
                             OrderSpecifier.NullHandling.NullsLast));
                     break;
                 default:

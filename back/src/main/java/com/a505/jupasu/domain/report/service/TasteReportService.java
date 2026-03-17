@@ -56,10 +56,10 @@ public class TasteReportService {
             double rating = review.getRating();
             var wine = review.getWine();
 
-            sumSweet += rating * wine.getSweetness();
-            sumAcid += rating * wine.getAcidity();
-            sumBody += rating * wine.getBody();
-            sumTan += rating * wine.getTannin();
+            sumSweet += rating * wine.getTasteProfile().getSweetness();
+            sumAcid += rating * wine.getTasteProfile().getAcidity();
+            sumBody += rating * wine.getTasteProfile().getBody();
+            sumTan += rating * wine.getTasteProfile().getTannin();
             sumAlc += rating * normalizeAlcohol(Double.valueOf(wine.getAlcoholDegree())); // 도수 1~5 척도 변환
 
             totalWeight += rating;
@@ -110,8 +110,8 @@ public class TasteReportService {
         for (Review review : reviews) {
             sb.append(String.format("- 와인: %s, 평점: %.1f, 맛(당/산/바/탄/알): %.1f/%.1f/%.1f/%.1f/%.1f\n",
                     review.getWine().getNameKr(), review.getRating(),
-                    review.getWine().getSweetness(), review.getWine().getAcidity(),
-                    review.getWine().getBody(), review.getWine().getTannin(),
+                    review.getWine().getTasteProfile().getSweetness(), review.getWine().getTasteProfile().getAcidity(),
+                    review.getWine().getTasteProfile().getBody(), review.getWine().getTasteProfile().getTannin(),
                     review.getWine().getAlcoholDegree()));
         }
         return sb.toString();

@@ -7,6 +7,7 @@ import com.querydsl.core.types.dsl.*;
 import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
 import com.querydsl.core.types.Path;
+import com.querydsl.core.types.dsl.PathInits;
 
 
 /**
@@ -17,19 +18,13 @@ public class QWine extends EntityPathBase<Wine> {
 
     private static final long serialVersionUID = 1751479409L;
 
+    private static final PathInits INITS = PathInits.DIRECT2;
+
     public static final QWine wine = new QWine("wine");
 
     public final com.a505.jupasu.global.common.entity.QBaseEntity _super = new com.a505.jupasu.global.common.entity.QBaseEntity(this);
 
-    public final NumberPath<Float> acidity = createNumber("acidity", Float.class);
-
     public final NumberPath<Float> alcoholDegree = createNumber("alcoholDegree", Float.class);
-
-    public final NumberPath<Double> averageRating = createNumber("averageRating", Double.class);
-
-    public final NumberPath<Float> body = createNumber("body", Float.class);
-
-    public final StringPath country = createString("country");
 
     //inherited
     public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
@@ -42,37 +37,50 @@ public class QWine extends EntityPathBase<Wine> {
 
     public final StringPath imageUrl = createString("imageUrl");
 
+    public final BooleanPath isRealAlcoholDegree = createBoolean("isRealAlcoholDegree");
+
+    public final BooleanPath isRealNameEn = createBoolean("isRealNameEn");
+
+    public final BooleanPath isRealNameKr = createBoolean("isRealNameKr");
+
     public final StringPath nameEn = createString("nameEn");
 
     public final StringPath nameKr = createString("nameKr");
 
-    public final NumberPath<Integer> price = createNumber("price", Integer.class);
+    public final com.a505.jupasu.domain.wine.entity.vo.QOrigin origin;
 
-    public final StringPath region = createString("region");
+    public final com.a505.jupasu.domain.wine.entity.vo.QWinePriceAndRating priceAndRating;
 
     public final StringPath summary = createString("summary");
 
-    public final NumberPath<Float> sweetness = createNumber("sweetness", Float.class);
-
-    public final NumberPath<Float> tannin = createNumber("tannin", Float.class);
+    public final com.a505.jupasu.domain.wine.entity.vo.QTasteProfile tasteProfile;
 
     public final EnumPath<WineType> type = createEnum("type", WineType.class);
 
     //inherited
     public final DateTimePath<java.time.LocalDateTime> updatedAt = _super.updatedAt;
 
-    public final StringPath winery = createString("winery");
-
     public QWine(String variable) {
-        super(Wine.class, forVariable(variable));
+        this(Wine.class, forVariable(variable), INITS);
     }
 
     public QWine(Path<? extends Wine> path) {
-        super(path.getType(), path.getMetadata());
+        this(path.getType(), path.getMetadata(), PathInits.getFor(path.getMetadata(), INITS));
     }
 
     public QWine(PathMetadata metadata) {
-        super(Wine.class, metadata);
+        this(metadata, PathInits.getFor(metadata, INITS));
+    }
+
+    public QWine(PathMetadata metadata, PathInits inits) {
+        this(Wine.class, metadata, inits);
+    }
+
+    public QWine(Class<? extends Wine> type, PathMetadata metadata, PathInits inits) {
+        super(type, metadata, inits);
+        this.origin = inits.isInitialized("origin") ? new com.a505.jupasu.domain.wine.entity.vo.QOrigin(forProperty("origin")) : null;
+        this.priceAndRating = inits.isInitialized("priceAndRating") ? new com.a505.jupasu.domain.wine.entity.vo.QWinePriceAndRating(forProperty("priceAndRating")) : null;
+        this.tasteProfile = inits.isInitialized("tasteProfile") ? new com.a505.jupasu.domain.wine.entity.vo.QTasteProfile(forProperty("tasteProfile")) : null;
     }
 
 }
