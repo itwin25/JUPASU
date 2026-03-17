@@ -28,7 +28,7 @@ public class WineDummyService {
                 "average_rating, description, summary, image_url, created_at, updated_at) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
-        int totalCount = 1_000_000;
+        int totalCount = 10000;
         int batchSize = 10_000; // 1만 건씩 묶어서 전송
         int loopCount = totalCount / batchSize;
 

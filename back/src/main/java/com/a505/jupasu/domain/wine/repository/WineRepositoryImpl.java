@@ -3,16 +3,19 @@ package com.a505.jupasu.domain.wine.repository;
 import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.WineType;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -28,31 +31,54 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     @Override
     public Page<Wine> searchWines(WineSearchCondition condition, Pageable pageable) {
 
-        List<Wine> content = queryFactory
-                .selectFrom(wine)
-                .where(
-                        keywordContains(condition.getKeyword()),
-                        typeEq(condition.getType()),
-                        priceBetween(condition.getMinPrice(), condition.getMaxPrice()),
-                        ratingGoe(condition.getMinRate()),
-                        countryEq(condition.getCountry())
-                        )
-                .orderBy(getOrderSpecifier(pageable))
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+        BooleanBuilder builder = new BooleanBuilder();
 
-        JPAQuery<Long> countQuery = queryFactory
+        // 키워드 유사도 검색조건 추가
+        builder.and(keywordSimilarity(condition.getKeyword()));
+
+        // 필터링
+        builder.and(typeEq(condition.getType()));
+        builder.and(priceGoe(condition.getMinPrice()));
+        builder.and(priceLoe(condition.getMaxPrice()));
+        builder.and(ratingGoe(condition.getMinRate()));
+        builder.and(countryEq(condition.getCountry()));
+
+        OrderSpecifier<?> [] orderSpecifiers = getOrderSpecifier(pageable);
+
+        // 조회 쿼리
+        JPAQuery<Wine> query = queryFactory
+                .selectFrom(wine)
+                .where(builder)
+                .offset(pageable.getOffset())
+                .offset(pageable.getPageSize());
+
+        // 동적 정렬
+        if (StringUtils.hasText(condition.getKeyword())) {
+            NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
+                    "function('word_similarity', {0}, {1})", condition.getKeyword(), wine.nameKr);
+
+            // 유사도를 1순위로 정렬하고, 그 뒤에 페이징 정렬 조건들을 적용
+            query.orderBy(similarity.desc());
+            for (OrderSpecifier<?> orderSpecifier : orderSpecifiers) {
+                query.orderBy(orderSpecifier);
+            }
+        } else {
+            query.orderBy(orderSpecifiers);
+        }
+
+        List<Wine> content = query.fetch();
+
+        // 5. 카운트 쿼리
+        Long total = queryFactory
                 .select(wine.count())
                 .from(wine)
-                .where(
-                        keywordContains(condition.getKeyword()),
-                        typeEq(condition.getType()),
-                        priceBetween(condition.getMinPrice(), condition.getMaxPrice()),
-                        ratingGoe(condition.getMinRate()),
-                        countryEq(condition.getCountry())
-                );
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+                .where(builder) // 본 쿼리와 동일한 builder 적용
+                .fetchOne();
+
+        long totalCount = total != null ? total : 0L;
+
+        return new PageImpl<>(content, pageable, totalCount);
+
     }
 
     //=============================================================
@@ -61,12 +87,16 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     /**
      * 와인 이름에 키워드가 포함되어있는지 검사
      */
-    private BooleanExpression keywordContains(String keyword) {
+    private BooleanExpression keywordSimilarity(String keyword) {
         if (!StringUtils.hasText(keyword)) {
             return null;
         }
-        return wine.nameKr.containsIgnoreCase(keyword)
-                .or(wine.nameEn.containsIgnoreCase(keyword));
+        // PostgreSQL word_similarity 함수 호출
+        NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
+                "function('word_similarity', {0}, {1})", keyword, wine.nameKr);
+
+        // 유사도 점수 0.1 이상인 것만 필터링 (기존 <% 연산자와 동일한 역할)
+        return similarity.gt(0.1);
     }
 
     /**
@@ -79,15 +109,12 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     /**
      * 와인 가격 범위 검사
      */
-    private BooleanExpression priceBetween(Integer minPrice, Integer maxPrice) {
-        if(minPrice !=  null && maxPrice != null) {
-            return wine.price.between(minPrice, maxPrice);
-        } else if(minPrice != null) {
-            return wine.price.goe(minPrice);
-        } else if(maxPrice != null) {
-            return wine.price.loe(maxPrice);
-        }
-        return null;
+    private BooleanExpression priceGoe(Integer minPrice) {
+        return minPrice != null ? wine.price.goe(minPrice) : null;
+    }
+
+    private BooleanExpression priceLoe(Integer maxPrice) {
+        return maxPrice != null ? wine.price.loe(maxPrice) : null;
     }
 
     /**

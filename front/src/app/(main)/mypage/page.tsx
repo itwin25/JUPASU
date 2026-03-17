@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useUserMyPage } from '@/features/user/hooks/useUserMyPage';
 import {
   ChevronLeft,
   ChevronRight,
@@ -75,7 +76,7 @@ type SearchFriendItem = FriendItem & {
 const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 1,
-    author: '와인수인',
+    author: '와인초보',
     wineName: 'Cloudy Bay',
     subtitle: 'Sauvignon Blanc',
     rating: 4,
@@ -192,6 +193,7 @@ function Pagination() {
 }
 
 export default function MyPage() {
+  const { data: profile, isLoading } = useUserMyPage();
   const { data: myReviews = [] } = useMyReviewsQuery();
   const { data: scrapListData } = useWineScrapListQuery();
   const { data: friendListData } = useFriendListQuery();
@@ -457,10 +459,17 @@ export default function MyPage() {
         <section className="border-primary-100 rounded-[1.5rem] border bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
-              <Image src="/dog1.svg" alt="프로필 이미지" fill className="object-cover" />
+              <Image
+                src={profile?.character ? `/${profile.character}.svg` : '/dog1.svg'}
+                alt="프로필 이미지"
+                fill
+                className="object-cover"
+              />
             </div>
             <div>
-              <h2 className="text-text-main text-lg font-black">와인수인</h2>
+              <h2 className="text-text-main text-lg font-black">
+                {isLoading ? '로딩 중...' : profile?.nickname || '사용자'}
+              </h2>
               <p className="text-text-main/45 mt-1 text-sm font-medium">
                 오늘도 취향을 한 잔씩 쌓는 중
               </p>
@@ -470,19 +479,19 @@ export default function MyPage() {
           <div className="mt-5 rounded-[1.25rem] bg-[#F9F7F2] p-3">
             <div className="h-3 rounded-full bg-white">
               <div
-                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262]"
-                style={{ width: '15%' }}
+                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262] transition-all duration-500"
+                style={{ width: `${Math.min(((profile?.reviewCount || 0) / 10) * 100, 100)}%` }}
               />
             </div>
           </div>
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{wishlistItems.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.wishlistCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{visibleReviews.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.reviewCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
@@ -492,7 +501,7 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
-              <p className="text-lg font-black text-[#B36262]">{visibleFriends.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.friendCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
