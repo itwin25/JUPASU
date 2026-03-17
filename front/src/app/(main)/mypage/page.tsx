@@ -17,6 +17,7 @@ import {
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useSignout } from '@/features/auth/hooks';
+import { useMyReviewsQuery } from '@/features/review/hooks/useWineReviewsQuery';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
@@ -142,6 +143,7 @@ function Pagination() {
 }
 
 export default function MyPage() {
+  const { data: myReviews = [] } = useMyReviewsQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
@@ -154,9 +156,37 @@ export default function MyPage() {
   const [editedContent, setEditedContent] = useState('');
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [reviewOverrides, setReviewOverrides] = useState<
+    Record<number, Pick<ReviewItem, 'content' | 'rating'>>
+  >({});
+  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
-  const editingReview = reviews.find((review) => review.id === editingReviewId) ?? null;
+  const mappedReviews = useMemo<ReviewItem[]>(
+    () =>
+      myReviews.map((review) => {
+        const override = reviewOverrides[review.reviewId];
+        const createdDate = new Date(review.createdAt);
+
+        return {
+          id: review.reviewId,
+          author: review.nickname,
+          wineName: review.wineName,
+          subtitle: '작성한 리뷰',
+          rating: override?.rating ?? review.rating,
+          content: override?.content ?? review.content,
+          date: Number.isNaN(createdDate.getTime())
+            ? ''
+            : createdDate.toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
+          avatar: '/dog1.svg',
+        };
+      }),
+    [myReviews, reviewOverrides],
+  );
+  const visibleReviews = (myReviews.length > 0 ? mappedReviews : reviews).filter(
+    (review) => !deletedReviewIds.includes(review.id),
+  );
+  const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
 
   const filteredFriendResults = useMemo(() => {
     if (!friendSearchQuery.trim()) return SEARCH_RESULTS;
@@ -184,19 +214,33 @@ export default function MyPage() {
   const saveReview = () => {
     if (!editingReview) return;
 
-    setReviews((prev) =>
-      prev.map((review) =>
-        review.id === editingReview.id
-          ? { ...review, content: editedContent.trim(), rating: editedRating }
-          : review,
-      ),
-    );
+    if (myReviews.length > 0) {
+      setReviewOverrides((prev) => ({
+        ...prev,
+        [editingReview.id]: {
+          content: editedContent.trim(),
+          rating: editedRating,
+        },
+      }));
+    } else {
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === editingReview.id
+            ? { ...review, content: editedContent.trim(), rating: editedRating }
+            : review,
+        ),
+      );
+    }
     closeReviewEditModal();
   };
 
   const deleteReview = () => {
     if (deletingReviewId === null) return;
-    setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    if (myReviews.length > 0) {
+      setDeletedReviewIds((prev) => [...prev, deletingReviewId]);
+    } else {
+      setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    }
     setDeletingReviewId(null);
   };
 
@@ -274,7 +318,7 @@ export default function MyPage() {
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{reviews.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{visibleReviews.length}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
@@ -466,7 +510,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {reviews.map((review) => (
+          {visibleReviews.map((review) => (
             <div
               key={review.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"

@@ -2,6 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { reviewApi } from '../api/review.api';
 import { QUERY_KEY } from '@/constants/query-key';
 
+export function useMyReviewsQuery() {
+  return useQuery({
+    queryKey: QUERY_KEY.REVIEW.MY,
+    queryFn: reviewApi.getMyReviews,
+  });
+}
+
 export function useWineReviewsQuery(wineId: string | number) {
   return useQuery({
     queryKey: QUERY_KEY.REVIEW.LIST(wineId),
@@ -22,7 +29,8 @@ export function useCreateReviewMutation() {
 
 export function useUpdateReviewMutation() {
   return useMutation({
-    mutationFn: ({ id, content }: { id: string | number; content: string }) => reviewApi.update(id, content),
+    mutationFn: ({ id, content }: { id: string | number; content: string }) =>
+      reviewApi.update(id, content),
   });
 }
 
