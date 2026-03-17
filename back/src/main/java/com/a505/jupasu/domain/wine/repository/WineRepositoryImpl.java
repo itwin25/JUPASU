@@ -51,7 +51,7 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
                 .selectFrom(wine)
                 .where(builder)
                 .offset(pageable.getOffset())
-                .offset(pageable.getPageSize());
+                .limit(pageable.getPageSize());
 
         // 동적 정렬
         if (StringUtils.hasText(condition.keyword())) {
