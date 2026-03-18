@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.reviews.service;
 
 
+import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
 import com.a505.jupasu.domain.reviews.dto.MyPageReviewResponse;
 import com.a505.jupasu.domain.reviews.dto.ReviewCreateRequest;
 import com.a505.jupasu.domain.reviews.dto.ReviewResponse;
@@ -30,6 +31,7 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final WineRepository wineRepository;
     private final UserRepository userRepository;
+    private final PreferenceRepository preferenceRepository;
 
     /**
      * 와인별 리뷰 조회
@@ -64,6 +66,10 @@ public class ReviewService {
                 .isCounted(false) // 초기값
                 .build();
 
+        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
+            preference.markReportAsOutdated();
+        });
+
         return reviewRepository.save(review).getId();
     }
 
@@ -82,6 +88,10 @@ public class ReviewService {
         }
 
         review.updateReview(request.getRating(), request.getContent());
+        
+        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
+            preference.markReportAsOutdated();
+        });
     }
 
     /**
@@ -97,7 +107,12 @@ public class ReviewService {
         if(!review.getUser().getId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
         }
+        
         reviewRepository.delete(review);
+        
+        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
+            preference.markReportAsOutdated();
+        });
     }
 
     /**
