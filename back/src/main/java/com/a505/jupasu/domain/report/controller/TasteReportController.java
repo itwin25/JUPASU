@@ -30,7 +30,7 @@ public class TasteReportController {
     public ApiResponse<TasteReportResponse> getTasteReport(
             @AuthenticationPrincipal LoginUserCustom loginUser) {
 
-        TasteReportResponse response = tasteReportService.generateReport(loginUser.getUser());
+        TasteReportResponse response = tasteReportService.getOrCreateReport(loginUser.getUser());
 
         return ApiResponse.success(response);
     }

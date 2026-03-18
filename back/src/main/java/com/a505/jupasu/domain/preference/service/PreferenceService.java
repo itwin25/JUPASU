@@ -43,6 +43,7 @@ public class PreferenceService {
                 request.getDrinkingSituations()
         );
 
+        preference.markReportAsOutdated();
         preferenceRepository.save(preference);
     }
 }
