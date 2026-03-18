@@ -1,6 +1,11 @@
 import { API_PATH } from '@/constants/api-path';
 import { api } from '@/lib/axios';
-import { AuthResponse, SignupRequest, SigninRequest } from '@/features/auth/types/auth.types';
+import {
+  AuthResponse,
+  SignupRequest,
+  SigninRequest,
+  ResetPasswordRequest,
+} from '@/features/auth/types/auth.types';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -61,6 +66,32 @@ export const authApi = {
    */
   signOut: async (): Promise<AuthResponse<null>> => {
     const { data } = await api.post<AuthResponse<null>>(API_PATH.AUTH.SIGNOUT);
+    return data;
+  },
+
+  /**
+   * 비밀번호 재설정 OTP 발송
+   */
+  sendPasswordResetOtp: async (email: string): Promise<AuthResponse<null>> => {
+    const { data } = await api.post<AuthResponse<null>>(API_PATH.AUTH.PASS_RESET_SEND, { email });
+    return data;
+  },
+
+  /**
+   * 비밀번호 재설정 OTP 검증
+   */
+  verifyPasswordResetOtp: async (
+    email: string,
+    code: string,
+  ): Promise<AxiosResponse<AuthResponse<null>>> => {
+    return await api.post<AuthResponse<null>>(API_PATH.AUTH.PASS_RESET_VERIFY, { email, code });
+  },
+
+  /**
+   * 비밀번호 재설정
+   */
+  resetPassword: async (request: ResetPasswordRequest): Promise<AuthResponse<null>> => {
+    const { data } = await api.post<AuthResponse<null>>(API_PATH.AUTH.PASS_RESET, request);
     return data;
   },
 };

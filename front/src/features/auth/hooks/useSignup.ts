@@ -4,12 +4,14 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { authApi } from '@/features/auth/api/auth.api';
 import { SignupRequest, AuthResponse, AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { useTimer } from '@/hooks';
 
 export const useSignup = () => {
   const [step, setStep] = useState(1);
   const [nickname, setNickname] = useState('');
   const [debouncedNickname, setDebouncedNickname] = useState('');
   const router = useRouter();
+  const authTimer = useTimer(300); // 인증코드 유효시간용 (5분)
 
   // 1. 닉네임 디바운싱 (0.5초 대기)
   useEffect(() => {
@@ -43,6 +45,9 @@ export const useSignup = () => {
         await authApi.validateEmail(email);
         return authApi.sendOtp(email);
       },
+      onSuccess: () => {
+        authTimer.start();
+      },
     }),
     verifyOtp: useMutation<
       AuthResponse<null>,
@@ -50,6 +55,9 @@ export const useSignup = () => {
       { email: string; code: string }
     >({
       mutationFn: (params) => authApi.verifyOtp(params.email, params.code),
+      onSuccess: () => {
+        authTimer.stop();
+      },
     }),
     signUp: useMutation<AuthResponse<null>, AxiosError<AuthErrorResponse>, SignupRequest>({
       mutationFn: (request) => authApi.signUp(request),
@@ -76,5 +84,9 @@ export const useSignup = () => {
     handleBack,
     onboardingData,
     setOnboardingData,
+    authCodeTimeLeft: authTimer.formattedTime,
+    isAuthCodeExpired: authTimer.isExpired,
+    startTimer: authTimer.start,
+    stopTimer: authTimer.stop,
   };
 };
