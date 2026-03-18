@@ -648,8 +648,9 @@ export default function MyPage() {
                   🧑🏻
                 </div>
                 <p className="text-text-main/80 text-[12px] leading-5 font-medium">
-                  과일향이 풍부하고 당도가 적절한 와인을 산미가 살아있는 와인에 높은 점수를
-                  주셨어요. 탄닌이 강하지 않은 미디엄 바디 스타일을 선호하는 편이에요.
+                  {isReportLoading
+                    ? '분석 결과를 불러오는 중...'
+                    : tasteReport?.content || '리포트 내용이 없습니다.'}
                 </p>
               </div>
 
@@ -671,7 +672,9 @@ export default function MyPage() {
                   </div>
                   {isBestOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.bestDescription || 'Best 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
@@ -693,7 +696,9 @@ export default function MyPage() {
                   </div>
                   {isWorstOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.worstDescription || 'Worst 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
