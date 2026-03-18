@@ -22,6 +22,8 @@ export default function SignupPage() {
     setOnboardingData,
     authCodeTimeLeft,
     isAuthCodeExpired,
+    resendSeconds,
+    isSentOnce,
   } = useSignup();
 
   return (
@@ -72,15 +74,12 @@ export default function SignupPage() {
             onSuccess={handleStep1Success}
             authCodeTimeLeft={authCodeTimeLeft}
             isAuthCodeExpired={isAuthCodeExpired}
+            resendSeconds={resendSeconds}
+            isSentOnce={isSentOnce}
           />
         )}
         {step === 2 && (
-          <Step2Taste
-            data={onboardingData}
-            setData={setOnboardingData}
-            onNext={handleNext}
-            onPrev={handleBack}
-          />
+          <Step2Taste data={onboardingData} setData={setOnboardingData} onNext={handleNext} />
         )}
         {step === 3 && <Step3WineReview onNext={handleNext} onPrev={handleBack} />}
       </main>

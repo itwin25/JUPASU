@@ -42,6 +42,8 @@ interface SignUpFormProps {
   onSuccess: () => void;
   authCodeTimeLeft: string;
   isAuthCodeExpired: boolean;
+  resendSeconds: number;
+  isSentOnce: boolean;
 }
 
 export default function SignUpForm({
@@ -53,6 +55,8 @@ export default function SignUpForm({
   onSuccess,
   authCodeTimeLeft,
   isAuthCodeExpired,
+  resendSeconds,
+  isSentOnce,
 }: SignUpFormProps) {
   const [currentSubStep, setCurrentSubStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
@@ -94,8 +98,17 @@ export default function SignUpForm({
         clearErrors('email');
         setCurrentSubStep(3); // 성공 이벤트 시점에 상태 변경 (안전)
       },
-      onError: (error: AxiosError<AuthErrorResponse>) =>
-        setError('email', { message: error.response?.data?.message || '발송 실패' }),
+      onError: (error: AxiosError<AuthErrorResponse>) => {
+        const message = error.response?.data?.message || '발송 실패';
+        // 60초 관련 에러는 타이머 UI로 대체하므로 폼 에러에서 제외
+        if (!message.includes('60초')) {
+          setError('email', { message });
+        } else {
+          clearErrors('email');
+          // 60초 에러이지만 이미 가입된 이메일 여부 등은 subStep이 넘어가지 않은 상태여야 함
+          // 비밀번호 재설정과는 달리 회원가입은 subStep 3으로 넘어가면 이메일 수정이 안 되므로 주의
+        }
+      },
     });
   };
 
@@ -156,29 +169,42 @@ export default function SignUpForm({
 
         {/* 2. 이메일 섹션 */}
         {shouldShowEmail && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 flex items-start gap-2">
-            <div className="flex-1">
-              <Input
-                label="이메일"
-                type="email"
-                placeholder="example@email.com"
-                {...register('email')}
-                error={errors.email?.message}
-                disabled={currentSubStep >= 3}
-                required
-              />
+          <div className="animate-in fade-in slide-in-from-bottom-4 space-y-1.5">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <Input
+                  label="이메일"
+                  type="email"
+                  placeholder="example@email.com"
+                  {...register('email')}
+                  error={errors.email?.message}
+                  disabled={currentSubStep >= 3}
+                  required
+                />
+              </div>
+              {currentSubStep < 3 && (
+                <div className="pt-[26px]">
+                  <Button
+                    type="button"
+                    onClick={handleAuthSend}
+                    isLoading={requestOtp.isPending}
+                    disabled={resendSeconds > 0}
+                    variant="secondary"
+                    className="h-[56px] min-w-[80px]"
+                  >
+                    {isSentOnce ? '재전송' : '인증'}
+                  </Button>
+                </div>
+              )}
             </div>
-            {currentSubStep < 3 && (
-              <div className="pt-[26px]">
-                <Button
-                  type="button"
-                  onClick={handleAuthSend}
-                  isLoading={requestOtp.isPending}
-                  variant="secondary"
-                  className="h-[56px]"
-                >
-                  인증
-                </Button>
+            {resendSeconds > 0 && currentSubStep < 3 && (
+              <div className="flex items-center justify-between bg-white p-4">
+                <p className="text-primary-600 animate-in fade-in ml-1 text-xs font-medium duration-300">
+                  메일을 못 받으셨나요?
+                </p>
+                <p className="text-primary-600 animate-in fade-in ml-1 text-xs font-medium duration-300">
+                  {resendSeconds}초 후 재전송
+                </p>
               </div>
             )}
           </div>
