@@ -28,8 +28,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 환경 변수 주입
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # 실제 빌드 (이때 .dockerignore에 의해 .next/ 등은 제외되어 빌드 속도 향상)
