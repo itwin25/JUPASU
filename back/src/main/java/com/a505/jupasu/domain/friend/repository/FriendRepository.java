@@ -30,4 +30,8 @@ public interface FriendRepository extends JpaRepository<Friend,Long> {
 
     // 탈퇴하는 사용자와 관련된 모든 친구 관계(신청한 것 + 받은 것) 삭제
     void deleteByRequesterOrReceiver(User requester, User receiver);
+
+    // 유저의 특정 상태(ex. ACCEPTED)인 친구 수 조회
+    @Query("SELECT COUNT(f) FROM Friend f WHERE (f.requester = :user OR f.receiver = :user) AND f.status = :status")
+    long countByUserAndStatus(@Param("user") User user, @Param("status") FriendStatus status);
 }

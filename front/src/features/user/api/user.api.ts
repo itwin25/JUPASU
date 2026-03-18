@@ -2,6 +2,7 @@ import { api } from '@/lib/axios';
 import { API_PATH } from '@/constants/api-path';
 
 import { UpdateProfileRequest, WithdrawRequest, UserMyPageResponse } from '@/types/user.types';
+import { AuthResponse } from '@/features/auth/types/auth.types';
 
 export const userApi = {
   /**
@@ -18,7 +19,8 @@ export const userApi = {
   },
 
   // 회원 탈퇴
-  withdrawUser: async (data: WithdrawRequest): Promise<void> => {
-    await api.post(API_PATH.USER.WITHDRAW, data);
+  withdrawUser: async (data: WithdrawRequest): Promise<AuthResponse<null>> => {
+    const { data: responseData } = await api.post<AuthResponse<null>>(API_PATH.USER.WITHDRAW, data);
+    return responseData;
   },
 };

@@ -29,4 +29,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // 특정 유저가 작성한 와인 리뷰 조회
     @Query("select r from Review r join fetch r.wine w where r.user = :user order by r.createdAt desc")
     List<Review> findAllByUserWithWine(@Param("user") User user);
+
+    // 유저가 작성한 리뷰 수 조회
+    long countByUser(User user);
 }

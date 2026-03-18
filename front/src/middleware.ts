@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 1. 오직 비로그인 유저만 진입 가능 (로그인 유저 진입 시 /home으로 강제 이동)
-const GUEST_ONLY_ROUTES = ['/initial', '/login', '/signup', '/password-reset'];
+const GUEST_ONLY_ROUTES = ['/', '/initial', '/login', '/signup', '/password-reset'];
 const ACCESS_TOKEN_KEY = 'jupasu_access_token';
 
 export function middleware(request: NextRequest) {

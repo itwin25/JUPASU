@@ -1,6 +1,6 @@
 package com.a505.jupasu.domain.wine.dto;
 
-import com.a505.jupasu.domain.user.entity.DrinkingSituation;
+import com.a505.jupasu.domain.preference.entity.DrinkingSituation;
 import lombok.Builder;
 
 import java.util.List;
@@ -12,7 +12,7 @@ public record WineQuickRecommendResponse(
 ) {
     public static WineQuickRecommendResponse of(DrinkingSituation situation, List<WineRecommendationItem> recommendations) {
         return WineQuickRecommendResponse.builder()
-                .situationName(situation.getName())
+                .situationName(situation.getDescription())
                 .recommendations(recommendations)
                 .build();
     }

@@ -4,12 +4,16 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { authApi } from '@/features/auth/api/auth.api';
 import { SignupRequest, AuthResponse, AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { useTimer } from '@/hooks';
 
 export const useSignup = () => {
   const [step, setStep] = useState(1);
   const [nickname, setNickname] = useState('');
   const [debouncedNickname, setDebouncedNickname] = useState('');
   const router = useRouter();
+  const authTimer = useTimer(300); // 인증코드 유효시간용 (5분)
+  const resendTimer = useTimer(60); // 재전송 제한 시간용 (60초)
+  const [isSentOnce, setIsSentOnce] = useState(false);
 
   // 1. 닉네임 디바운싱 (0.5초 대기)
   useEffect(() => {
@@ -33,7 +37,9 @@ export const useSignup = () => {
   });
 
   const [onboardingData, setOnboardingData] = useState({
-    tastes: { sweet: 3, acid: 3, body: 3, tannin: 3, aroma: 3 },
+    tastes: { sweet: 5, acid: 5, body: 5, tannin: 5, aroma: 5 },
+    selectedWineTypes: [] as string[],
+    selectedFlavorTags: [] as string[],
     selectedSituations: [] as string[],
   });
 
@@ -43,6 +49,18 @@ export const useSignup = () => {
         await authApi.validateEmail(email);
         return authApi.sendOtp(email);
       },
+      onSuccess: () => {
+        authTimer.start();
+        resendTimer.start();
+        setIsSentOnce(true);
+      },
+      onError: (error: AxiosError<AuthErrorResponse>) => {
+        const message = error.response?.data?.message || '';
+        if (message.includes('60초')) {
+          resendTimer.start(60);
+          setIsSentOnce(true);
+        }
+      },
     }),
     verifyOtp: useMutation<
       AuthResponse<null>,
@@ -50,6 +68,9 @@ export const useSignup = () => {
       { email: string; code: string }
     >({
       mutationFn: (params) => authApi.verifyOtp(params.email, params.code),
+      onSuccess: () => {
+        authTimer.stop();
+      },
     }),
     signUp: useMutation<AuthResponse<null>, AxiosError<AuthErrorResponse>, SignupRequest>({
       mutationFn: (request) => authApi.signUp(request),
@@ -76,5 +97,11 @@ export const useSignup = () => {
     handleBack,
     onboardingData,
     setOnboardingData,
+    authCodeTimeLeft: authTimer.formattedTime,
+    isAuthCodeExpired: authTimer.isExpired,
+    resendSeconds: resendTimer.timeLeft,
+    isSentOnce,
+    startTimer: authTimer.start,
+    stopTimer: authTimer.stop,
   };
 };

@@ -42,7 +42,7 @@ public class Preference {
     // 선호 탄닌 (1~10 척도)
     private Integer tannin;
 
-    // 선호 도수 (1~10 척도)
+    // 선호 도수 (실제 도수 %, 예: 13)
     private Integer Abv;
 
     // 선호 가격대 최소 (단위: 원)
