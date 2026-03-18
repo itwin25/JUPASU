@@ -30,6 +30,7 @@ import {
   useMyReviewsQuery,
   useUpdateReviewMutation,
 } from '@/features/review/hooks/useWineReviewsQuery';
+import { ReviewModal } from '@/features/review/components';
 import {
   useWineScrapListQuery,
   useWineScrapMutation,
@@ -223,8 +224,6 @@ export default function MyPage() {
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
   const wineScrapMutation = useWineScrapMutation();
-  const friendList = friendListData ?? [];
-  const pendingFriendList = pendingFriendListData ?? [];
   const wishlistItems = useMemo<WishlistItem[]>(
     () =>
       scrapListData
@@ -271,7 +270,7 @@ export default function MyPage() {
   const visibleFriends = useMemo<FriendItem[]>(
     () =>
       friendListData
-        ? friendList.map((friend) => ({
+        ? friendListData.map((friend) => ({
             id: friend.friendId,
             requestId: friend.requestId,
             friendId: friend.friendId,
@@ -280,12 +279,12 @@ export default function MyPage() {
             avatar: resolveCharacterImage(friend.character),
           }))
         : FRIENDS,
-    [friendList, friendListData],
+    [friendListData],
   );
   const visiblePendingFriends = useMemo<FriendItem[]>(
     () =>
       pendingFriendListData
-        ? pendingFriendList.map((friend) => ({
+        ? pendingFriendListData.map((friend) => ({
             id: friend.requesterId,
             requestId: friend.requestId,
             friendId: friend.requesterId,
@@ -294,7 +293,7 @@ export default function MyPage() {
             avatar: resolveCharacterImage(friend.character),
           }))
         : FRIEND_REQUESTS,
-    [pendingFriendList, pendingFriendListData],
+    [pendingFriendListData],
   );
 
   const filteredFriendResults = useMemo<SearchFriendItem[]>(() => {
@@ -757,8 +756,51 @@ export default function MyPage() {
         <Pagination />
       </Modal>
 
-      <Modal
+      <ReviewModal
+        key={`${editingReview?.id ?? 'closed'}-${editingReview?.rating ?? 0}`}
         isOpen={editingReview !== null}
+        onClose={closeReviewEditModal}
+        onSubmit={async ({ rating, content }) => {
+          if (!editingReview) return;
+
+          const trimmedContent = content.trim();
+          if (!trimmedContent || rating === 0) return;
+
+          if (myReviews.length > 0 && editingReview.wineId) {
+            await updateReviewMutation.mutateAsync({
+              wineId: editingReview.wineId,
+              reviewId: editingReview.id,
+              rating,
+              content: trimmedContent,
+            });
+          } else {
+            setReviews((prev) =>
+              prev.map((review) =>
+                review.id === editingReview.id
+                  ? { ...review, content: trimmedContent, rating }
+                  : review,
+              ),
+            );
+          }
+
+          closeReviewEditModal();
+        }}
+        initialData={
+          editingReview
+            ? {
+                rating: editingReview.rating,
+                content: editingReview.content,
+              }
+            : undefined
+        }
+        wineInfo={{
+          name: editingReview?.wineName ?? '',
+          category: editingReview?.subtitle ?? '',
+        }}
+      />
+
+      <Modal
+        isOpen={false && editingReview !== null}
         onClose={closeReviewEditModal}
         title="리뷰 수정"
         hideDefaultFooter
