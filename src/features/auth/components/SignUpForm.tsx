@@ -40,6 +40,8 @@ interface SignUpFormProps {
   isValidatingNickname: boolean;
   isNicknameAvailable: boolean;
   onSuccess: () => void;
+  authCodeTimeLeft: string;
+  isAuthCodeExpired: boolean;
 }
 
 export default function SignUpForm({
@@ -49,6 +51,8 @@ export default function SignUpForm({
   isValidatingNickname,
   isNicknameAvailable,
   onSuccess,
+  authCodeTimeLeft,
+  isAuthCodeExpired,
 }: SignUpFormProps) {
   const [currentSubStep, setCurrentSubStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
@@ -187,9 +191,21 @@ export default function SignUpForm({
               <Input
                 placeholder="인증번호"
                 {...register('authCode')}
-                error={errors.authCode?.message}
+                error={
+                  isAuthCodeExpired
+                    ? '인증 시간이 만료되었습니다. 다시 시도해 주세요.'
+                    : errors.authCode?.message
+                }
                 disabled={currentSubStep >= 4}
                 required
+                suffix={
+                  currentSubStep === 3 &&
+                  !isAuthCodeExpired && (
+                    <span className="text-primary-600 mr-2 text-sm font-medium">
+                      {authCodeTimeLeft}
+                    </span>
+                  )
+                }
               />
             </div>
             {currentSubStep === 3 && (
