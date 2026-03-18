@@ -20,6 +20,8 @@ export default function SignupPage() {
     handleBack,
     onboardingData,
     setOnboardingData,
+    authCodeTimeLeft,
+    isAuthCodeExpired,
   } = useSignup();
 
   return (
@@ -68,6 +70,8 @@ export default function SignupPage() {
             isValidatingNickname={isValidatingNickname}
             isNicknameAvailable={isNicknameAvailable}
             onSuccess={handleStep1Success}
+            authCodeTimeLeft={authCodeTimeLeft}
+            isAuthCodeExpired={isAuthCodeExpired}
           />
         )}
         {step === 2 && (
