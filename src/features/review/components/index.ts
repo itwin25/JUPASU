@@ -1,1 +1,1 @@
-// review components
+export { default as ReviewModal } from './ReviewModal';

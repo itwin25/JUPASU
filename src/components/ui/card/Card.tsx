@@ -11,21 +11,22 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     const paddings = {
       none: 'p-0',
       sm: 'p-4',
-      md: 'p-6',
-      lg: 'p-8',
+      md: 'p-5',
+      lg: 'p-6',
     };
 
     const variants = {
-      default: 'bg-white border border-primary-100 shadow-[0_4px_24px_rgba(51,34,17,0.03)]',
-      soft: 'bg-primary-100/50 border-none',
-      outlined: 'bg-transparent border-2 border-primary-100',
+      default:
+        'border border-primary-100/85 bg-white/88 shadow-[0_10px_30px_rgba(51,34,17,0.05)] backdrop-blur-sm',
+      soft: 'border border-primary-100/50 bg-primary-100/55 shadow-none',
+      outlined: 'border border-primary-100 bg-transparent shadow-none',
     };
 
     return (
       <div
         ref={ref}
         className={cn(
-          'rounded-[2rem] transition-all',
+          'rounded-[1.75rem] transition-all',
           variants[variant],
           paddings[padding],
           className,
