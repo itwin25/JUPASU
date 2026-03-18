@@ -27,6 +27,7 @@ export const API_PATH = {
     ME: '/users/me',
     REVIEWS: '/users/reviews',
     WITHDRAW: '/users/withdraw',
+    PREFERENCES: '/preferences',
   },
   FRIEND: {
     LIST: '/friends',
