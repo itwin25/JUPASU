@@ -21,4 +21,7 @@ public interface WineScrapRepository extends JpaRepository<WineScrap, Long> {
     // 특정 사용자의 스크랩 목록 조회
     @Query("select s from WineScrap s join fetch s.wine w where s.user = :user order by s.createdAt desc")
     List<WineScrap> findAllByUserWithWine(@Param("user") User user);
+
+    // 스크랩 개수 조회
+    long countByUser(User user);
 }

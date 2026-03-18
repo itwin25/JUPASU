@@ -1,48 +1,35 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// 토큰 없이 접근 가능한 공개 라우트 목록
-const publicRoutes = ['/login', '/signup', '/password-reset'];
-
-// 인증 쿠키 이름
+// 1. 오직 비로그인 유저만 진입 가능 (로그인 유저 진입 시 /home으로 강제 이동)
+const GUEST_ONLY_ROUTES = ['/', '/initial', '/login', '/signup', '/password-reset'];
 const ACCESS_TOKEN_KEY = 'jupasu_access_token';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // 현재 요청된 경로가 publicRoute인지 확인
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
-
-  // 토큰 존재 여부 확인
   const token = request.cookies.get(ACCESS_TOKEN_KEY)?.value;
 
-  // 토큰이 없는 사용자가 공개되지 않은 라우트에 접근하려는 경우 -> 로그인 페이지로 강제 이동
-  if (!token && !isPublicRoute) {
+  // 정확한 경로 일치 확인 (startsWith 대신 includes 사용으로 '/' 버그 방지)
+  const isGuestOnly = GUEST_ONLY_ROUTES.includes(pathname);
+
+  // Case 1: 로그인한 유저가 비로그인 전용 페이지(/login, /signup 등)에 접근
+  if (token && isGuestOnly) {
+    return NextResponse.redirect(new URL('/home', request.url));
+  }
+
+  // Case 2: 로그인하지 않은 유저가 보호된 경로(그 외 모든 경로)에 접근
+  // '/' 경로 역시 GUEST_ONLY에 없으므로, 토큰이 없으면 여기서 걸려 /login으로 이동합니다.
+  if (!token && !isGuestOnly) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     loginUrl.searchParams.set('error', 'login_required');
     return NextResponse.redirect(loginUrl);
   }
 
-  // 이미 로그인한 사용자(토큰 보유)가 로그인/회원가입 페이지에 접근하려는 경우 -> 메인 페이지로 강제 이동
-  if (token && isPublicRoute) {
-    return NextResponse.redirect(new URL('/home', request.url));
-  }
-
-  // 그 외의 경우는 정상적으로 라우팅 통과
   return NextResponse.next();
 }
 
-// 미들웨어가 실행될 경로 설정 (정적 리소스, Next.js 설정 등은 미들웨어 통과 제외)
 export const config = {
-  matcher: [
-    /*
-     * 다음 경로들로 시작하는 요청은 미들웨어에서 무시
-     * - api (API 라우트)
-     * - _next/static (정적 파일)
-     * - _next/image (이미지 최적화 파일)
-     * - 모든 확장자를 가진 파일 (예: .png, .jpg, .svg, .ico)
-     */
-    '/((?!api|_next/static|_next/image|.*\\.[\\w]+$).*)',
-  ],
+  // api, 정적 리소스, 이미지 등을 제외한 모든 경로에서 미들웨어 실행
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)'],
 };

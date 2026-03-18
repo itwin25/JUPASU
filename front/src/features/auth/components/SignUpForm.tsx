@@ -2,22 +2,54 @@
 
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { UseMutationResult } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { AxiosError } from 'axios';
 
 import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
 import { signupSchema, SignupSchema } from '@/features/auth/schemas/auth.schema';
-import { useSignup } from '@/features/auth/hooks/useSignup';
-import { AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { AuthErrorResponse, AuthResponse, SignupRequest } from '@/features/auth/types/auth.types';
 
-interface Step1FormProps {
-  mutations: ReturnType<typeof useSignup>['mutations'];
+type SignUpMutations = {
+  requestOtpAction: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    string,
+    unknown
+  >;
+  verifyOtp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    { email: string; code: string },
+    unknown
+  >;
+  signUp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    SignupRequest,
+    unknown
+  >;
+};
+
+interface SignUpFormProps {
+  mutations: SignUpMutations;
+  setNickname: (nickname: string) => void;
+  nicknameMessage?: string;
+  isValidatingNickname: boolean;
+  isNicknameAvailable: boolean;
   onSuccess: () => void;
 }
 
-export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
+export default function SignUpForm({
+  mutations,
+  setNickname,
+  nicknameMessage,
+  isValidatingNickname,
+  isNicknameAvailable,
+  onSuccess,
+}: SignUpFormProps) {
   const [currentSubStep, setCurrentSubStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -49,12 +81,14 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
 
   const isAgeChecked = useWatch({ control, name: 'isAgeChecked' });
 
+  const shouldShowEmail = isNicknameAvailable || currentSubStep >= 2;
+
   const handleAuthSend = async () => {
     if (!(await trigger('email'))) return;
     requestOtp.mutate(getValues('email'), {
       onSuccess: () => {
         clearErrors('email');
-        setCurrentSubStep(3);
+        setCurrentSubStep(3); // 성공 이벤트 시점에 상태 변경 (안전)
       },
       onError: (error: AxiosError<AuthErrorResponse>) =>
         setError('email', { message: error.response?.data?.message || '발송 실패' }),
@@ -89,27 +123,35 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
   return (
     <form onSubmit={handleSubmit(onFinalSubmit)} className="space-y-8 pb-10">
       <h2 className="text-primary-700 text-sm font-black tracking-widest uppercase">
-        Step 1 - 기본 정보
+        Sign Up - 기본 정보
       </h2>
 
       <div className="space-y-6">
-        {/* 닉네임 */}
-        <Input
-          label="닉네임"
-          placeholder="와인을 사랑하는 사람"
-          {...register('nickname', {
-            onChange: (e) => {
-              if (e.target.value.length >= 2 && currentSubStep === 1) {
-                setCurrentSubStep(2);
-              }
-            },
-          })}
-          error={errors.nickname?.message}
-          required
-        />
+        {/* 1. 닉네임 섹션 */}
+        <div className="space-y-1.5">
+          <Input
+            label="닉네임"
+            placeholder="와인을 사랑하는 사람"
+            {...register('nickname', {
+              onChange: (e) => setNickname(e.target.value),
+            })}
+            error={isValidatingNickname ? undefined : errors.nickname?.message || nicknameMessage}
+            required
+            suffix={isNicknameAvailable && <CheckCircle2 size={18} className="text-green-500" />}
+          />
+          {/* 상태 메시지 영역 (Type Error 해결을 위해 helperText 대신 별도 div 사용) */}
+          {!errors.nickname && !nicknameMessage && (
+            <div className="px-1 text-xs font-medium">
+              {isValidatingNickname && <span className="text-text-main/40">중복 확인 중...</span>}
+              {isNicknameAvailable && (
+                <span className="text-green-600">사용 가능한 닉네임입니다.</span>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* 이메일 */}
-        {currentSubStep >= 2 && (
+        {/* 2. 이메일 섹션 */}
+        {shouldShowEmail && (
           <div className="animate-in fade-in slide-in-from-bottom-4 flex items-start gap-2">
             <div className="flex-1">
               <Input
@@ -118,11 +160,11 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
                 placeholder="example@email.com"
                 {...register('email')}
                 error={errors.email?.message}
-                disabled={currentSubStep > 2}
+                disabled={currentSubStep >= 3}
                 required
               />
             </div>
-            {currentSubStep === 2 && (
+            {currentSubStep < 3 && (
               <div className="pt-[26px]">
                 <Button
                   type="button"
@@ -138,7 +180,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           </div>
         )}
 
-        {/* 인증번호 */}
+        {/* 3. 인증번호 섹션 */}
         {currentSubStep >= 3 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 flex items-end gap-2">
             <div className="flex-1">
@@ -146,7 +188,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
                 placeholder="인증번호"
                 {...register('authCode')}
                 error={errors.authCode?.message}
-                disabled={currentSubStep > 3}
+                disabled={currentSubStep >= 4}
                 required
               />
             </div>
@@ -163,7 +205,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           </div>
         )}
 
-        {/* 비밀번호 섹션 */}
+        {/* 4. 비밀번호 섹션 */}
         {currentSubStep >= 4 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
             <Input
@@ -173,7 +215,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
               {...register('password')}
               error={errors.password?.message}
               suffix={
-                <button type="button" onClick={() => setShowPw(!showPw)}>
+                <button type="button" onClick={() => setShowPw(!showPw)} className="pr-2">
                   {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               }
@@ -187,7 +229,11 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
               error={errors.confirmPassword?.message}
               onBlur={handlePwGroupBlur}
               suffix={
-                <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPw(!showConfirmPw)}
+                  className="pr-2"
+                >
                   {showConfirmPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               }
@@ -196,7 +242,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           </div>
         )}
 
-        {/* 연령 체크 */}
+        {/* 5. 연령 체크 섹션 */}
         {currentSubStep >= 5 && (
           <div
             onClick={() => setValue('isAgeChecked', !isAgeChecked, { shouldValidate: true })}
@@ -218,7 +264,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
       <Button
         type="submit"
         size="full"
-        disabled={!isAgeChecked || signUp.isPending}
+        disabled={!isAgeChecked || signUp.isPending || !isNicknameAvailable}
         isLoading={signUp.isPending}
       >
         다음
