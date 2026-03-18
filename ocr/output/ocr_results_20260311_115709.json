@@ -1,0 +1,524 @@
+{
+  "evaluation_date": "2026-03-11T11:57:09.302594",
+  "model": "PP-OCRv5-Server",
+  "total_evaluated": 50,
+  "results": [
+    {
+      "filename": "peregrine-wines-central-otago-limited-pinot-noir-rose_2025_3879963.png",
+      "ground_truth": "Peregrine Pinot Noir Rosé 2025",
+      "recognized": " nOsE PEXOT NDIR CENEDAL OTAOO ",
+      "raw_list": [
+        "",
+        "nOsE",
+        "PEXOT NDIR",
+        "CENEDAL OTAOO",
+        ""
+      ]
+    },
+    {
+      "filename": "torcalvano-gracciano-amarone-della-valpolicella_2002_1171804.png",
+      "ground_truth": "Folonari Amarone della Valpolicella 2002",
+      "recognized": "FOLONARI AJLARONE ILALLN",
+      "raw_list": [
+        "FOLONARI",
+        "AJLARONE",
+        "ILALLN"
+      ]
+    },
+    {
+      "filename": "badia-a-coltibuono-chianti-cetamura_2006_1126792.png",
+      "ground_truth": "Coltibuono Chianti Cetamura 2006",
+      "recognized": "CETAMURA CHIANTI Coltibuono",
+      "raw_list": [
+        "CETAMURA",
+        "CHIANTI",
+        "Coltibuono"
+      ]
+    },
+    {
+      "filename": "p-ferraud-and-fils-saint-amour-cuvee-ensorceleuse_2004_1455750.png",
+      "ground_truth": "Pierre Ferraud & Fils Cuvée Ensorceleuse Saint-Amour 2004",
+      "recognized": "FERRAUD &FILS SAINT-AMOUR   ",
+      "raw_list": [
+        "FERRAUD",
+        "&FILS",
+        "SAINT-AMOUR",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "filename": "joseph-pascal-volnay_2023_2354503.png",
+      "ground_truth": "Joseph Pascal Volnay 2023",
+      "recognized": "2023 VOLNAY Jaept Base",
+      "raw_list": [
+        "2023",
+        "VOLNAY",
+        "Jaept Base"
+      ]
+    },
+    {
+      "filename": "punters-corner-shiraz_2006_1213807.png",
+      "ground_truth": "Punters Corner Shiraz 2006",
+      "recognized": "POSTERS CORSSE C 01 2006",
+      "raw_list": [
+        "POSTERS CORSSE",
+        "C",
+        "01",
+        "2006"
+      ]
+    },
+    {
+      "filename": "domaine-bonnardot-bourgogne-aligote_2023_1893627.png",
+      "ground_truth": "Domaine Bonnardot Bourgogne Aligoté 2023",
+      "recognized": "LRGOGNE ALIGOTE 2 DOMAINE BONNARDOT",
+      "raw_list": [
+        "LRGOGNE ALIGOTE",
+        "2",
+        "DOMAINE",
+        "BONNARDOT"
+      ]
+    },
+    {
+      "filename": "banrock-station-moscato_2019_84331.png",
+      "ground_truth": "Banrock Station Moscato 2019",
+      "recognized": "BANROCK STATION MOSCATO",
+      "raw_list": [
+        "BANROCK",
+        "STATION",
+        "MOSCATO"
+      ]
+    },
+    {
+      "filename": "ca-del-bosco-vintage-collection-franciacorta-saten_2018_1632534.png",
+      "ground_truth": "Ca' del Bosco Vintage Collection Franciacorta Satén 2018",
+      "recognized": "Ca'delBosco ",
+      "raw_list": [
+        "Ca'delBosco",
+        ""
+      ]
+    },
+    {
+      "filename": "clos-bellane-urgonien-1-14-chateauneuf-du-pape_2020_5566462.png",
+      "ground_truth": "Clos Bellane Urgonien 1.14 Châteauneuf-du-Pape 2020",
+      "recognized": "Clos Bellane CHATEAUNEUF DUPA ",
+      "raw_list": [
+        "Clos",
+        "Bellane",
+        "CHATEAUNEUF DUPA",
+        ""
+      ]
+    },
+    {
+      "filename": "fr-chateau-latour-grand-vin-pauillac-premier-grand-cru-classe_1995_1655970.png",
+      "ground_truth": "Château Latour Grand Vin Pauillac (Premier Grand Cru Classé) 1995",
+      "recognized": "GRANDVIN DE CHATEAULATOUR  PL",
+      "raw_list": [
+        "GRANDVIN",
+        "DE",
+        "CHATEAULATOUR",
+        "",
+        "PL"
+      ]
+    },
+    {
+      "filename": "wente-family-vineyards-riva-ranch-pinot-noir-arroyo-seco-red-wine_2012_4426980.png",
+      "ground_truth": "Wente Family Vineyards Riva Ranch Pinot Noir 2012",
+      "recognized": "WENTE  RIVA RANCH PINOTN ",
+      "raw_list": [
+        "WENTE",
+        "",
+        "RIVA RANCH",
+        "PINOTN",
+        ""
+      ]
+    },
+    {
+      "filename": "elena-walch-pinot-bianco-selezione_2022_1720575.png",
+      "ground_truth": "Elena Walch Pinot Bianco (Selezione) 2022",
+      "recognized": "ELENA WALCH PROT BAANCO ALTDADI6E ",
+      "raw_list": [
+        "ELENA WALCH",
+        "PROT BAANCO",
+        "ALTDADI6E",
+        ""
+      ]
+    },
+    {
+      "filename": "devotus-reserve-single-vineyard-pinot-noir_2021_3723907.png",
+      "ground_truth": "Devotus Reserve Single Vineyard Pinot Noir 2021",
+      "recognized": "DEVOTUS RESERVE",
+      "raw_list": [
+        "DEVOTUS",
+        "RESERVE"
+      ]
+    },
+    {
+      "filename": "it-s-cristina-cabernet-sauvignon-garda_2020_1127734.png",
+      "ground_truth": "S. Cristina Cabernet Sauvignon Garda 2020",
+      "recognized": "o0 Cahinet Saunpu ",
+      "raw_list": [
+        "o0",
+        "Cahinet Saunpu",
+        ""
+      ]
+    },
+    {
+      "filename": "egon-muller-scharzhof-scharzhofberger-riesling-auslese_2023_1637184.png",
+      "ground_truth": "Egon Müller - Scharzhof Scharzhofberger Riesling Auslese 2023",
+      "recognized": "L RIESLINO uzhoflergor.hale",
+      "raw_list": [
+        "L",
+        "RIESLINO",
+        "uzhoflergor.hale"
+      ]
+    },
+    {
+      "filename": "chateau-de-pibarnon-bandol-rose_2023_77755.png",
+      "ground_truth": "Château de Pibarnon Bandol Rosé 2023",
+      "recognized": "BINDOL CIATEAU de PIBARNT",
+      "raw_list": [
+        "BINDOL",
+        "CIATEAU de PIBARNT"
+      ]
+    },
+    {
+      "filename": "rutini-trumpeter-cabernet-sauvignon_2015_16510.png",
+      "ground_truth": "Rutini Trumpeter Cabernet Sauvignon 2015",
+      "recognized": "TRUMPETER RUT ",
+      "raw_list": [
+        "TRUMPETER",
+        "RUT",
+        ""
+      ]
+    },
+    {
+      "filename": "two-paddocks-pinot-noir_2024_2018570.png",
+      "ground_truth": "Two Paddocks Pinot Noir 2024",
+      "recognized": "TWO PADDOCKS PINOT NOIR WINE CO NIW EALAN CENTAALOTAGO",
+      "raw_list": [
+        "TWO",
+        "PADDOCKS",
+        "PINOT NOIR",
+        "WINE CO NIW EALAN",
+        "CENTAALOTAGO"
+      ]
+    },
+    {
+      "filename": "donnafugata-mille-e-una-notte_2019_4793.png",
+      "ground_truth": "Donnafugata Mille E Una Notte 2019",
+      "recognized": "MI LENOTTE NNAI N",
+      "raw_list": [
+        "MI LENOTTE",
+        "NNAI",
+        "N"
+      ]
+    },
+    {
+      "filename": "cavalleri-blanc-de-blancs-franciacorta-brut_nv_1548457.png",
+      "ground_truth": "Cavalleri Blanc de Blancs Franciacorta Brut",
+      "recognized": "CAVALL.ERI Franacus Bnde B",
+      "raw_list": [
+        "CAVALL.ERI",
+        "Franacus",
+        "Bnde B"
+      ]
+    },
+    {
+      "filename": "heinrich-pannobile_2021_1126495.png",
+      "ground_truth": "Heinrich Pannobile 2021",
+      "recognized": "HEINKICH Pannobile BURGENLAND",
+      "raw_list": [
+        "HEINKICH",
+        "Pannobile",
+        "BURGENLAND"
+      ]
+    },
+    {
+      "filename": "champagne-paul-bara-champagne-grand-cru-millesime-brut_2014_1233467.png",
+      "ground_truth": "Paul Bara Millesimé Brut Champagne Grand Cru 'Bouzy' 2014",
+      "recognized": "CHAMPAGNE Paul Bara BSY GRAND MILLESIME",
+      "raw_list": [
+        "CHAMPAGNE",
+        "Paul Bara",
+        "BSY",
+        "GRAND MILLESIME"
+      ]
+    },
+    {
+      "filename": "di-majo-norante-contado-aglianico-riserva_2019_1142199.png",
+      "ground_truth": "Di Majo Norante Contado Aglianico Riserva 2019",
+      "recognized": "CONTADO AULCASICO DEL EOLIE DIMAIO NORANTE",
+      "raw_list": [
+        "CONTADO",
+        "AULCASICO DEL EOLIE",
+        "DIMAIO NORANTE"
+      ]
+    },
+    {
+      "filename": "francois-martenot-bourgogne-chardonnay-va767_2013_6481137.png",
+      "ground_truth": "Francois Martenot Bourgogne Chardonnay 2013",
+      "recognized": "RhtT CHARDONNAI FLANCOIS MARTENOT MAISON",
+      "raw_list": [
+        "RhtT",
+        "CHARDONNAI",
+        "FLANCOIS MARTENOT",
+        "MAISON"
+      ]
+    },
+    {
+      "filename": "du-courlat-lussac-saint-emilion-cuvee-jean-baptiste_2014_1514489.png",
+      "ground_truth": "Château du Courlat Lussac-Saint-Émilion Cuvée Jean-Baptiste 2014",
+      "recognized": " CHATLAU DU COURLAT  2000",
+      "raw_list": [
+        "",
+        "CHATLAU DU",
+        "COURLAT",
+        "",
+        "2000"
+      ]
+    },
+    {
+      "filename": "peter-lehmann-portrait-dry-riesling_2016_1866649.png",
+      "ground_truth": "Peter Lehmann Portrait Dry Riesling 2016",
+      "recognized": "Peter LEHMANN Portrair RY RIESLIN BDNAEY",
+      "raw_list": [
+        "Peter",
+        "LEHMANN",
+        "Portrair",
+        "RY",
+        "RIESLIN",
+        "BDNAEY"
+      ]
+    },
+    {
+      "filename": "domaine-comte-georges-de-vogue-chambolle-musigny_2022_83446.png",
+      "ground_truth": "Domaine Comte Georges de Vogüé Chambolle-Musigny 2022",
+      "recognized": "AMBOLLE·MUSIGN Cnee Guyes deVste",
+      "raw_list": [
+        "AMBOLLE·MUSIGN",
+        "Cnee Guyes deVste"
+      ]
+    },
+    {
+      "filename": "domaine-a-f-gros-vosne-romanee-maizieres_2022_1100242.png",
+      "ground_truth": "A.F. Gros Vosne-Romanée Maizières 2022",
+      "recognized": "DOMAINEA.FG  MAIZIERES pllat C",
+      "raw_list": [
+        "DOMAINEA.FG",
+        "",
+        "MAIZIERES",
+        "pllat C"
+      ]
+    },
+    {
+      "filename": "saltram-pepperjack-cabernet-sauvignon_2022_64454.png",
+      "ground_truth": "Saltram Pepperjack Cabernet Sauvignon 2022",
+      "recognized": "市 EPPERIACS",
+      "raw_list": [
+        "市",
+        "EPPERIACS"
+      ]
+    },
+    {
+      "filename": "felton-road-bannockburn-pinot-noir_2018_88318.png",
+      "ground_truth": "Felton Road Bannockburn Pinot Noir 2018",
+      "recognized": "FELTON BOAD PINOT NOIR ",
+      "raw_list": [
+        "FELTON BOAD",
+        "PINOT NOIR",
+        ""
+      ]
+    },
+    {
+      "filename": "chateau-trotanoy-pomerol_2014_1098770.png",
+      "ground_truth": "Château Trotanoy Pomerol 2014",
+      "recognized": "CHATEAU TROTANOY POMEROL AEA P APO",
+      "raw_list": [
+        "CHATEAU TROTANOY",
+        "POMEROL",
+        "AEA",
+        "P",
+        "APO"
+      ]
+    },
+    {
+      "filename": "chateau-brown-pessac-leognan_1998_1199355.png",
+      "ground_truth": "Château Brown Pessac-Léognan 1998",
+      "recognized": "GRAND VIN DE GRAVES H CHATEAU BROWN PESSAC LEOGNAN",
+      "raw_list": [
+        "GRAND VIN DE GRAVES",
+        "H",
+        "CHATEAU",
+        "BROWN",
+        "PESSAC LEOGNAN"
+      ]
+    },
+    {
+      "filename": "jermann-pinot-grigio_2022_1989135.png",
+      "ground_truth": "Jermann Pinot Grigio 2022",
+      "recognized": "Sermann PINOt GEUGIIO",
+      "raw_list": [
+        "Sermann",
+        "PINOt GEUGIIO"
+      ]
+    },
+    {
+      "filename": "rupert-and-rothschild-vignerons-baroness-nadine_2018_12437.png",
+      "ground_truth": "Rupert & Rothschild Baroness Nadine 2018",
+      "recognized": "RUPERTABOTHSCHILS GPGDe DEPE   4",
+      "raw_list": [
+        "RUPERTABOTHSCHILS",
+        "GPGDe",
+        "DEPE",
+        "",
+        "",
+        "4"
+      ]
+    },
+    {
+      "filename": "cycles-gladiator-merlot-central-coast_2005_3220019.png",
+      "ground_truth": "Cycles Gladiator Merlot Central Coast 2005",
+      "recognized": "Ccles GLADIATO M ",
+      "raw_list": [
+        "Ccles",
+        "GLADIATO",
+        "M",
+        ""
+      ]
+    },
+    {
+      "filename": "ercavio-garnacha-de-la-madre-castilla-la-mancha_2021_5342613.png",
+      "ground_truth": "Más Que Vinos Garnacha de la Madre 2021",
+      "recognized": "L.lMol.",
+      "raw_list": [
+        "L.lMol."
+      ]
+    },
+    {
+      "filename": "black-barn-single-vineyard-merlot_2020_9373701.png",
+      "ground_truth": "Black Barn Single Vineyard Merlot 2020",
+      "recognized": "8B BLACE BARN  ",
+      "raw_list": [
+        "8B",
+        "BLACE BARN",
+        "",
+        ""
+      ]
+    },
+    {
+      "filename": "montes-classic-series-reserva-sauvignon-blanc-central-valley_2008_12618329.png",
+      "ground_truth": "Montes Classic Series / Reserva Sauvignon Blanc 2008",
+      "recognized": "SELNOE SLANC  ",
+      "raw_list": [
+        "SELNOE",
+        "SLANC",
+        "",
+        ""
+      ]
+    },
+    {
+      "filename": "feudi-di-san-gregorio-falanghina-serrocielo_2023_1631655.png",
+      "ground_truth": "Feudi di San Gregorio Falanghina Serrocielo 2023",
+      "recognized": "SERRO CIELO",
+      "raw_list": [
+        "SERRO",
+        "CIELO"
+      ]
+    },
+    {
+      "filename": "powers-winery-malbec_2009_1216168.png",
+      "ground_truth": "Powers Malbec 2009",
+      "recognized": "POWERS MALBEC COLUMBIA VALLET",
+      "raw_list": [
+        "POWERS",
+        "MALBEC",
+        "COLUMBIA VALLET"
+      ]
+    },
+    {
+      "filename": "pegasus-bay-winery-pinot-noir_2022_16117.png",
+      "ground_truth": "Pegasus Bay Pinot Noir 2022",
+      "recognized": "PEGASUS BAY PINOT NOIR",
+      "raw_list": [
+        "PEGASUS BAY",
+        "PINOT NOIR"
+      ]
+    },
+    {
+      "filename": "william-fevre-chablis-sea-limited-edition-chablis_2018_9024084.png",
+      "ground_truth": "William Fèvre SEA Limited Edition Chablis 2018",
+      "recognized": "WILLIAM FEVRE CHABLIS C",
+      "raw_list": [
+        "WILLIAM FEVRE",
+        "CHABLIS",
+        "C"
+      ]
+    },
+    {
+      "filename": "glaetzer-anaperenna_2006_1165293.png",
+      "ground_truth": "Glaetzer Anaperenna 2006",
+      "recognized": "ANAPERENNA",
+      "raw_list": [
+        "ANAPERENNA"
+      ]
+    },
+    {
+      "filename": "michel-redde-et-fils-barre-a-mine-blanc-fume-de-pouilly_2022_4561282.png",
+      "ground_truth": "Michel Redde Barre A Mine Blanc Fumé de Pouilly 2022",
+      "recognized": "R",
+      "raw_list": [
+        "R"
+      ]
+    },
+    {
+      "filename": "merryvale-vineyards-profile_2001_1128691.png",
+      "ground_truth": "Merryvale Profile 2001",
+      "recognized": "PROFILE ",
+      "raw_list": [
+        "PROFILE",
+        ""
+      ]
+    },
+    {
+      "filename": "kressmann-monopole-bordeaux_2009_1136310.png",
+      "ground_truth": "Kressmann Monopole Bordeaux 2009",
+      "recognized": "KRESSMANN MONOPOLE  BOMUX",
+      "raw_list": [
+        "KRESSMANN",
+        "MONOPOLE",
+        "",
+        "BOMUX"
+      ]
+    },
+    {
+      "filename": "pio-cesare-dolcetto-d-alba_2022_22546.png",
+      "ground_truth": "Pio Cesare Dolcetto d'Alba 2022",
+      "recognized": "PIO CESARE DolattedAlla",
+      "raw_list": [
+        "PIO CESARE",
+        "DolattedAlla"
+      ]
+    },
+    {
+      "filename": "bricco-maiolica-barbera-d-alba_2012_1101162.png",
+      "ground_truth": "Bricco Maiolica Barbera d'Alba 2012",
+      "recognized": "BARBERA D'ALBA",
+      "raw_list": [
+        "BARBERA",
+        "D'ALBA"
+      ]
+    },
+    {
+      "filename": "terranoble-ca1-andes-carmenere_2011_1458091.png",
+      "ground_truth": "TerraNoble CA1 Andes Carmenère 2011",
+      "recognized": "CARMENE C+1 CmILe",
+      "raw_list": [
+        "CARMENE",
+        "C+1",
+        "CmILe"
+      ]
+    }
+  ]
+}

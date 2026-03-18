@@ -18,3 +18,15 @@ dist/
 
 docker-compose.local.yml
 nginx/nginx.local.conf
+# Large data and models
+ocr/data/images/
+ocr/models/
+ai/crawled-results/
+ai/data/onnx_model/
+*.zip
+*.onnx
+*.pdiparams
+*.safetensors
+*.bin
+*.model
+

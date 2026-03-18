@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { OCRResult } from '../types';
+import { executeOcrAction } from '../actions/ocr.action';
 
 export const useOCR = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +20,7 @@ export const useOCR = () => {
       setIsLoading(true);
       setError(null);
       try {
-        console.log('📡 [Server OCR] 서버 분석 요청 중...');
+        console.log('📡 [Server Action OCR] 서버 분석 요청 중...');
 
         const formData = new FormData();
 
@@ -35,20 +36,23 @@ export const useOCR = () => {
           formData.append('image', blob, 'scan.jpg');
         }
 
-        // 서버 API 호출
-        const response = await fetch('/api/ocr', {
-          method: 'POST',
-          body: formData,
-        });
+        // 서버 액션 호출 (직접 함수 실행)
+        const result = await executeOcrAction(formData);
 
-        if (!response.ok) throw new Error('서버 분석 응답 실패');
+        if (!result.success) {
+          throw new Error(result.error || '분석에 실패했습니다.');
+        }
 
-        const data = await response.json();
-        console.log('✅ [Server OCR] 결과 수신:', data);
+        console.log('✅ [Server Action OCR] 결과 수신:', result);
 
-        return data;
+        return {
+          success: true,
+          results: result.results || [],
+          refined: result.refined,
+          imageInfo: result.imageInfo,
+        };
       } catch (err) {
-        console.error('❌ Server OCR Error:', err);
+        console.error('❌ Server Action OCR Error:', err);
         const msg = err instanceof Error ? err.message : '분석에 실패했습니다.';
         setError(msg);
         throw new Error(msg);

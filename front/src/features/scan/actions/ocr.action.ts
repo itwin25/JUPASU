@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+'use server';
+
 import * as ort from 'onnxruntime-node';
 import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
 import { env } from '@/lib/env';
+import { OCRResult } from '../types';
 
 // 🚀 타입 정의
 interface OCRBox {
@@ -11,12 +13,6 @@ interface OCRBox {
   y: number;
   width: number;
   height: number;
-}
-
-interface OCRResult {
-  text: string;
-  score: number;
-  box: OCRBox | number[][] | number[];
 }
 
 // PaddleOCR 라이브러리 내부 구조 정의
@@ -161,7 +157,6 @@ async function callLLMToRefine(ocrText: string) {
     const content = data.choices[0]?.message?.content;
     const result = typeof content === 'string' ? JSON.parse(content) : content;
 
-    // 로직 추가: vintage가 숫자가 아니면 빈 값으로 설정하여 프론트에서 가이드 텍스트 노출 유도
     if (result && typeof result.vintage === 'string') {
       const cleanVintage = result.vintage.trim();
       if (!/^\d+$/.test(cleanVintage)) {
@@ -172,16 +167,17 @@ async function callLLMToRefine(ocrText: string) {
     return result;
   } catch (error) {
     console.error('❌ LLM Refine Error:', error);
-    return { winery: '', wineName: '', vintage: '' }; // 실패 시 빈 값 반환
+    return { winery: '', wineName: '', vintage: '' };
   }
 }
 
-export async function POST(req: NextRequest) {
+/**
+ * [Server Action] 이미지 분석 실행
+ */
+export async function executeOcrAction(formData: FormData) {
   try {
-    const formData = await req.formData();
     const imageFile = formData.get('image') as File;
-
-    if (!imageFile) return NextResponse.json({ error: '이미지 파일이 없습니다.' }, { status: 400 });
+    if (!imageFile) throw new Error('이미지 파일이 없습니다.');
 
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const ocrService = await getOcrService();
@@ -200,9 +196,7 @@ export async function POST(req: NextRequest) {
       data: new Uint8Array(data),
     });
 
-    console.log('📦 [Server OCR] Raw Item Example:', JSON.stringify(rawResults?.[0]));
-
-    // 3. 결과 정제 및 텍스트 결합
+    // 3. 결과 정제
     const simplifiedResults: OCRResult[] = Array.isArray(rawResults)
       ? rawResults.map((item: unknown) => {
           let text = '';
@@ -210,51 +204,52 @@ export async function POST(req: NextRequest) {
           let box: OCRBox | number[][] | number[] = [];
 
           if (item && typeof item === 'object' && !Array.isArray(item)) {
-            const obj = item as {
+            const resultItem = item as {
               text?: string;
               confidence?: number;
               score?: number;
-              box?: unknown;
-              points?: unknown;
-              point?: unknown;
-              bbox?: unknown;
+              box?: OCRBox;
+              points?: number[][];
+              point?: number[];
+              bbox?: number[];
             };
-            text = String(obj.text || '');
-            score = Number(obj.confidence || obj.score || 0);
-            box = (obj.box || obj.points || obj.point || obj.bbox || []) as
-              | OCRBox
-              | number[][]
-              | number[];
+            text = String(resultItem.text || '');
+            score = Number(resultItem.confidence || resultItem.score || 0);
+            box = (resultItem.box ||
+              resultItem.points ||
+              resultItem.point ||
+              resultItem.bbox ||
+              []) as OCRBox | number[][] | number[];
           } else if (Array.isArray(item) && item.length >= 2) {
-            box = (Array.isArray(item[0]) ? item[0] : []) as number[][] | number[];
-            const val = item[1];
-            text = String(Array.isArray(val) ? val[0] : val);
-            score = Number(Array.isArray(val) ? val[1] : 0);
+            box = item[0] as OCRBox | number[][] | number[];
+            text = String(Array.isArray(item[1]) ? item[1][0] : item[1]);
+            score = Number(Array.isArray(item[1]) ? item[1][1] : 0);
           }
           return { text, score, box };
         })
       : [];
 
-    // 4. LLM 정제 요청 (인식된 텍스트 중 스코어가 0.8(80점) 초과인 것만 결합하여 전송)
+    // 4. LLM 정제
     const allText = simplifiedResults.map((r) => r.text).join('\n');
     const filteredText = simplifiedResults
       .filter((r) => r.score > 0.8)
       .map((r) => r.text)
       .join('\n');
 
-    console.log('📡 [Server OCR] LLM 정제 요청 중 (신뢰도 80점 초과만 포함)...');
     const refinedData = await callLLMToRefine(filteredText || allText);
-    console.log('✅ [Server OCR] LLM 정제 완료:', refinedData);
 
-    return NextResponse.json({
+    return {
       success: true,
       results: simplifiedResults,
-      refined: refinedData, // LLM이 정제한 구조화된 데이터
+      refined: refinedData,
       imageInfo: { width: info.width, height: info.height },
-    });
+    };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : '서버 내부 오류';
-    console.error('❌ Server OCR Critical Error:', error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    console.error('❌ Server Action OCR Error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '서버 분석 오류',
+      results: [],
+    };
   }
 }

@@ -1,0 +1,21 @@
+[project]
+name = "ocr"
+version = "0.1.0"
+description = "Wine Label OCR using PP-OCRv5"
+readme = "README.md"
+requires-python = "==3.11.*"
+dependencies = [
+    "huggingface-hub[cli]",
+    "numpy<2.0",
+    "onnx>=1.20.1",
+    "onnx-simplifier>=0.5.0",
+    "onnxruntime-gpu>=1.24.3",
+    "opencv-python",
+    "paddle2onnx>=2.0.1",
+    "paddleocr>=3.0.0",
+    "paddlepaddle>=3.0.0",
+    "paddlex>=3.0.0",
+    "pillow",
+    "pyclipper>=1.4.0",
+    "shapely>=2.1.2",
+]

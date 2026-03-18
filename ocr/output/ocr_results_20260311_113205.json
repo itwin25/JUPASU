@@ -1,0 +1,111 @@
+{
+  "evaluation_date": "2026-03-11T11:32:05.646653",
+  "model": "PP-OCRv5-Server",
+  "total_evaluated": 10,
+  "results": [
+    {
+      "filename": "peregrine-wines-central-otago-limited-pinot-noir-rose_2025_3879963.png",
+      "ground_truth": "Peregrine Pinot Noir Rosé 2025",
+      "recognized": "PINOT NOIR ROSE NILND WIN CENTRAL OTAEO",
+      "raw_list": [
+        "PINOT NOIR",
+        "ROSE",
+        "NILND WIN",
+        "CENTRAL OTAEO"
+      ]
+    },
+    {
+      "filename": "torcalvano-gracciano-amarone-della-valpolicella_2002_1171804.png",
+      "ground_truth": "Folonari Amarone della Valpolicella 2002",
+      "recognized": "火 FOLONARI AMARONE DULAVALPOU",
+      "raw_list": [
+        "火",
+        "FOLONARI",
+        "AMARONE",
+        "DULAVALPOU"
+      ]
+    },
+    {
+      "filename": "badia-a-coltibuono-chianti-cetamura_2006_1126792.png",
+      "ground_truth": "Coltibuono Chianti Cetamura 2006",
+      "recognized": "CETAMURA CHIANTI Coltibuono",
+      "raw_list": [
+        "CETAMURA",
+        "CHIANTI",
+        "Coltibuono"
+      ]
+    },
+    {
+      "filename": "p-ferraud-and-fils-saint-amour-cuvee-ensorceleuse_2004_1455750.png",
+      "ground_truth": "Pierre Ferraud & Fils Cuvée Ensorceleuse Saint-Amour 2004",
+      "recognized": "SAINT-AMOUR Cucie Encoveife",
+      "raw_list": [
+        "SAINT-AMOUR",
+        "Cucie Encoveife"
+      ]
+    },
+    {
+      "filename": "joseph-pascal-volnay_2023_2354503.png",
+      "ground_truth": "Joseph Pascal Volnay 2023",
+      "recognized": "2023 VOLNAY Tosepk Paseal",
+      "raw_list": [
+        "2023",
+        "VOLNAY",
+        "Tosepk Paseal"
+      ]
+    },
+    {
+      "filename": "punters-corner-shiraz_2006_1213807.png",
+      "ground_truth": "Punters Corner Shiraz 2006",
+      "recognized": "PUNTERS CORNER COONAWARRA SHIRAZ 2006",
+      "raw_list": [
+        "PUNTERS CORNER",
+        "COONAWARRA",
+        "SHIRAZ",
+        "2006"
+      ]
+    },
+    {
+      "filename": "domaine-bonnardot-bourgogne-aligote_2023_1893627.png",
+      "ground_truth": "Domaine Bonnardot Bourgogne Aligoté 2023",
+      "recognized": "BOURGOGNE ALIGOTE DOMAINE 2021 BONNARDOT",
+      "raw_list": [
+        "BOURGOGNE ALIGOTE",
+        "DOMAINE",
+        "2021",
+        "BONNARDOT"
+      ]
+    },
+    {
+      "filename": "banrock-station-moscato_2019_84331.png",
+      "ground_truth": "Banrock Station Moscato 2019",
+      "recognized": "B A N R O C K STATION  MOSCATO",
+      "raw_list": [
+        "B A N R O C K",
+        "STATION",
+        "",
+        "MOSCATO"
+      ]
+    },
+    {
+      "filename": "ca-del-bosco-vintage-collection-franciacorta-saten_2018_1632534.png",
+      "ground_truth": "Ca' del Bosco Vintage Collection Franciacorta Satén 2018",
+      "recognized": "Ca'delBosco",
+      "raw_list": [
+        "Ca'delBosco"
+      ]
+    },
+    {
+      "filename": "clos-bellane-urgonien-1-14-chateauneuf-du-pape_2020_5566462.png",
+      "ground_truth": "Clos Bellane Urgonien 1.14 Châteauneuf-du-Pape 2020",
+      "recognized": "Clos \"Uegusie Bellane CHATEAUNEUF-DU-PAPE MSENBOUTIELEAUCLO",
+      "raw_list": [
+        "Clos",
+        "\"Uegusie",
+        "Bellane",
+        "CHATEAUNEUF-DU-PAPE",
+        "MSENBOUTIELEAUCLO"
+      ]
+    }
+  ]
+}
