@@ -50,7 +50,7 @@ EXPOSE 8000
 
 # [최적화] 헬스체크 추가 (API 상태 모니터링)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # 서버 실행
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
