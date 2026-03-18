@@ -41,4 +41,7 @@ export const API_PATH = {
     DETAIL: (wineId: number | string, reviewId: number | string) =>
       `/reviews/${wineId}/review/${reviewId}`,
   },
+  REPORT: {
+    TASTE: '/users/reports',
+  },
 } as const;
