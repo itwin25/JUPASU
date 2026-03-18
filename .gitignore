@@ -17,3 +17,4 @@ build/
 dist/
 
 docker-compose.local.yml
+nginx/nginx.local.conf
