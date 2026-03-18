@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useUserMyPage } from '@/features/user/hooks/useUserMyPage';
+import { useTasteReportQuery } from '@/features/report/hooks/useTasteReportQuery';
 import {
   ChevronLeft,
   ChevronRight,
@@ -192,16 +193,38 @@ function Pagination() {
   );
 }
 
+// 레이더 차트 (오각형) 좌표 계산을 위한 헬퍼 함수
+// value: 0 ~ maxVal 기준
+// maxXY: 배경 다각형의 각 꼭짓점 좌표 (x, y)
+function calculateRadarPoint(
+  value: number,
+  maxVal: number,
+  maxXY: [number, number],
+  centerXY = 120,
+) {
+  const scaledValue = Math.min(Math.max(value, 0), maxVal);
+  const ratio = scaledValue / maxVal;
+
+  const [maxX, maxY] = maxXY;
+  const x = centerXY + (maxX - centerXY) * ratio;
+  const y = centerXY + (maxY - centerXY) * ratio;
+
+  return `${x},${y}`;
+}
+
 export default function MyPage() {
   const { data: profile, isLoading } = useUserMyPage();
   const { data: myReviews = [] } = useMyReviewsQuery();
   const { data: scrapListData } = useWineScrapListQuery();
   const { data: friendListData } = useFriendListQuery();
   const { data: pendingFriendListData } = usePendingFriendListQuery();
+  const { data: tasteReport, isLoading: isReportLoading } = useTasteReportQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
-  const [activeModal, setActiveModal] = useState<'wishlist' | 'reviews' | 'friends' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    'wishlist' | 'reviews' | 'friends' | 'terms' | null
+  >(null);
   const [friendTab, setFriendTab] = useState<'list' | 'search' | 'requests'>('list');
   const [reviews, setReviews] = useState(INITIAL_REVIEWS);
   const [activeReviewMenuId, setActiveReviewMenuId] = useState<number | null>(null);
@@ -410,6 +433,23 @@ export default function MyPage() {
     await wineScrapMutation.mutateAsync(wineId);
   };
 
+  // 차트 좌표 생성 중심점 120, 베이스 기준 반경 75
+  const radarChartPoints = useMemo(() => {
+    if (!tasteReport?.radarChart) {
+      // 데이터가 없을 때의 기본 빈 오각형
+      return '120,45 191,97 164,181 76,181 49,97';
+    }
+
+    const radar = tasteReport.radarChart;
+    const p1 = calculateRadarPoint(radar.tannin, 100, [120, 30]); // 상단: 탄닌
+    const p2 = calculateRadarPoint(radar.acidity, 100, [195, 84]); // 우상단: 산미
+    const p3 = calculateRadarPoint(radar.body, 100, [166, 173]); // 우하단: 바디
+    const p4 = calculateRadarPoint(radar.sweetness, 100, [74, 173]); // 좌하단: 당도
+    const p5 = calculateRadarPoint(radar.alcohol, 20, [45, 84]); // 좌상단: 도수
+
+    return `${p1} ${p2} ${p3} ${p4} ${p5}`;
+  }, [tasteReport]);
+
   return (
     <div className="bg-background min-h-screen pb-24">
       <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
@@ -513,7 +553,10 @@ export default function MyPage() {
           <div className="border-primary-100 mt-3 rounded-[1.5rem] border bg-white p-4 shadow-sm">
             <div className="bg-white px-1 py-1">
               <p className="text-text-main text-center text-[11px] leading-relaxed font-black">
-                와인초보님은 &apos;상큼하고 가벼운&apos; 화이트 와인 취향이에요!
+                {isReportLoading
+                  ? '리포트를 불러오는 중이에요...'
+                  : tasteReport?.mainTitle ||
+                    "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
               </p>
 
               <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
@@ -530,31 +573,66 @@ export default function MyPage() {
                     <line x1="120" y1="120" x2="74" y2="173" />
                     <line x1="120" y1="120" x2="45" y2="84" />
                   </g>
+                  {/* 동적으로 계산된 좌표로 다각형 생성 */}
                   <polygon
-                    points="120,73 171,98 157,157 86,163 61,97"
+                    points={radarChartPoints}
                     fill="rgba(196, 91, 91, 0.16)"
                     stroke="#C75B5B"
                     strokeWidth="4"
                     strokeLinejoin="round"
+                    className="transition-all duration-700 ease-in-out"
                   />
                 </svg>
 
-                <span className="text-text-main/55 absolute top-0 left-1/2 -translate-x-1/2 text-[10px] font-medium">
-                  탄닌
-                </span>
-                <span className="text-text-main/55 absolute top-[72px] right-[2px] text-[10px] font-medium">
-                  산미
-                </span>
-                <span className="text-text-main/55 absolute right-[34px] bottom-[28px] text-[10px] font-medium">
-                  바디
-                </span>
-                <span className="text-text-main/55 absolute bottom-[28px] left-[34px] text-[10px] font-medium">
-                  당도
-                </span>
-                <span className="text-text-main/55 absolute top-[72px] left-[0px] text-[10px] font-medium">
-                  도수
-                </span>
-                <button className="absolute right-[2px] bottom-[26px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white">
+                <div className="absolute top-[-10px] left-1/2 flex -translate-x-1/2 flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    탄닌
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.tannin ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute top-[68px] right-[-10px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    산미
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.acidity ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute right-[22px] bottom-[20px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    바디
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.body ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute bottom-[20px] left-[22px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    당도
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.sweetness ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute top-[68px] left-[-10px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    도수
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.alcohol ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/20</span>
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveModal('terms')}
+                  className="absolute right-[-10px] bottom-[16px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white transition-transform hover:scale-110"
+                >
                   ?
                 </button>
               </div>
@@ -570,8 +648,9 @@ export default function MyPage() {
                   🧑🏻
                 </div>
                 <p className="text-text-main/80 text-[12px] leading-5 font-medium">
-                  과일향이 풍부하고 당도가 적절한 와인을 산미가 살아있는 와인에 높은 점수를
-                  주셨어요. 탄닌이 강하지 않은 미디엄 바디 스타일을 선호하는 편이에요.
+                  {isReportLoading
+                    ? '분석 결과를 불러오는 중...'
+                    : tasteReport?.content || '리포트 내용이 없습니다.'}
                 </p>
               </div>
 
@@ -593,7 +672,9 @@ export default function MyPage() {
                   </div>
                   {isBestOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.bestDescription || 'Best 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
@@ -615,7 +696,9 @@ export default function MyPage() {
                   </div>
                   {isWorstOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.worstDescription || 'Worst 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
@@ -624,6 +707,50 @@ export default function MyPage() {
           </div>
         </section>
       </main>
+
+      {/* 용어 설명 모달 */}
+      <Modal
+        isOpen={activeModal === 'terms'}
+        onClose={() => setActiveModal(null)}
+        title="와인 용어 설명"
+        hideDefaultFooter
+        className={modalClassName}
+      >
+        <div className="bg-primary-100/80 mb-4 h-px" />
+        <div className="text-text-main space-y-4 text-[13px] leading-relaxed">
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">탄닌 (Tannin)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              입안을 마르게 하거나 떫은 맛을 내는 성분이에요. 주로 포도 껍질과 씨에서 나옵니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">산미 (Acidity)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              포도의 산 성분으로 인해 느껴지는 신맛이에요. 와인에 상쾌함과 생기를 줍니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">바디 (Body)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              입안에서 느껴지는 와인의 무게감이나 질감이에요. 물(가벼움)과 우유(무거움)의 차이와
+              비슷해요.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">당도 (Sweetness)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              와인에서 느껴지는 단맛이에요. 발효 후 남은 잔당의 양에 따라 결정됩니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">도수 (Alcohol)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              와인에 포함된 알코올의 비율이에요. 효모가 당을 분해하여 생성합니다.
+            </p>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={activeModal === 'wishlist'}
