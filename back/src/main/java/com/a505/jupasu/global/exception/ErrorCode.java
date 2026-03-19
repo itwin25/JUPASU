@@ -53,7 +53,12 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 만료되었습니다. 다시 로그인해주세요."),
 
     // 상황 관련 예외
-    SITUATION_NOT_FOUND(HttpStatus.BAD_REQUEST, "만족하는 상황이 존재하지 않습니다.");
+    SITUATION_NOT_FOUND(HttpStatus.BAD_REQUEST, "만족하는 상황이 존재하지 않습니다."),
+
+    // AI 관련 예외
+    AI_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "AI 서버 처리 중 오류가 발생했습니다."),
+    AI_SERVER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI 서버에 연결할 수 없습니다."),
+    AI_PROCESSING_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "AI 서버 응답 시간이 초과되었습니다.");
 
     private final HttpStatus status;
     private final String message;

@@ -71,6 +71,16 @@ public class RedisService {
         stringRedisTemplate.delete(Arrays.asList(keys));
     }
 
+    /** List Push — 리스트의 왼쪽에 데이터 추가 */
+    public void pushToList(String key, String value) {
+        stringRedisTemplate.opsForList().leftPush(key, value);
+    }
+
+    /** List Trim — 리스트 크기를 일정 개수로 유지 */
+    public void trimList(String key, long maxSize) {
+        stringRedisTemplate.opsForList().trim(key, 0, maxSize - 1);
+    }
+
     /**
      * Pipeline으로 다수 키를 한 번의 네트워크 왕복에 일괄 삭제
      * Redis cleanup에서 사용
