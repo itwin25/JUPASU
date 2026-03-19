@@ -63,7 +63,7 @@ public class SecurityConfig {
                                 //테스트용 api 추가
                                 , "/api/dummy/**"
                                 //데이터 삽입용 api 추가
-                                ,"/api/admin/wines"
+                                ,"/api/admin/wines/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
