@@ -6,56 +6,58 @@ import { Home, Camera, Search, User, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
-  { label: '홈', icon: Home, path: '/home' },
-  { label: '스캔', icon: Camera, path: '/scan' },
-  { label: '챗봇', icon: MessageCircle, path: '/chat', isCenter: true },
-  { label: '검색', icon: Search, path: '/search' },
-  { label: '마이', icon: User, path: '/mypage' },
+  { icon: Home, path: '/home' },
+  { icon: Camera, path: '/scan' },
+  { icon: MessageCircle, path: '/chat', isCenter: true },
+  { icon: Search, path: '/search' },
+  { icon: User, path: '/mypage' },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
-  // 챗봇 페이지(/chat)와 취향 설정 페이지(/mypage/taste)에서는 하단 탭을 표시하지 않음
   if (pathname === '/chat' || pathname === '/mypage/taste') return null;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-primary-100 px-6 pb-safe pt-2 shadow-sm">
-      <div className="flex items-center justify-between h-16 relative max-w-md mx-auto">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname.startsWith(item.path);
-          
-          if (item.isCenter) {
-            return (
-              <div key={item.path} className="relative w-16 h-16 flex items-center justify-center">
-                <Link
-                  href={item.path}
-                  className="absolute -top-10 w-20 h-20 bg-[#B36262] rounded-full border-[8px] border-background flex items-center justify-center shadow-lg active:scale-95 transition-all"
-                >
-                  <item.icon size={36} className="text-white fill-white" />
-                </Link>
-              </div>
-            );
-          }
+    <nav className="fixed inset-x-0 bottom-0 z-50 pb-[max(0rem,env(safe-area-inset-bottom))]">
+      <div className="app-shell">
+        <div className="border-primary-100/70 relative flex h-[4.7rem] items-center justify-between border-t bg-white/96 px-6 shadow-[0_-8px_22px_rgba(51,34,17,0.04)] backdrop-blur-xl">
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname.startsWith(item.path);
 
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={cn(
-                'flex flex-col items-center gap-1 px-3 transition-colors py-2',
-                isActive ? 'text-[#B36262]' : 'text-gray-400'
-              )}
-            >
-              <item.icon 
-                size={26} 
+            if (item.isCenter) {
+              return (
+                <div
+                  key={item.path}
+                  className="relative flex h-16 w-16 items-center justify-center"
+                >
+                  <Link
+                    href={item.path}
+                    className="border-background absolute -top-[1.45rem] flex h-[4.05rem] w-[4.05rem] items-center justify-center rounded-full border-[5px] bg-[#B36262] shadow-[0_10px_24px_rgba(179,98,98,0.28)] transition-all active:scale-95"
+                  >
+                    <item.icon size={24} className="text-white" />
+                  </Link>
+                </div>
+              );
+            }
+
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
                 className={cn(
-                  isActive ? 'stroke-[2.5px]' : 'stroke-[2px]'
-                )} 
-              />
-            </Link>
-          );
-        })}
+                  'flex min-w-0 flex-1 items-center justify-center py-2 transition-colors',
+                  isActive ? 'text-[#B36262]' : 'text-text-main/40',
+                )}
+              >
+                <item.icon
+                  size={21}
+                  className={cn(isActive ? 'stroke-[2.25px]' : 'stroke-[1.85px]')}
+                />
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

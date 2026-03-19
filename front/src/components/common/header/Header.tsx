@@ -13,41 +13,43 @@ interface HeaderProps {
   className?: string;
 }
 
-export default function Header({ 
-  title, 
-  showBackButton = true, 
-  rightSlot, 
+export default function Header({
+  title,
+  showBackButton = true,
+  rightSlot,
   transparent = false,
-  className 
+  className,
 }: HeaderProps) {
   const router = useRouter();
 
   return (
-    <header 
+    <header
       className={cn(
-        "sticky top-0 z-40 flex w-full items-center justify-between px-4 h-16 transition-all",
-        !transparent ? "bg-background/80 backdrop-blur-xl border-b border-primary-100/20" : "bg-transparent",
-        className
+        'page-gutter top-safe sticky top-0 z-40 flex h-[4.25rem] w-full items-center justify-between transition-all',
+        !transparent
+          ? 'border-primary-100/35 bg-background/78 border-b backdrop-blur-xl'
+          : 'bg-transparent',
+        className,
       )}
     >
-      <div className="flex flex-1 items-center gap-1">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
         {showBackButton && (
-          <Button 
-            variant="icon" 
+          <Button
+            variant="icon"
             onClick={() => router.back()}
-            className="border-none shadow-none bg-transparent -ml-2 hover:bg-primary-100/30"
+            className="hover:bg-primary-100/30 -ml-2 h-11 w-11 border-none bg-transparent shadow-none"
           >
-            <ChevronLeft size={28} className="text-text-main" />
+            <ChevronLeft size={24} className="text-text-main" />
           </Button>
         )}
         {title && (
-          <h1 className="text-lg font-extrabold text-text-main tracking-tight">{title}</h1>
+          <h1 className="text-text-main truncate text-[1.05rem] font-extrabold tracking-tight">
+            {title}
+          </h1>
         )}
       </div>
-      
-      <div className="flex flex-1 justify-end items-center gap-2">
-        {rightSlot}
-      </div>
+
+      <div className="flex flex-1 items-center justify-end gap-2">{rightSlot}</div>
     </header>
   );
 }

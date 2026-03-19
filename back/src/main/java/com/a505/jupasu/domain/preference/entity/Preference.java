@@ -55,6 +55,10 @@ public class Preference {
     @Column(columnDefinition = "TEXT")
     private String preferSummary;
 
+    // 리포트 갱신 여부
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean isReportOutdated = true;
+
     // 선호 와인 종류 리스트 (다중 선택)
     @ElementCollection(targetClass = WineType.class)
     @CollectionTable(name = "pref_wine_types", joinColumns = @JoinColumn(name = "pref_id"))
@@ -123,5 +127,14 @@ public class Preference {
         if (wineTypes != null) this.preferredWineTypes = wineTypes;
         if (flavors != null) this.preferredFlavors = flavors;
         if (situations != null) this.drinkingSituations = situations;
+    }
+
+    public void markReportAsOutdated() {
+        this.isReportOutdated = true;
+    }
+
+    public void updateReportSummary(String summary) {
+        this.preferSummary = summary;
+        this.isReportOutdated = false;
     }
 }
