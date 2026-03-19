@@ -1,10 +1,8 @@
 # ================================
 # Stage 1: Dependencies
 # ================================
-FROM node:20-alpine AS deps
+FROM node:20-slim AS deps
 
-# libc6-compat 추가 (일부 네이티브 라이브러리 필요 시 대비)
-RUN apk add --no-cache libc6-compat
 RUN npm install -g pnpm@9
 
 WORKDIR /app
@@ -18,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 # ================================
 # Stage 2: Builder
 # ================================
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 RUN npm install -g pnpm@9
 WORKDIR /app
@@ -32,13 +30,13 @@ ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 실제 빌드 (이때 .dockerignore에 의해 .next/ 등은 제외되어 빌드 속도 향상)
+# 실제 빌드
 RUN pnpm build
 
 # ================================
 # Stage 3: Runner
 # ================================
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 
@@ -47,8 +45,8 @@ ENV PORT=80
 ENV HOSTNAME="0.0.0.0"
 
 # 보안: 비루트 사용자 사용
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 -g nodejs nextjs
 
 # 빌드 산출물 및 실행에 필요한 파일만 복사
 COPY --from=builder /app/public ./public
@@ -60,5 +58,5 @@ USER nextjs
 
 EXPOSE 80
 
-# pnpm 대신 node 명령어로 직접 실행 (속도 및 보안 유리)
+# pnpm 대신 node 명령어로 직접 실행
 CMD ["node_modules/.bin/next", "start"]

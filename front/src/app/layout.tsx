@@ -11,12 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: 'JUPASU',
-  description: '주파수 와인 추천 서비스',
-  icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
-  },
+  description: 'AI Wine Sommelier Service',
 };
 
 export default function RootLayout({

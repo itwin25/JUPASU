@@ -1,54 +1,142 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, Image as ImageIcon } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
-import LoadingSpinner from '@/components/common/loading-spinner/LoadingSpinner';
 import { useOCR } from '../hooks/useOCR';
 import { OCRResult } from '../types';
 
 export default function Scanner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [results, setResults] = useState<OCRResult[]>([]);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
 
-  const { isLoaded, isLoading: isModelLoading, error: modelError, initOCR, executeOCR } = useOCR();
-
+  // 🚀 이전 캡처 이미지 URL 해제 (메모리 관리)
   useEffect(() => {
-    initOCR();
-  }, [initOCR]);
-// 2. 카메라 권한 획득 및 스트림 가져오기
-const startCamera = useCallback(async () => {
-  try {
-    const constraints = {
-      video: { 
-        facingMode: 'environment',
-        // 특정 해상도를 강제하지 않고 기기가 제공하는 기본 원본 화질을 그대로 사용
-      },
+    return () => {
+      if (capturedImage && capturedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(capturedImage);
+      }
     };
-    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-    setStream(newStream);
-  } catch (err) {
-    console.error('Error accessing camera:', err);
-    alert('카메라 접근 권한이 필요합니다.');
-  }
-}, []);
+  }, [capturedImage]);
+
+  const { executeOCR, error: ocrError, isLoading: isOcrLoading } = useOCR();
+
+  // 🚀 OCR 처리 로직
+  const processOCR = useCallback(
+    async (imageSource: HTMLCanvasElement | HTMLImageElement) => {
+      // 카메라 스트림 즉시 종료
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+      }
+
+      setIsCapturing(true);
+      try {
+        let canvas: HTMLCanvasElement;
+        if (imageSource instanceof HTMLCanvasElement) {
+          canvas = imageSource;
+        } else {
+          canvas = document.createElement('canvas');
+          canvas.width = imageSource.naturalWidth;
+          canvas.height = imageSource.naturalHeight;
+          canvas.getContext('2d')?.drawImage(imageSource, 0, 0);
+        }
+
+        // 🚀 서버 사이드 분석 호출
+        const result = await executeOCR(canvas);
+        console.log('✅ [Main] 서버 OCR 응답:', result);
+
+        setResults(result.results || []);
+
+        // 캡처한 이미지를 프리뷰로 설정
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedImage(dataUrl);
+      } catch (err) {
+        console.error('OCR failed:', err);
+        alert('텍스트 분석 중 오류가 발생했습니다.');
+      } finally {
+        setIsCapturing(false);
+      }
+    },
+    [executeOCR, stream],
+  );
+
+  const captureAndScan = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      alert('카메라가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      try {
+        await processOCR(canvas);
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    }
+  }, [processOCR]);
+
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const objectUrl = URL.createObjectURL(file);
+      const img = new window.Image();
+      img.onload = () => {
+        processOCR(img);
+        URL.revokeObjectURL(objectUrl);
+        img.onload = null;
+        img.src = '';
+      };
+      img.src = objectUrl;
+    },
+    [processOCR],
+  );
+
+  const startCamera = useCallback(async () => {
+    try {
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(newStream);
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    if (isLoaded && !stream) {
+    if (!stream && !capturedImage) {
       startCamera();
     }
-  }, [isLoaded, stream, startCamera]);
+  }, [stream, capturedImage, startCamera]);
 
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-      videoRef.current.play().catch(e => console.error("Video play failed:", e));
+      videoRef.current.play().catch((e) => console.error('Video play failed:', e));
     }
-  }, [stream, isLoaded, capturedImage]);
+  }, [stream]);
 
   useEffect(() => {
     return () => {
@@ -58,154 +146,133 @@ const startCamera = useCallback(async () => {
     };
   }, [stream]);
 
-  const captureAndScan = useCallback(async () => {
-    if (!videoRef.current || !canvasRef.current || !isLoaded) return;
-
-    const video = videoRef.current;
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      alert('카메라가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      return;
-    }
-
-    setIsCapturing(true);
-    const canvas = canvasRef.current;
-    const context = canvas.getContext('2d');
-
-    if (context) {
-      // 1. 카메라 하드웨어가 제공하는 원본 해상도 그대로 캔버스 크기 설정
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      console.log(`📸 [RAW CAPTURE] 카메라 원본 해상도: ${video.videoWidth}x${video.videoHeight}`);
-      console.log(`🎨 [CANVAS] 전처리로 전달되는 캔버스 크기: ${canvas.width}x${canvas.height}`);
-      
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      try {
-        // 2. OCR 실행 (내부에서 전처리 수행)
-        const { results: ocrResults, debugImage } = await executeOCR(canvas);
-        
-        // 3. 전처리된 이미지를 캔버스에 다시 그리기 위해 Image 객체 생성
-        const img = new window.Image();
-        img.onload = () => {
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // 캔버스 크기를 전처리된 이미지 크기(1280px 등)에 맞춤
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-
-            // 4. 전처리된 이미지 위에 박스 그리기
-            ctx.strokeStyle = '#FF0000';
-            ctx.lineWidth = 3;
-            ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
-            ctx.font = 'bold 16px sans-serif';
-
-            ocrResults.forEach((res) => {
-              if (!res.box) return;
-              ctx.beginPath();
-              if (typeof res.box === 'object' && 'x' in res.box) {
-                const { x, y, width, height } = res.box as any;
-                ctx.rect(x, y, width, height);
-                ctx.stroke(); ctx.fill();
-                if (res.text) ctx.fillText(res.text, x, y - 5);
-              } else if (Array.isArray(res.box) && res.box.length >= 4) {
-                ctx.moveTo(res.box[0][0], res.box[0][1]);
-                for (let i = 1; i < res.box.length; i++) ctx.lineTo(res.box[i][0], res.box[i][1]);
-                ctx.closePath(); ctx.stroke(); ctx.fill();
-                if (res.text) ctx.fillText(res.text, res.box[0][0], res.box[0][1] - 5);
-              }
-            });
-
-            // 5. 최종 결과(전처리+박스)를 화면에 표시
-            setCapturedImage(canvas.toDataURL('image/jpeg'));
-          }
-        };
-        img.src = debugImage;
-        setResults(ocrResults);
-
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
-          setStream(null);
-        }
-      } catch (err) {
-        console.error('Scan failed:', err);
-        alert('텍스트 분석 중 오류가 발생했습니다.');
-      } finally {
-        setIsCapturing(false);
-      }
-    }
-  }, [isLoaded, executeOCR, stream]);
-
   const resetScanner = useCallback(() => {
     setResults([]);
     setCapturedImage(null);
     startCamera();
   }, [startCamera]);
 
-  if (modelError) {
-    return (
-      <div className="p-6 text-center space-y-4">
-        <p className="text-red-500 font-medium">{modelError}</p>
-        <Button onClick={initOCR}>다시 시도</Button>
-      </div>
-    );
-  }
-
-  if (isModelLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4">
-        <LoadingSpinner />
-        <p className="text-text-main/60">OCR 인공지능 모델을 불러오고 있습니다...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full flex flex-col space-y-6">
-      <div className="relative w-full aspect-[3/4] bg-black rounded-[2rem] overflow-hidden border-2 border-primary-100 shadow-inner">
+    <div className="flex w-full flex-col space-y-6">
+      <div className="border-primary-100 relative aspect-square w-full overflow-hidden rounded-[2rem] border-2 bg-black shadow-inner">
         {!capturedImage ? (
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full object-contain"
+          />
         ) : (
-          <img src={capturedImage} alt="Captured" className="w-full h-full object-cover" />
+          <div className="relative h-full w-full">
+            <img src={capturedImage} alt="Captured" className="h-full w-full object-contain" />
+
+            {/* 🚀 CSS 기반 OCR 결과 박스 Overlay */}
+            <div className="absolute inset-0">
+              <div className="relative h-full w-full">
+                {results.map((res, idx) => {
+                  if (!res.box) return null;
+
+                  // 박스 좌표 계산 (서버에서 받은 좌표 [[x,y], ...])
+                  let xMin = 10000,
+                    yMin = 10000,
+                    xMax = 0,
+                    yMax = 0;
+
+                  if (Array.isArray(res.box) && Array.isArray(res.box[0])) {
+                    (res.box as number[][]).forEach((pt) => {
+                      xMin = Math.min(xMin, pt[0]);
+                      yMin = Math.min(yMin, pt[1]);
+                      xMax = Math.max(xMax, pt[0]);
+                      yMax = Math.max(yMax, pt[1]);
+                    });
+                  }
+
+                  // ⚠️ 좌표를 %로 표시하기 위해서는 원본 이미지 사이즈 대비 비율이 필요함
+                  // 현재 서버 OCR에서 리사이징을 하므로 좌표 보정이 복잡할 수 있음.
+                  // 우선은 원본 이미지 비율대로 표시한다고 가정.
+
+                  // 임시: 박스 그리기를 비활성화하거나 정교화 작업 필요
+                  return null;
+                })}
+              </div>
+            </div>
+          </div>
         )}
-        {isCapturing && (
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white space-y-2">
+        {(isCapturing || isOcrLoading) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-2 bg-black/40 text-white">
             <RefreshCw className="animate-spin" size={40} />
             <p className="font-bold">분석 중...</p>
           </div>
         )}
       </div>
+
+      {/* 캔버스 및 파일 입력 (숨김) */}
       <canvas ref={canvasRef} className="hidden" />
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileUpload}
+      />
+
       <div className="flex flex-col space-y-4">
         {!capturedImage ? (
-          <Button variant="primary" size="full" className="shadow-lg h-16 text-lg" onClick={captureAndScan} disabled={!isLoaded || isCapturing}>
-            <Camera className="mr-2" />
-            촬영 및 분석하기
-          </Button>
+          <div className="grid grid-cols-4 gap-3">
+            <Button
+              variant="primary"
+              className="col-span-3 h-16 rounded-2xl text-lg shadow-lg"
+              onClick={captureAndScan}
+              disabled={isCapturing || isOcrLoading}
+            >
+              <Camera className="mr-2" />
+              촬영 및 분석
+            </Button>
+            <Button
+              variant="outline"
+              className="border-primary-200 text-primary-700 col-span-1 h-16 rounded-2xl bg-white shadow-md"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isCapturing || isOcrLoading}
+            >
+              <ImageIcon size={28} />
+            </Button>
+          </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-white p-6 rounded-2xl border border-primary-100 shadow-sm max-h-48 overflow-y-auto">
-              <div className="flex items-center mb-3 text-primary-700 font-bold">
+            <div className="border-primary-100 max-h-48 overflow-y-auto rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="text-primary-700 mb-3 flex items-center font-bold">
                 <CheckCircle2 size={20} className="mr-2" />
                 분석 결과
               </div>
               {results.length > 0 ? (
                 <div className="space-y-2">
                   {results.map((res, idx) => (
-                    <div key={idx} className="text-sm p-2 bg-primary-50 rounded-lg border border-primary-100/50">
-                      <span className="font-medium text-text-main">{res.text}</span>
-                      <span className="ml-2 text-[10px] text-text-main/40">{(res.score * 100).toFixed(1)}%</span>
+                    <div
+                      key={idx}
+                      className="bg-primary-50 border-primary-100/50 rounded-lg border p-2 text-sm"
+                    >
+                      <span className="text-text-main font-medium">{res.text}</span>
+                      <span className="text-text-main/40 ml-2 text-[10px]">
+                        {(res.score * 100).toFixed(1)}%
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-text-main/40 text-center py-4 italic">텍스트를 찾지 못했습니다.</p>
+                <p className="text-text-main/40 py-4 text-center italic">
+                  텍스트를 찾지 못했습니다.
+                </p>
               )}
             </div>
+            {ocrError && <p className="text-xs text-red-500">{ocrError}</p>}
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={resetScanner}>다시 촬영</Button>
-              <Button variant="primary">이 정보로 검색</Button>
+              <Button variant="outline" className="h-14 rounded-2xl" onClick={resetScanner}>
+                다시 시도
+              </Button>
+              <Button variant="primary" className="h-14 rounded-2xl shadow-md">
+                이 정보로 검색
+              </Button>
             </div>
           </div>
         )}
