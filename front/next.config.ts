@@ -6,8 +6,9 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
 });
 
+// NextConfig 타입을 명시하여 ESLint 에러 해결
 const nextConfig: NextConfig = {
-  /* config options here */
+  turbopack: {}, // Turbopack 빌드 충돌 방지용 빈 객체
 };
 
 export default withPWA(nextConfig);
