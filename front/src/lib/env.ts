@@ -1,10 +1,6 @@
 /**
  * 환경 변수 안전하게 읽기
- *
- * 우선순위:
- * 1. NEXT_PUBLIC_API_URL
- * 2. NEXT_PUBLIC_API_BASE_URL
- * 3. /api
+ * 모든 AI 요청은 Spring 백엔드를 통해 전달됩니다.
  */
 const rawApiBaseUrl =
   process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '/api';
@@ -12,8 +8,7 @@ const rawApiBaseUrl =
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '');
 
 export const env = {
-  API_BASE_URL: normalizeBaseUrl(rawApiBaseUrl),
-  LLM_ENDPOINT: process.env.LLM_ENDPOINT || 'http://70.12.130.111:8000/v1/chat/completions',
-  LLM_MODEL: process.env.LLM_MODEL || './qwen3.5-35b-fp8',
+  // Spring 백엔드 API 기본 주소 (Nginx를 거치거나 직접 접속)
+  NEXT_PUBLIC_API_BASE_URL: normalizeBaseUrl(rawApiBaseUrl),
   IS_DEV: process.env.NODE_ENV === 'development',
 } as const;

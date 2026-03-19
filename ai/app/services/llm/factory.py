@@ -12,7 +12,7 @@ def get_llm() -> BaseChatModel:
     
     if settings.LLM_PROVIDER == "local":
         return ChatOpenAI(
-            model=settings.VLLM_MODEL_NAME,
+            model=settings.LLM_MODEL_NAME,
             openai_api_base=settings.LLM_API_BASE_URL,
             openai_api_key="EMPTY",
             temperature=0

@@ -32,20 +32,6 @@ services:
       - backend-network-dev
       - monitoring
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
-  ai:
-    image: ${DOCKER_USER}/jupasu:ai-dev
-    container_name: ai-fastapi-dev
-    restart: always
-    networks:
-      - backend-network-dev
-      - monitoring
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - 8001:18000
-
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
     image: ${DOCKER_USER}/jupasu:back-dev
@@ -58,13 +44,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      AI_SERVICE_URL: http://ai:18000
+      # 개발 서버에서도 외부 AI 서버(터널 등)를 바라보도록 설정
+      AI_SERVICE_URL: ${AI_SERVER_URL:-http://host.docker.internal:18000}
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       ALLOWED_ORIGINS: "http://localhost,https://j14a505.p.ssafy.io:8443"
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8081:8080"
     volumes:
@@ -74,8 +63,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
-      ai:
         condition: service_started
     networks:
       - backend-network-dev

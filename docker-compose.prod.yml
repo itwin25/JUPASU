@@ -32,19 +32,6 @@ services:
       - backend-network
       - monitoring
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
-  ai:
-    image: ${DOCKER_USER}/jupasu:ai-latest
-    container_name: ai-fastapi
-    restart: always
-    networks:
-      - backend-network
-      - monitoring
-    depends_on:
-      - db
-    ports:
-      - 18000:18000
-
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
     image: ${DOCKER_USER}/jupasu:back-latest
@@ -57,13 +44,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      AI_SERVICE_URL: http://ai:18000
+      # [변경] 컨테이너 내부 'ai'가 아닌, 리버스 터널이 열려있는 EC2 호스트를 바라봅니다.
+      AI_SERVICE_URL: http://host.docker.internal:18000
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       ALLOWED_ORIGINS: "http://localhost,https://j14a505.p.ssafy.io"
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8080"
     volumes:
@@ -73,8 +63,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
-      ai:
         condition: service_started
     networks:
       - backend-network

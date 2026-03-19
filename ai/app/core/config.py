@@ -14,18 +14,15 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     INTERNAL_API_KEY: str = "dev-secret-key"
     
-    # LLM Provider: 'local' (vLLM/Ollama OpenAI API) 또는 'gemini' (Google 상용 모델)
+    # LLM Provider: 'local' (sglang/vLLM/Ollama OpenAI API) 또는 'gemini' (Google 상용 모델)
     LLM_PROVIDER: Literal["local", "gemini"] = "local"
     
-    # Remote GPU Server (vLLM) Config
-    # 대여받은 H200 GPU 서버의 IP와 포트(기본 8000)를 설정합니다.
-    VLLM_API_URL: str = "http://your-gpu-server-ip:8000/v1"
-
-    # LLM API Base URL (OpenAI API Compatible)
-    LLM_API_BASE_URL: str = "http://70.12.130.111:8000/v1"
+    # Remote GPU Server (sglang/vLLM) Config
+    # sglang 서버가 동작하는 로컬 또는 원격 주소를 설정합니다. (기본 localhost:8000)
+    LLM_API_BASE_URL: str = "http://localhost:8000/v1"
     
-    # 사용할 모델명 (vLLM 서버 기동 시 설정한 --served-model-name과 일치해야 함)
-    VLLM_MODEL_NAME: str = "selected-model-name-later"
+    # 사용할 모델명 (sglang 서버 기동 시 설정한 --model-path 또는 --served-model-name과 일치해야 함)
+    LLM_MODEL_NAME: str = "selected-model-name-later"
     
     # Gemini Config (Google Cloud용)
     GOOGLE_API_KEY: str | None = None

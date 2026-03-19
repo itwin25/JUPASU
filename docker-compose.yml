@@ -26,18 +26,6 @@ services:
     ports:
       - "6379:6379"
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
-  ai:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    container_name: ai-fastapi
-    restart: always
-    depends_on:
-      - db
-    ports:
-      - 18000:18000
-
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
     build:
@@ -51,13 +39,16 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      AI_SERVICE_URL: http://ai:18000
+      # 로컬 개발 시에도 외부 AI 서버(터널 등)를 바라보도록 설정
+      AI_SERVICE_URL: ${AI_SERVER_URL:-http://host.docker.internal:18000}
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       SOURCE_IMAGE_DIR: /app/source_images
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /home/ubuntu/data/image:/app/source_images:ro
       - /home/ubuntu/data:/app/data:ro
@@ -68,8 +59,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
-      ai:
         condition: service_started
 
   # Frontend: Next.js (React 19)

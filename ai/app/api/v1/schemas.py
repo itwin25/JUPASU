@@ -1,42 +1,30 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
+from enum import Enum
 
-# --- OpenAI Compatible Request/Response Schemas ---
-
+# --- OpenAI Compatible Schemas ---
 class ChatMessage(BaseModel):
-    """OpenAI API 호환 메시지 구조"""
-    role: str = Field(..., description="메시지 작성자의 역할 (system, user, assistant)")
-    content: str = Field(..., description="메시지 내용")
+    role: str
+    content: str
 
 class ChatCompletionRequest(BaseModel):
-    """OpenAI API 호환 채팅 완료 요청 구조"""
-    model: str = Field(..., description="사용할 모델 ID")
-    messages: List[ChatMessage] = Field(..., description="대화를 구성하는 메시지 목록")
-    temperature: Optional[float] = Field(default=1.0, description="샘플링 온도")
-    top_p: Optional[float] = Field(default=1.0, description="Top-p 샘플링")
-    n: Optional[int] = Field(default=1, description="생성할 답변의 수")
-    stream: Optional[bool] = Field(default=False, description="스트리밍 여부")
-    stop: Optional[Any] = Field(default=None, description="생성 중단 시퀀스")
-    max_tokens: Optional[int] = Field(default=None, description="최대 생성 토큰 수")
-    presence_penalty: Optional[float] = Field(default=0.0, description="존재 패널티")
-    frequency_penalty: Optional[float] = Field(default=0.0, description="빈도 패널티")
-    user: Optional[str] = Field(default=None, description="사용자 식별자")
-    response_format: Optional[dict] = Field(default=None, description="응답 형식 (json_schema 등)")
+    model: str
+    messages: List[ChatMessage]
+    stream: Optional[bool] = False
+    response_format: Optional[dict] = None
+    user: Optional[str] = None
 
 class ChatCompletionChoice(BaseModel):
-    """채팅 완료 응답의 선택지 구조"""
     index: int
     message: ChatMessage
     finish_reason: Optional[str] = None
 
 class Usage(BaseModel):
-    """토큰 사용량 정보"""
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
 
 class ChatCompletionResponse(BaseModel):
-    """OpenAI API 호환 채팅 완료 응답 구조"""
     id: str
     object: str = "chat.completion"
     created: int
@@ -44,14 +32,37 @@ class ChatCompletionResponse(BaseModel):
     choices: List[ChatCompletionChoice]
     usage: Usage
 
-# --- Wine Information Structured Schemas ---
+# --- Sommelier Custom Schemas ---
 
-class WineInfo(BaseModel):
-    """와인 정보 구조화 스키마"""
-    winery: str = Field(..., alias="Winery", description="와이너리 명칭")
-    wine_name: str = Field(..., alias="WineName", description="와인 이름")
-    vintage: str = Field(..., alias="Vintage", description="생산 연도 (빈티지)")
+class SommelierTask(str, Enum):
+    LABEL_SCAN = "LABEL_SCAN"
+    MENU_SCAN = "MENU_SCAN"
+    CHAT = "CHAT"
 
-class WineStructuredResponse(BaseModel):
-    """구조화된 와인 정보 응답 스키마"""
-    wines: List[WineInfo] = Field(..., description="추출된 와인 정보 목록")
+class SommelierRequest(BaseModel):
+    task: SommelierTask
+    text_content: Optional[str] = None
+    user_id: str
+    session_id: str = "session-123"
+    mentioned_friends: List[dict] = Field(default=[])
+    stream: bool = False
+
+class CustomChatRequest(BaseModel):
+    """
+    고도화된 채팅 요청 스키마
+    - message: 사용자의 질문
+    - selected_wine: 사용자가 DB에서 선택한 확정 와인 정보
+    - selected_menu: 사용자가 확정한 메뉴판 와인/음식 목록
+    """
+    message: str
+    selected_wine: Optional[dict] = None 
+    selected_menu: Optional[dict] = None
+    user_id: str
+    session_id: str = "session-123"
+    stream: bool = False
+    mentioned_friends: List[dict] = Field(default=[])
+
+class CustomChatResponse(BaseModel):
+    answer: str
+    status: str = "success"
+    raw_ocr: Optional[str] = None

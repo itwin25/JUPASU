@@ -46,95 +46,104 @@ public class AiService {
     private static final int MAX_CHAT_CACHE_SIZE = 10;
 
     /**
-     * OpenAI 표준 규격 스트리밍 처리
+     * [고도화] 통합 소믈리에 프로세스 (OCR + LLM)
+     * stream 여부에 따라 Flux(스트림) 또는 Mono(단일응답)를 반환할 수 있도록 유연하게 구성합니다.
      */
-    public Flux<String> streamChat(ChatRequest request, String email) {
+    private MultipartBodyBuilder createMultipartBuilder(String taskType, String textContent, MultipartFile file, String email, boolean stream) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("task", taskType);
+        builder.part("user_id", email);
+        builder.part("stream", String.valueOf(stream));
+        if (textContent != null) builder.part("text_content", textContent);
+        if (file != null && !file.isEmpty()) builder.part("file", file.getResource());
+        return builder;
+    }
+
+    /**
+     * 스트리밍 방식 호출 (CHAT용)
+     */
+    public Flux<String> processSommelierStream(String taskType, String textContent, MultipartFile file, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        MultipartBodyBuilder builder = createMultipartBuilder(taskType, textContent, file, email, true);
+        StringBuilder fullTextForStorage = new StringBuilder();
         String redisKey = CHAT_CACHE_PREFIX + email;
 
-        // [사용자 질문 저장]
-        chatMessageRepository.save(ChatMessage.builder().user(user).role("user").content(request.getMessage()).build());
-        redisService.pushToList(redisKey, "User: " + request.getMessage());
-        redisService.trimList(redisKey, MAX_CHAT_CACHE_SIZE);
-
-        Map<String, Object> body = Map.of(
-                "messages", new Object[]{Map.of("role", "user", "content", request.getMessage())},
-                "stream", true
-        );
-
-        StringBuilder fullTextForStorage = new StringBuilder();
-
         return webClient.post()
-                .uri("/v1/chat/completions")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
+                .uri("/v1/sommelier/process")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                        clientResponse -> clientResponse.bodyToMono(String.class)
-                                .flatMap(errorBody -> {
-                                    log.error("AI 서버 에러: {}", errorBody);
-                                    return Mono.error(new CustomException(ErrorCode.AI_SERVER_ERROR));
-                                }))
                 .bodyToFlux(String.class)
                 .doOnNext(chunk -> {
-                    // [핵심: 데이터 가공 로직]
-                    // OpenAI 규격(data: { ... })에서 실제 텍스트만 뽑아내어 저장용으로 합칩니다.
                     try {
                         if (chunk.startsWith("data: ")) {
                             String jsonData = chunk.substring(6).trim();
                             if (!jsonData.equals("[DONE]")) {
                                 JsonNode root = objectMapper.readTree(jsonData);
-                                String content = root.path("choices").get(0).path("delta").path("content").asText("");
-                                fullTextForStorage.append(content);
+                                fullTextForStorage.append(root.path("content").asText(""));
                             }
                         }
                     } catch (Exception e) {
-                        log.warn("데이터 조각 파싱 중 오류 발생 (무시하고 계속 진행): {}", e.getMessage());
+                        log.warn("파싱 오류: {}", e.getMessage());
                     }
                 })
                 .doOnComplete(() -> {
-                    // [스트림 완료 시 DB/Redis 최종 저장]
                     if (!fullTextForStorage.isEmpty()) {
                         String finalAiContent = fullTextForStorage.toString();
                         chatMessageRepository.save(ChatMessage.builder().user(user).role("assistant").content(finalAiContent).build());
                         redisService.pushToList(redisKey, "AI: " + finalAiContent);
-                        redisService.trimList(redisKey, MAX_CHAT_CACHE_SIZE);
-                        redisService.expire(redisKey, 86400);
-                        log.info("AI 표준 답변 저장 완료");
                     }
-                })
-                .onErrorMap(e -> {
-                    if (e instanceof WebClientRequestException) return new CustomException(ErrorCode.AI_SERVER_UNAVAILABLE);
-                    if (e instanceof java.util.concurrent.TimeoutException || e.getCause() instanceof io.netty.handler.timeout.ReadTimeoutException) return new CustomException(ErrorCode.AI_PROCESSING_TIMEOUT);
-                    return e instanceof CustomException ? e : new CustomException(ErrorCode.AI_SERVER_ERROR);
                 });
     }
 
     /**
-     * OCR 분석 결과를 가져옵니다.
+     * 단일 응답 방식 호출 (SCAN용)
      */
-    public OcrResponse ocr(MultipartFile file) {
-        if (file == null || file.isEmpty()) throw new CustomException(ErrorCode.INVALID_REQUEST, "파일이 존재하지 않습니다.");
-
-        MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        builder.part("file", file.getResource());
+    public Map<String, Object> processSommelierSync(String taskType, String textContent, MultipartFile file, String email) {
+        MultipartBodyBuilder builder = createMultipartBuilder(taskType, textContent, file, email, false);
 
         return webClient.post()
-                .uri("/v1/vision/ocr")
+                .uri("/v1/sommelier/process")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
-                .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(),
-                        clientResponse -> clientResponse.bodyToMono(String.class)
-                                .flatMap(errorBody -> Mono.error(new CustomException(ErrorCode.AI_SERVER_ERROR))))
-                .bodyToMono(OcrResponse.class)
-                .onErrorMap(e -> {
-                    if (e instanceof WebClientRequestException) return new CustomException(ErrorCode.AI_SERVER_UNAVAILABLE);
-                    if (e instanceof java.util.concurrent.TimeoutException || e.getCause() instanceof io.netty.handler.timeout.ReadTimeoutException) return new CustomException(ErrorCode.AI_PROCESSING_TIMEOUT);
-                    return e instanceof CustomException ? e : new CustomException(ErrorCode.AI_SERVER_ERROR);
-                })
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(); // 분석 결과는 동기적으로 기다려서 받음
+    }
+
+    /**
+     * 와인 라벨 분석 (독립 실행 - 이미지 또는 텍스트 지원)
+     */
+    public Map<String, Object> scanLabel(String textContent, MultipartFile file) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        if (textContent != null) builder.part("text_content", textContent);
+        if (file != null && !file.isEmpty()) builder.part("file", file.getResource());
+
+        return webClient.post()
+                .uri("/v1/vision/ocr/label")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block();
+    }
+
+    /**
+     * 메뉴판 분석 (독립 실행 - 이미지 또는 텍스트 지원)
+     */
+    public Map<String, Object> scanMenu(String textContent, MultipartFile file) {
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        if (textContent != null) builder.part("text_content", textContent);
+        if (file != null && !file.isEmpty()) builder.part("file", file.getResource());
+
+        return webClient.post()
+                .uri("/v1/vision/ocr/menu")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
                 .block();
     }
 }

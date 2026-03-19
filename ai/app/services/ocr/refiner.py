@@ -29,26 +29,26 @@ class OCRRefiner:
                 "type": "object",
                 "properties": {
                     "winery": {"type": "string", "description": "와이너리 또는 제조사 이름"},
-                    "wineName": {"type": "string", "description": "와인의 정식 이름"},
+                    "wine_name": {"type": "string", "description": "와인의 정식 이름"},
                     "vintage": {"type": "string", "description": "생산 연도 (숫자 4자리)"}
                 },
-                "required": ["winery", "wineName", "vintage"]
+                "required": ["winery", "wine_name", "vintage"]
             }
         else:
             json_schema = {
                 "type": "object",
                 "properties": {
-                    "wines": {"type": "array", "items": {"type": "string"}},
-                    "foods": {"type": "array", "items": {"type": "string"}}
+                    "wine_names": {"type": "array", "items": {"type": "string"}},
+                    "food_names": {"type": "array", "items": {"type": "string"}}
                 },
-                "required": ["wines", "foods"]
+                "required": ["wine_names", "food_names"]
             }
 
         async with httpx.AsyncClient() as client:
             try:
                 # sglang의 guided_json 기능을 활용하여 구조화된 응답 강제
                 payload = {
-                    "model": self.settings.VLLM_MODEL_NAME,
+                    "model": self.settings.LLM_MODEL_NAME,
                     "messages": [
                         {"role": "system", "content": system_content},
                         {"role": "user", "content": user_content}
