@@ -483,7 +483,7 @@ export default function MyPage() {
                 className="hover:bg-primary-100/30 flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className="text-text-main text-[13px] font-bold">취향 분석 보기</span>
+                <span className="text-text-main text-[13px] font-bold">와인 취향 설정</span>
               </Link>
 
               <div className="bg-primary-100 mx-3 my-1 h-px" />
