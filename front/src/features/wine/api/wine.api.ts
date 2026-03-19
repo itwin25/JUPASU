@@ -4,11 +4,13 @@ import { ScrapWine, Wine, WineListParams } from '../types/wine.types';
 import { ApiResponse, PaginatedResponse } from '@/types/api.types';
 
 export const wineApi = {
-  getList: (params?: WineListParams) =>
-    api.get<PaginatedResponse<Wine>>(API_PATH.WINE.LIST, { params }).then((res) => res.data),
+  searchWines: (params?: WineListParams) =>
+    api
+      .get<ApiResponse<PaginatedResponse<Wine>>>(API_PATH.WINE.LIST, { params })
+      .then((res) => res.data.data),
 
   getDetail: (id: string | number) =>
-    api.get<Wine>(API_PATH.WINE.DETAIL(id)).then((res) => res.data),
+    api.get<ApiResponse<Wine>>(API_PATH.WINE.DETAIL(id)).then((res) => res.data.data),
 
   getQuickRecommendation: () => api.get<Wine[]>(API_PATH.WINE.RECOMMEND).then((res) => res.data),
 

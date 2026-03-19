@@ -6,7 +6,7 @@ import { WineListParams } from '../types/wine.types';
 export function useWineListQuery(params?: WineListParams) {
   return useQuery({
     queryKey: QUERY_KEY.WINE.LIST(params),
-    queryFn: () => wineApi.getList(params),
+    queryFn: () => wineApi.searchWines(params),
   });
 }
 

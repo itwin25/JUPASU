@@ -32,3 +32,6 @@ docker-compose.local.yml
 nginx/nginx.local.conf
 
 uploads/
+
+front/public/sw.js
+front/public/workbox-*.js
