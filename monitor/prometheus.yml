@@ -25,10 +25,10 @@ scrape_configs:
   - job_name: 'ai'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['ai-fastapi:8000']
+      - targets: ['ai-fastapi:18000']
         labels:
           env: 'prod'
-      - targets: ['ai-fastapi-dev:8000']
+      - targets: ['ai-fastapi-dev:18000']
         labels:
           env: 'dev'
 

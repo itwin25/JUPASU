@@ -41,10 +41,9 @@ services:
       - backend-network
       - monitoring
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     ports:
-      - 8000:8000
+      - 18000:18000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
@@ -58,7 +57,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      AI_SERVICE_URL: http://ai:8000
+      AI_SERVICE_URL: http://ai:18000
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}

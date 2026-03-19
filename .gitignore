@@ -15,6 +15,12 @@ node_modules/
 .next/
 build/
 dist/
+ocr/
+docs/
+
+# AI Exclusions
+ai/app/models/
+ai/crawled-results/*.zip
 
 docker-compose.local.yml
 nginx/nginx.local.conf
