@@ -22,6 +22,12 @@ WORKDIR /app
 
 # 보안을 위한 비루트 사용자 생성 (권장)
 RUN addgroup -S spring && adduser -S spring -G spring
+
+# ⭐️ 이미지 업로드 및 데이터 디렉토리 생성 및 권한 설정
+RUN mkdir -p /app/uploads/images/wines /app/data && \
+    chown -R spring:spring /app/uploads /app/data
+
+# 사용자 전환
 USER spring
 
 # 빌드 스테이지에서 생성된 '실행 가능한 JAR'만 복사
