@@ -69,7 +69,7 @@ services:
       - "8080"
     volumes:
       - ./back/uploads:/app/uploads
-      - ./back/data:/app/data
+      - ../data:/app/data
     depends_on:
       db:
         condition: service_healthy
