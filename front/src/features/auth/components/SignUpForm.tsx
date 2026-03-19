@@ -39,7 +39,7 @@ interface SignUpFormProps {
   nicknameMessage?: string;
   isValidatingNickname: boolean;
   isNicknameAvailable: boolean;
-  onSuccess: () => void;
+  onSuccess: (data: SignupSchema) => void;
   authCodeTimeLeft: string;
   isAuthCodeExpired: boolean;
   resendSeconds: number;
@@ -131,7 +131,7 @@ export default function SignUpForm({
 
   const onFinalSubmit = (data: SignupSchema) => {
     signUp.mutate(data, {
-      onSuccess: () => onSuccess(),
+      onSuccess: () => onSuccess(data),
       onError: (error: AxiosError<AuthErrorResponse>) =>
         alert(error.response?.data?.message || '가입 실패'),
     });

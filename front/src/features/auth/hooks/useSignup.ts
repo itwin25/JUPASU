@@ -3,7 +3,9 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { authApi } from '@/features/auth/api/auth.api';
+import { onboardingApi } from '@/features/onboarding/api/onboarding.api';
 import { SignupRequest, AuthResponse, AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { TasteData } from '@/features/wine/components/TasteProfileForm';
 import { useTimer } from '@/hooks';
 
 export const useSignup = () => {
@@ -37,7 +39,7 @@ export const useSignup = () => {
   });
 
   const [onboardingData, setOnboardingData] = useState({
-    tastes: { sweet: 5, acid: 5, body: 5, tannin: 5, aroma: 5 },
+    tastes: { sweet: 3, acid: 3, body: 3, tannin: 3, abv: 3 },
     selectedWineTypes: [] as string[],
     selectedFlavorTags: [] as string[],
     selectedSituations: [] as string[],
@@ -75,10 +77,39 @@ export const useSignup = () => {
     signUp: useMutation<AuthResponse<null>, AxiosError<AuthErrorResponse>, SignupRequest>({
       mutationFn: (request) => authApi.signUp(request),
     }),
+    updatePreference: useMutation<void, AxiosError<AuthErrorResponse>, TasteData>({
+      mutationFn: (data) => onboardingApi.submitOnboarding(data),
+      onSuccess: () => {
+        setStep(3);
+      },
+    }),
   };
 
-  const handleStep1Success = () => setStep(2);
-  const handleNext = () => (step === 2 ? setStep(3) : router.push('/signup/complete'));
+  const handleStep1Success = async (data: SignupRequest) => {
+    try {
+      // 1. 자동 로그인 실행 (토큰 획득)
+      await authApi.signIn({
+        email: data.email,
+        password: data.password,
+      });
+
+      // 2. Step 2로 이동
+      setStep(2);
+    } catch (error) {
+      console.error('Login after signup failed:', error);
+    }
+  };
+
+  const handleNext = async () => {
+    if (step === 2) {
+      // Step 2에서 '다음' 클릭 시 취향 정보 제출
+      mutations.updatePreference.mutate(onboardingData);
+    } else if (step === 3) {
+      router.push('/signup/complete');
+    } else {
+      setStep((prev) => prev + 1);
+    }
+  };
   const handleBack = () => (step === 1 ? router.push('/login') : setStep((prev) => prev - 1));
 
   // 닉네임 에러 메시지 추출

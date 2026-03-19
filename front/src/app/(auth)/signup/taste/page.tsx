@@ -11,11 +11,11 @@ import Button from '@/components/ui/button/Button';
 
 export default function TasteOnboardingPage() {
   const [tastes, setTastes] = useState<Record<string, number>>({
-    sweet: 5,
-    acid: 5,
-    body: 5,
-    tannin: 5,
-    aroma: 5,
+    sweet: 3,
+    acid: 3,
+    body: 3,
+    tannin: 3,
+    abv: 3,
   });
 
   const handleTasteChange = (key: string, value: number) => {
@@ -23,14 +23,14 @@ export default function TasteOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="bg-background min-h-screen pb-24">
       <Header title="취향 분석" />
-      <main className="px-6 py-8 space-y-10">
-        <PageTitle 
-          title="취향 분석" 
-          description="선호하시는 맛과 상황을 알려주시면 최적의 와인을 추천해드릴게요." 
+      <main className="space-y-10 px-6 py-8">
+        <PageTitle
+          title="취향 분석"
+          description="선호하시는 맛과 상황을 알려주시면 최적의 와인을 추천해드릴게요."
         />
-        
+
         <section>
           <SectionTitle title="선호하는 맛" />
           <TasteSliderGroup tastes={tastes} onChange={handleTasteChange} />
@@ -46,7 +46,7 @@ export default function TasteOnboardingPage() {
           <SituationSelector />
         </section>
 
-        <div className="fixed bottom-0 left-0 w-full p-6 bg-background/80 backdrop-blur-md">
+        <div className="bg-background/80 fixed bottom-0 left-0 w-full p-6 backdrop-blur-md">
           <Button size="full">분석 결과 확인하기</Button>
         </div>
       </main>
