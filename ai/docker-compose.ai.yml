@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  ai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jupasu-ai-server
+    ports:
+      - "18000:18000"
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['1'] # 1번 GPU만 사용 (H200)
+              capabilities: [gpu]
+    environment:
+      - CUDA_VISIBLE_DEVICES=1 # 애플리케이션 레벨에서도 1번만 보이도록 설정
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+networks:
+  default:
+    name: jupasu-network
