@@ -1,29 +1,31 @@
 package com.a505.jupasu.domain.wine.service;
 
 import com.a505.jupasu.domain.wine.dto.parsing.VivinoRawData;
+import com.a505.jupasu.domain.wine.entity.Food;
 import com.a505.jupasu.domain.wine.entity.Wine;
+import com.a505.jupasu.domain.wine.entity.WineFoodPairing;
 import com.a505.jupasu.domain.wine.entity.vo.Origin;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.entity.vo.WinePriceAndRating;
+import com.a505.jupasu.domain.wine.repository.FoodRepository;
+import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
 import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.domain.wine.util.WineDataParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.io.InputStream;
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -31,122 +33,162 @@ import java.util.UUID;
 public class WineDataInitService {
 
     private final WineRepository wineRepository;
+    private final FoodRepository foodRepository;
+    private final WineFoodPairingRepository wineFoodPairingRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    // ⭐️ 로컬 PC에서 원본 이미지를 가져올 폴더
-    private final String SOURCE_IMAGE_DIR = "C:/image";
-    // 프로젝트 내에 복사될 폴더
-    private final String TARGET_IMAGE_DIR = "uploads/images/wines";
+    @Value("${SOURCE_IMAGE_DIR:C:/image}")
+    private String sourceImageDir;
+
+    @Value("${TARGET_IMAGE_DIR:uploads/images/wines}")
+    private String targetImageDir;
+
+    // ⭐️ 파일명 변경: vivino_ultra_results_kr_food.json
+    @Value("${DATA_FILE_PATH:C:/ssafy/jupasu/data/vivino_ultra_results_kr_food.json}")
+    private String dataFilePath;
 
     @Transactional
     public void importWineDataFromJson() {
+        log.info("🍷 [1/4] 데이터 초기화 시작 및 폴더 점검...");
         try {
-            Path uploadPath = Paths.get(TARGET_IMAGE_DIR);
+            Path uploadPath = Paths.get(targetImageDir);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
 
-            InputStream inputStream = getClass().getResourceAsStream("/vivino_ultra_results_with_kr.json");
-            if (inputStream == null) {
-                log.error("JSON 파일을 찾을 수 없습니다.");
+            File jsonFile = new File(dataFilePath);
+            if (!jsonFile.exists()) {
+                log.error("❌ JSON 파일을 찾을 수 없습니다: {}", dataFilePath);
                 return;
             }
 
-            List<VivinoRawData> rawDataList = objectMapper.readValue(inputStream, new TypeReference<>() {});
-            List<Wine> wineList = new ArrayList<>();
+            List<VivinoRawData> rawDataList = objectMapper.readValue(jsonFile, new TypeReference<>() {});
+            log.info("🍷 [2/4] 외부 JSON 파일에서 {} 건의 데이터를 읽었습니다.", rawDataList.size());
 
-            for (VivinoRawData raw : rawDataList) {
-                Object[] priceInfo = WineDataParser.parsePrice(raw.price());
-                Object[] alcInfo = WineDataParser.parseAlcohol(raw.alcohol());
-                Double averageRating = (raw.ratings() != null && raw.ratings().get("average") != null)
-                        ? raw.ratings().get("average") : 0.0;
+            Map<String, Food> foodCache = new HashMap<>();
+            int batchSize = 1000;
+            List<Wine> wineBatch = new ArrayList<>();
+            List<VivinoRawData> rawBatch = new ArrayList<>();
 
+            log.info("🍷 [3/4] 와인 엔티티 변환 및 연관관계 저장 진행 중...");
+            for (int i = 0; i < rawDataList.size(); i++) {
+                VivinoRawData raw = rawDataList.get(i);
+
+                Map<String, String> allFacts = raw.allFacts() != null ? raw.allFacts() : Map.of();
                 Map<String, String> taste = raw.tasteProfile() != null ? raw.tasteProfile() : Map.of();
+
+                Object[] priceInfo = WineDataParser.parsePrice(raw.price());
+                Object[] alcInfo = WineDataParser.parseAlcohol(allFacts.get("Alcohol content"));
+                Double avgRating = (raw.ratings() != null && raw.ratings().get("average") != null)
+                        ? Double.valueOf(raw.ratings().get("average").toString()) : 0.0;
+
                 Object[] sweetnessInfo = WineDataParser.parseTaste(taste.get("sweetness"));
                 Object[] acidityInfo = WineDataParser.parseTaste(taste.get("acidity"));
                 Object[] bodyInfo = WineDataParser.parseTaste(taste.get("boldness"));
-                Object[] tanninInfo = WineDataParser.parseTaste(taste.get("tannin"));
+                Object[] tanninInfo = WineDataParser.parseTaste(taste.get("tannic"));
 
-                // 이미지 복사 로직 실행!
-                String finalImageUrl = processImageFile(raw.localImagePath());
+                String grapes = allFacts.getOrDefault("Grapes", "");
+                String winery = StringUtils.hasText(raw.winery()) ? raw.winery() : allFacts.getOrDefault("Winery", "");
+                String region = StringUtils.hasText(raw.region()) ? raw.region() : allFacts.getOrDefault("Region", "");
+                String style = allFacts.getOrDefault("Wine style", "");
+
+                String finalImageUrl = processImageFile(raw.localImagePaths());
 
                 Wine wine = Wine.builder()
                         .nameKr(raw.nameKr())
                         .isRealNameKr(StringUtils.hasText(raw.nameKr()))
                         .nameEn(raw.wineName())
                         .isRealNameEn(StringUtils.hasText(raw.wineName()))
-                        .type(WineDataParser.parseType(raw.type()))
-                        .grapeVariety(raw.grapes())
+                        .type(WineDataParser.parseType(raw.wineType()))
+                        .grapeVariety(grapes)
+                        .style(style)
                         .description(raw.description())
-                        .imageUrl(finalImageUrl) // ⭐️ UUID로 변환된 최종 URL 저장
+                        .imageUrl(finalImageUrl)
                         .alcoholDegree((Float) alcInfo[0])
                         .isRealAlcoholDegree((Boolean) alcInfo[1])
-                        .origin(Origin.builder().country(raw.country()).isRealCountry(StringUtils.hasText(raw.country())).region(raw.region()).isRealRegion(StringUtils.hasText(raw.region())).winery(raw.winery()).isRealWinery(StringUtils.hasText(raw.winery())).build())
-                        .priceAndRating(WinePriceAndRating.builder().price((Integer) priceInfo[0]).isRealPrice((Boolean) priceInfo[1]).averageRating(averageRating).isRealRating(averageRating > 0.0).build())
+                        .origin(Origin.builder().country(raw.country()).isRealCountry(StringUtils.hasText(raw.country())).region(region).isRealRegion(StringUtils.hasText(region)).winery(winery).isRealWinery(StringUtils.hasText(winery)).build())
+                        .priceAndRating(WinePriceAndRating.builder().price((Integer) priceInfo[0]).isRealPrice((Boolean) priceInfo[1]).averageRating(avgRating).isRealRating(avgRating > 0.0).build())
                         .tasteProfile(TasteProfile.builder().sweetness((Float) sweetnessInfo[0]).isRealSweetness((Boolean) sweetnessInfo[1]).acidity((Float) acidityInfo[0]).isRealAcidity((Boolean) acidityInfo[1]).body((Float) bodyInfo[0]).isRealBody((Boolean) bodyInfo[1]).tannin((Float) tanninInfo[0]).isRealTannin((Boolean) tanninInfo[1]).build())
                         .build();
 
-                wineList.add(wine);
+                wineBatch.add(wine);
+                rawBatch.add(raw);
+
+                // 1000건 단위 Batch Insert
+                if (wineBatch.size() == batchSize || i == rawDataList.size() - 1) {
+
+                    // ⭐️ [핵심 1] saveAll의 리턴값을 다시 받아와서 확실하게 ID가 생성된 와인 리스트를 사용합니다!
+                    List<Wine> savedWines = wineRepository.saveAll(wineBatch);
+
+                    List<WineFoodPairing> pairingBatch = new ArrayList<>();
+
+                    // ⭐️ [핵심 2] 연관관계 매핑 (ID가 있는 savedWines 사용)
+                    for (int j = 0; j < savedWines.size(); j++) {
+                        Wine savedWine = savedWines.get(j);
+                        VivinoRawData correspondingRaw = rawBatch.get(j);
+
+                        // JSON에 food_pairings 데이터가 존재한다면
+                        if (correspondingRaw.foodPairings() != null && !correspondingRaw.foodPairings().isEmpty()) {
+                            for (String foodName : correspondingRaw.foodPairings()) {
+                                if (!StringUtils.hasText(foodName)) continue;
+
+                                // 음식 찾기 or 새로 만들기
+                                Food food = foodCache.computeIfAbsent(foodName, key ->
+                                        foodRepository.findByName(key).orElseGet(() -> foodRepository.save(Food.builder().name(key).build()))
+                                );
+
+                                // 페어링 엔티티 조립
+                                pairingBatch.add(WineFoodPairing.builder()
+                                        .wine(savedWine)
+                                        .food(food)
+                                        .build());
+                            }
+                        }
+                    }
+
+                    // ⭐️ [핵심 3] 조립된 페어링 정보들을 최종적으로 DB에 저장합니다.
+                    wineFoodPairingRepository.saveAll(pairingBatch);
+
+                    log.info("👉 {}/{} 건 와인 및 음식 페어링 저장 완료...", i + 1, rawDataList.size());
+                    wineBatch.clear();
+                    rawBatch.clear();
+                }
             }
 
-            wineRepository.saveAll(wineList);
-            log.info("🍷 총 {}개의 와인 데이터 및 이미지 세팅 완료!", wineList.size());
+            log.info("🎉 [4/4] 와인, 음식, 연관관계 데이터 및 이미지 세팅이 성공적으로 끝났습니다!");
 
         } catch (Exception e) {
-            log.error("와인 데이터 초기화 중 에러 발생: {}", e.getMessage(), e);
+            log.error("❌ 와인 데이터 초기화 중 에러 발생: {}", e.getMessage(), e);
         }
     }
 
-    /**
-     * 이미지 복사 헬퍼 메서드 (OS 호환성 강화 ⭐️)
-     */
-    private String processImageFile(Map<String, String> localImagePath) {
+    private String processImageFile(Map<String, String> localImagePaths) {
         String defaultImageUrl = "/images/default_wine.png";
-
-        if (localImagePath == null || !localImagePath.containsKey("bottle")) {
+        if (localImagePaths == null || !localImagePaths.containsKey("bottle")) {
             return defaultImageUrl;
         }
 
-        // 예: "C:\\datasets\\wine\\wine_bottle_2159.png"
-        String rawPathStr = localImagePath.get("bottle");
-        if (!StringUtils.hasText(rawPathStr)) {
-            return defaultImageUrl;
-        }
+        String rawPathStr = localImagePaths.get("bottle");
+        if (!StringUtils.hasText(rawPathStr)) return defaultImageUrl;
 
         try {
-            // ⭐️ 윈도우나 리눅스 환경에 상관없이 파일명(wine_bottle_2159.png)만 강제로 추출합니다.
             String fileNameOnly = rawPathStr;
-            if (fileNameOnly.contains("\\")) {
-                fileNameOnly = fileNameOnly.substring(fileNameOnly.lastIndexOf("\\") + 1);
-            }
-            if (fileNameOnly.contains("/")) {
-                fileNameOnly = fileNameOnly.substring(fileNameOnly.lastIndexOf("/") + 1);
-            }
+            if (fileNameOnly.contains("\\")) fileNameOnly = fileNameOnly.substring(fileNameOnly.lastIndexOf("\\") + 1);
+            if (fileNameOnly.contains("/")) fileNameOnly = fileNameOnly.substring(fileNameOnly.lastIndexOf("/") + 1);
 
-            // 개발자님의 C:/image 폴더와 추출한 파일명을 합쳐서 진짜 파일 위치를 만듭니다.
-            Path sourcePath = Paths.get(SOURCE_IMAGE_DIR, fileNameOnly);
+            Path sourcePath = Paths.get(sourceImageDir, fileNameOnly);
+            if (!Files.exists(sourcePath)) return defaultImageUrl;
 
-            if (!Files.exists(sourcePath)) {
-                log.warn("이미지 없음 (기본 이미지 대체): {}", sourcePath.toString());
-                return defaultImageUrl;
-            }
-
-            // 확장자 추출 및 UUID 적용
-            String extension = "";
-            int extIndex = fileNameOnly.lastIndexOf(".");
-            if (extIndex > 0) {
-                extension = fileNameOnly.substring(extIndex);
-            }
+            String extension = fileNameOnly.lastIndexOf(".") > 0 ? fileNameOnly.substring(fileNameOnly.lastIndexOf(".")) : "";
             String newFileName = UUID.randomUUID().toString() + extension;
-            Path targetPath = Paths.get(TARGET_IMAGE_DIR, newFileName);
+            Path targetPath = Paths.get(targetImageDir, newFileName);
 
-            // 파일 복사
             Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-
             return "/images/wines/" + newFileName;
 
         } catch (Exception e) {
-            log.error("이미지 복사 실패 ({}): {}", rawPathStr, e.getMessage());
+            log.error("이미지 복사 실패: {}", e.getMessage());
             return defaultImageUrl;
         }
     }
