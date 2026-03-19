@@ -26,14 +26,14 @@ export default function TasteEditPage() {
   const router = useRouter();
   const [tasteData, setTasteData] = useState<TasteData>({
     tastes: {
-      sweet: 6,
-      acid: 6, // fresh -> acid로 통일
-      body: 6,
-      tannin: 6,
-      aroma: 6,
+      sweet: 3,
+      acid: 3,
+      body: 3,
+      tannin: 3,
+      abv: 3,
     },
     selectedWineTypes: ['레드', '화이트'],
-    selectedFlavorTags: ['과일향', '베리류'],
+    selectedFlavorTags: ['과일향', '베리향'],
     selectedSituations: ['집들이'],
   });
 
