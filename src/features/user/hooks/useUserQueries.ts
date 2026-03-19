@@ -25,3 +25,15 @@ export function useWithdrawMutation() {
     mutationFn: userApi.withdrawUser,
   });
 }
+
+export function useUpdatePreferenceMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: userApi.updatePreference,
+    onSuccess: () => {
+      // 취향 정보가 업데이트되면 유저의 최신 AI 리포트가 만료되므로 report taste 캐시를 무효화하여 다시 가져옴
+      queryClient.invalidateQueries({ queryKey: ['report', 'taste'] });
+    },
+  });
+}

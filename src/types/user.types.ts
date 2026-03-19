@@ -26,6 +26,19 @@ export interface WithdrawRequest {
   password: string;
 }
 
+export interface UpdatePreferenceRequest {
+  sweetness?: number;
+  acidity?: number;
+  body?: number;
+  tannin?: number;
+  abv?: number;
+  preferredPriceMin?: number;
+  preferredPriceMax?: number;
+  preferredTypes?: string[];
+  preferredFlavors?: string[];
+  drinkingSituations?: string[];
+}
+
 export interface UserProfileResponse {
   status: string;
   data: UserInfo;
