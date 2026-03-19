@@ -1,35 +1,99 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-primary-900: #880606;
-  --color-primary-700: #B36262;
-  --color-primary-500: #D95F63;
-  --color-primary-100: #EBE6DF;
-  
-  --color-background: #F9F7F2;
+  --color-primary-700: #b36262;
+  --color-primary-500: #d95f63;
+  --color-primary-100: #ebe6df;
+
+  --color-background: #f9f7f2;
   --color-text-main: #332211;
 
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
   --radius-3xl: 2rem;
-  
-  --font-inter: "Inter", sans-serif;
+
+  --font-inter: 'Inter', sans-serif;
 }
 
 :root {
-  --background: #F9F7F2;
+  --background: #f9f7f2;
   --foreground: #332211;
+  --app-max-width: 31rem;
+  --page-gutter: 1.125rem;
+  --header-height: 4.25rem;
+  --bottom-nav-height: 5.5rem;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 @layer base {
+  html {
+    background: var(--background);
+  }
+
   body {
     @apply bg-background text-text-main font-inter antialiased;
     min-height: 100dvh;
     -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
   }
 
-  /* 모바일 하단 여백 처리 */
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@layer components {
+  .app-shell {
+    width: 100%;
+    max-width: var(--app-max-width);
+    margin-inline: auto;
+  }
+
+  .page-gutter {
+    padding-inline: var(--page-gutter);
+  }
+
+  .top-safe {
+    padding-top: max(0.75rem, var(--safe-top));
+  }
+
+  .bottom-safe {
+    padding-bottom: max(0.75rem, var(--safe-bottom));
+  }
+
+  .bottom-nav-safe {
+    padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 1rem);
+  }
+
+  .floating-safe {
+    bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) - 1rem);
+  }
+
+  .section-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .content-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .soft-card {
+    border: 1px solid color-mix(in srgb, var(--color-primary-100) 70%, white 30%);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 10px 30px rgba(51, 34, 17, 0.05);
+    backdrop-filter: blur(14px);
   }
 }
