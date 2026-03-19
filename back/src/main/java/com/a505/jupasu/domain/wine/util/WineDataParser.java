@@ -19,12 +19,12 @@ public class WineDataParser {
 
     public static Object[] parseTaste(String rawPercent) {
         if (!StringUtils.hasText(rawPercent)) {
-            return new Object[]{3.0f, false}; // 결측치 3.0 처리 및 가짜(false) 마킹
+            return new Object[]{3.0f, false}; // 결측치 3.0점 및 false
         }
         try {
             String numeric = rawPercent.replaceAll("[^0-9.]", "");
             float val = Float.parseFloat(numeric);
-            return new Object[]{val / 20.0f, true}; // 100분율을 5점 만점으로 환산
+            return new Object[]{val / 20.0f, true}; // 백분율 -> 5점 만점
         } catch (Exception e) {
             return new Object[]{3.0f, false};
         }
@@ -32,7 +32,7 @@ public class WineDataParser {
 
     public static Object[] parseAlcohol(String rawAlcohol) {
         if (!StringUtils.hasText(rawAlcohol)) {
-            return new Object[]{13.0f, false}; // 결측치 평균 도수 13.0 처리
+            return new Object[]{13.0f, false}; // 결측치 13.0도 및 false
         }
         String cleaned = rawAlcohol.toLowerCase();
         if (cleaned.contains("non-alcoholic") || cleaned.equals("0%")) {
@@ -53,7 +53,7 @@ public class WineDataParser {
         if (type.contains("WHITE")) return WineType.WHITE;
         if (type.contains("SPARK")) return WineType.SPARKLING;
         if (type.contains("ROSE")) return WineType.ROSE;
-        if (type.contains("DESSERT")) return WineType.DESSERT;
+        if (type.contains("DESSERT") || type.contains("PORT")) return WineType.DESSERT;
         if (type.contains("FORTIFIED")) return WineType.FORTIFIED;
         return WineType.RED;
     }
