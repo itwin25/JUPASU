@@ -43,7 +43,7 @@ public class Preference {
     private Integer tannin;
 
     // 선호 도수 (실제 도수 %, 예: 13)
-    private Integer Abv;
+    private Integer abv;
 
     // 선호 가격대 최소 (단위: 원)
     private Integer preferredPriceMin;
@@ -83,14 +83,14 @@ public class Preference {
      */
     @Builder
     public Preference(User user, Integer sweetness, Integer acidity, Integer body, Integer tannin,
-                      Integer Abv, Integer preferredPriceMin, Integer preferredPriceMax, String preferSummary,
+                      Integer abv, Integer preferredPriceMin, Integer preferredPriceMax, String preferSummary,
                       List<WineType> wineTypes, List<WineFlavor> flavors, List<DrinkingSituation> situations) {
         this.user = user;
         this.sweetness = sweetness;
         this.acidity = acidity;
         this.body = body;
         this.tannin = tannin;
-        this.Abv = Abv;
+        this.abv = abv;
         this.preferredPriceMin = preferredPriceMin;
         this.preferredPriceMax = preferredPriceMax;
         this.preferSummary = preferSummary;
@@ -105,7 +105,7 @@ public class Preference {
      * @param acidity            선호 산도
      * @param body               선호 바디감
      * @param tannin             선호 탄닌
-     * @param Abv                선호 도수
+     * @param abv                선호 도수
      * @param preferredPriceMin  선호 가격대 최소
      * @param preferredPriceMax  선호 가격대 최대
      * @param preferSummary      유저 취향 요약 텍스트
@@ -114,13 +114,13 @@ public class Preference {
      * @param situations         주요 음용 상황 리스트
      */
     public void updatePreference(Integer sweetness, Integer acidity, Integer body, Integer tannin,
-                                 Integer Abv, Integer preferredPriceMin, Integer preferredPriceMax, String preferSummary,
+                                 Integer abv, Integer preferredPriceMin, Integer preferredPriceMax, String preferSummary,
                                  List<WineType> wineTypes, List<WineFlavor> flavors, List<DrinkingSituation> situations) {
         if (sweetness != null) this.sweetness = sweetness;
         if (acidity != null) this.acidity = acidity;
         if (body != null) this.body = body;
         if (tannin != null) this.tannin = tannin;
-        if (Abv != null) this.Abv = Abv;
+        if (abv != null) this.abv = abv;
         if (preferredPriceMin != null) this.preferredPriceMin = preferredPriceMin;
         if (preferredPriceMax != null) this.preferredPriceMax = preferredPriceMax;
         if (preferSummary != null) this.preferSummary = preferSummary;
