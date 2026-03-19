@@ -1,22 +1,18 @@
-export type WineType = 'RED' | 'WHITE' | 'ROSE' | 'SPARKLING' | 'DESSERT';
+export type WineType = 'RED' | 'WHITE' | 'ROSE' | 'DESSERT' | 'FORTIFIED';
 
 export interface Wine {
   id: number;
-  name: string;
-  origin: string;
-  price: number;
+  nameKr: string;
+  nameEn: string;
   type: WineType;
+  country: string;
+  averageRating: number;
+  price: number;
   imageUrl: string;
-  rating: number;
-  taste: {
-    sweetness: number;
-    acidity: number;
-    tannin: number;
-    body: number;
-  };
 }
 
 export interface WineListParams {
+  keyword?: string;
   page?: number;
   size?: number;
   type?: WineType;
