@@ -25,6 +25,12 @@ export interface ValidateEmailRequest {
   email: string;
 }
 
+export interface ResetPasswordRequest {
+  email: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
 export type SigninRequest = SigninSchema;
 
 // 응답 (공통)

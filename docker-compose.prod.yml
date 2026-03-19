@@ -82,7 +82,7 @@ services:
     container_name: front-nextjs
     restart: always
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     expose:
