@@ -141,9 +141,10 @@ const PAGINATION = [1, 2, 3, 4, 5];
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
 
-function resolveCharacterImage(character?: string) {
-  if (!character) return '/dog1.svg';
-  return character.startsWith('/') ? character : `/${character}`;
+function resolveCharacterImage(character?: string, level: number = 1) {
+  if (!character) return '/tiger1.png';
+  if (character.startsWith('/')) return character;
+  return `/${character}${level}.png`;
 }
 
 function getCountryCode(country?: string) {
@@ -449,6 +450,12 @@ export default function MyPage() {
     return `${p1} ${p2} ${p3} ${p4} ${p5}`;
   }, [tasteReport]);
 
+  // 레벨 계산: 리뷰 5개당 1레벨, 최대 5레벨
+  const currentReviewCount = profile?.reviewCount || 0;
+  const currentLevel = Math.min(Math.floor(currentReviewCount / 5) + 1, 5);
+  const progressInLevel = currentLevel === 5 ? 5 : currentReviewCount % 5;
+  const progressPercentage = (progressInLevel / 5) * 100;
+
   return (
     <div className="bg-background min-h-screen pb-24">
       <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
@@ -499,7 +506,7 @@ export default function MyPage() {
           <div className="flex items-center gap-3">
             <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
               <Image
-                src={profile?.character ? `/${profile.character}.svg` : '/dog1.svg'}
+                src={resolveCharacterImage(profile?.character ?? 'tiger', currentLevel)}
                 alt="프로필 이미지"
                 fill
                 className="object-cover"
@@ -516,10 +523,10 @@ export default function MyPage() {
           </div>
 
           <div className="mt-5 rounded-[1.25rem] bg-[#F9F7F2] p-3">
-            <div className="h-3 rounded-full bg-white">
+            <div className="relative h-3 overflow-hidden rounded-full bg-white">
               <div
                 className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262] transition-all duration-500"
-                style={{ width: `${Math.min(((profile?.reviewCount || 0) / 10) * 100, 100)}%` }}
+                style={{ width: `${progressPercentage}%` }}
               />
             </div>
           </div>
