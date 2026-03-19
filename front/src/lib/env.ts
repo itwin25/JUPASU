@@ -9,6 +9,6 @@ const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '');
 
 export const env = {
   // Spring 백엔드 API 기본 주소 (Nginx를 거치거나 직접 접속)
-  NEXT_PUBLIC_API_BASE_URL: normalizeBaseUrl(rawApiBaseUrl),
+  API_BASE_URL: normalizeBaseUrl(rawApiBaseUrl),
   IS_DEV: process.env.NODE_ENV === 'development',
 } as const;

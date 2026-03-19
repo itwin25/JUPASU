@@ -32,7 +32,6 @@ import java.util.Map;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class AiService {
 
@@ -40,7 +39,15 @@ public class AiService {
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final RedisService redisService;
-    private final ObjectMapper objectMapper; // JSON 파싱을 위한 도구 추가
+    private final ObjectMapper objectMapper = new ObjectMapper(); // 직접 생성하여 의존성 문제 해결
+
+    public AiService(WebClient webClient, ChatMessageRepository chatMessageRepository, 
+                     UserRepository userRepository, RedisService redisService) {
+        this.webClient = webClient;
+        this.chatMessageRepository = chatMessageRepository;
+        this.userRepository = userRepository;
+        this.redisService = redisService;
+    } // JSON 파싱을 위한 도구 추가
 
     private static final String CHAT_CACHE_PREFIX = "chat:cache:";
     private static final int MAX_CHAT_CACHE_SIZE = 10;

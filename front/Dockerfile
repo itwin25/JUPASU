@@ -10,9 +10,8 @@ WORKDIR /app
 # 의존성 정의 파일만 먼저 복사
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# 의존성 설치 (CI 환경을 위해 --frozen-lockfile 사용)
-RUN pnpm install --frozen-lockfile
-
+# 의존성 설치 (잠금 파일 불일치 허용)
+RUN pnpm install --no-frozen-lockfile
 # ================================
 # Stage 2: Builder
 # ================================

@@ -34,12 +34,16 @@ services:
     container_name: backend-spring
     restart: always
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      # Spring Boot 표준 환경 변수명 사용
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-jupasu}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-jupasu_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-jupasu_pass}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      # 로컬 개발 시에도 외부 AI 서버(터널 등)를 바라보도록 설정
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      
+      # AI 및 기타 설정
       AI_SERVICE_URL: ${AI_SERVER_URL:-http://host.docker.internal:18000}
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
@@ -69,12 +73,25 @@ services:
     container_name: front-nextjs
     restart: always
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
+      - NEXT_PUBLIC_API_BASE_URL=/api
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
+    expose:
+      - "80"
+    depends_on:
+      - backend
+
+  # Reverse Proxy: Nginx
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    restart: always
     ports:
       - "80:80"
+    volumes:
+      - ./nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
     depends_on:
+      - frontend
       - backend
 
 volumes:

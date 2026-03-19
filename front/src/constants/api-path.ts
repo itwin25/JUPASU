@@ -25,6 +25,7 @@ export const API_PATH = {
     PROFILE: '/users/profile',
     ONBOARDING: '/users/onboarding',
     ME: '/users/me',
+    PREFERENCES: '/users/preferences', // 취향 정보 수정 엔드포인트 추가
     REVIEWS: '/users/reviews',
     WITHDRAW: '/users/withdraw',
   },

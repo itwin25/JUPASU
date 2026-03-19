@@ -7,117 +7,129 @@ import sharp from 'sharp';
 import { env } from '@/lib/env';
 import { OCRResult } from '../types';
 
-// --- [기존 OCR 로직 복구] ---
-interface PaddleOcrLib {
-  PaddleOcrService: {
-    createInstance: (options: unknown) => Promise<PaddleOcrServiceInstance>;
-    prototype: {
-      initialize: (this: PaddleOcrServiceInstance) => Promise<void>;
-    };
-  };
-  DetectionService: new (
-    ortModule: typeof ort,
-    session: ort.InferenceSession,
-    options: unknown,
-  ) => unknown;
-  RecognitionService: new (
-    ortModule: typeof ort,
-    session: ort.InferenceSession,
-    options: unknown,
-  ) => unknown;
-}
-
 interface PaddleOcrServiceInstance {
   recognize: (options: { width: number; height: number; data: Uint8Array }) => Promise<unknown[]>;
   detectionSession?: ort.InferenceSession;
   recognitionSession?: ort.InferenceSession;
   detectionService?: unknown;
   recognitionService?: unknown;
-  options: { detection: unknown; recognition: unknown };
+  initialize?: () => Promise<void>;
+  options: {
+    detection: unknown;
+    recognition: unknown;
+  };
 }
 
-interface GlobalWithPaddle {
-  paddleocr: PaddleOcrLib;
-  self: GlobalWithPaddle;
-}
-
-const g = global as unknown as GlobalWithPaddle;
 let ocrServiceInstance: PaddleOcrServiceInstance | null = null;
 
 async function getOcrService(): Promise<PaddleOcrServiceInstance> {
   if (ocrServiceInstance) return ocrServiceInstance;
-  g.self = g;
-  await import('paddleocr/dist/index.js');
-  const { PaddleOcrService } = g.paddleocr;
+
+  // 1. 패키지 동적 임포트
+  const paddleocrModule = await import('paddleocr');
+  const PaddleOcrService =
+    paddleocrModule.PaddleOcrService ||
+    (paddleocrModule.default ? paddleocrModule.default.PaddleOcrService : null);
+  const DetectionService =
+    paddleocrModule.DetectionService ||
+    (paddleocrModule.default ? paddleocrModule.default.DetectionService : null);
+  const RecognitionService =
+    paddleocrModule.RecognitionService ||
+    (paddleocrModule.default ? paddleocrModule.default.RecognitionService : null);
+
+  if (!PaddleOcrService) {
+    throw new Error('PaddleOcrService를 로드할 수 없습니다.');
+  }
+
+  // 2. 모델 파일 로드
   const modelDir = path.join(process.cwd(), 'public', 'models', 'server');
   const dictDir = path.join(process.cwd(), 'public', 'models', 'dicts');
+
   const [detBuffer, recBuffer, dictText] = await Promise.all([
     fs.readFile(path.join(modelDir, 'det_server.onnx')),
     fs.readFile(path.join(modelDir, 'rec_latin.onnx')),
     fs.readFile(path.join(dictDir, 'latin_dict.txt'), 'utf-8'),
   ]);
-  const cpuOptions: ort.InferenceSession.SessionOptions = {
-    executionProviders: ['cpu'],
-    graphOptimizationLevel: 'basic',
-  };
-  PaddleOcrService.prototype.initialize = async function (this: PaddleOcrServiceInstance) {
-    const lib = g.paddleocr;
-    this.detectionSession = await ort.InferenceSession.create(detBuffer, cpuOptions);
-    this.recognitionSession = await ort.InferenceSession.create(recBuffer, cpuOptions);
-    this.detectionService = new lib.DetectionService(
-      ort,
-      this.detectionSession,
-      this.options.detection,
-    );
-    this.recognitionService = new lib.RecognitionService(
-      ort,
-      this.recognitionSession,
-      this.options.recognition,
-    );
-  };
+
   const dictArray = dictText.replace(/\r/g, '').split('\n');
   dictArray.unshift('blank');
-  ocrServiceInstance = (await PaddleOcrService.createInstance({
+
+  // 3. 서비스 인스턴스 생성
+  const instance = (await PaddleOcrService.createInstance({
     ort: ort,
     detection: { modelBuffer: detBuffer, limitSideLen: 960 },
     recognition: { modelBuffer: recBuffer, charactersDictionary: dictArray },
   })) as PaddleOcrServiceInstance;
+
+  // 4. 세션 초기화 로직 보강 (필요한 경우)
+  if (DetectionService && RecognitionService) {
+    const cpuOptions: ort.InferenceSession.SessionOptions = {
+      executionProviders: ['cpu'],
+      graphOptimizationLevel: 'basic',
+    };
+
+    instance.initialize = async function (this: PaddleOcrServiceInstance) {
+      this.detectionSession = await ort.InferenceSession.create(detBuffer, cpuOptions);
+      this.recognitionSession = await ort.InferenceSession.create(recBuffer, cpuOptions);
+      this.detectionService = new DetectionService(
+        ort,
+        this.detectionSession,
+        this.options.detection,
+      );
+      this.recognitionService = new RecognitionService(
+        ort,
+        this.recognitionSession,
+        this.options.recognition,
+      );
+    };
+  }
+
+  ocrServiceInstance = instance;
   return ocrServiceInstance;
 }
 
 /**
- * [수정됨] Spring 서버를 호출하여 OCR 텍스트를 와인 정보로 정제
+ * Spring 서버를 호출하여 OCR 텍스트를 와인 정보로 정제
  */
 async function callSpringToRefine(ocrText: string, isMenu: boolean = false) {
   try {
     const endpoint = isMenu ? '/ai/menu' : '/ai/label';
 
-    // Spring의 SommelierRequest DTO 규격에 맞춰 전송
+    // Server Action 내에서 백엔드로 통신할 때 내부 도커 주소 사용 시도
+    // 만약 env.API_BASE_URL이 상대 경로(/api)라면 컨테이너 이름을 포함한 절대 주소로 변환
+    let baseUrl = env.API_BASE_URL;
+    if (baseUrl.startsWith('/')) {
+      baseUrl = `http://backend-spring:8080${baseUrl}`;
+    }
+
     const formData = new FormData();
     const requestBlob = new Blob([JSON.stringify({ textContent: ocrText })], {
       type: 'application/json',
     });
     formData.append('request', requestBlob);
 
-    const response = await fetch(`${env.NEXT_PUBLIC_API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       method: 'POST',
       body: formData,
     });
 
-    if (!response.ok) throw new Error('Spring 정제 요청 실패');
+    if (!response.ok) throw new Error(`Spring 정제 요청 실패 (상태: ${response.status})`);
 
     const result = await response.json();
-    return result.data.data; // FastAPI가 반환하는 정제된 데이터 (winery, wine_name, vintage 등)
+    if (!result.data || !result.data.data) {
+      return isMenu
+        ? { wine_names: [], food_names: [] }
+        : { winery: '', wine_name: '', vintage: '' };
+    }
+    return result.data.data;
   } catch (error) {
-    console.error('❌ Spring Refine Error:', error);
+    console.error('❌ callSpringToRefine Error:', error);
     return isMenu ? { wine_names: [], food_names: [] } : { winery: '', wine_name: '', vintage: '' };
   }
 }
 
 /**
  * [Server Action] 이미지 분석 실행
- * 1. 프론트엔드 서버에서 OCR 수행 (기존 로직)
- * 2. 추출된 텍스트만 백엔드로 보내서 정제 (신규 로직)
  */
 export async function executeOcrAction(formData: FormData) {
   try {
@@ -127,7 +139,7 @@ export async function executeOcrAction(formData: FormData) {
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     const ocrService = await getOcrService();
 
-    // 1. 이미지 전처리 및 OCR (프론트 서버)
+    // 1. 이미지 전처리 및 OCR
     const { data, info } = await sharp(buffer)
       .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
       .ensureAlpha()
@@ -140,13 +152,11 @@ export async function executeOcrAction(formData: FormData) {
       data: new Uint8Array(data),
     });
 
-    // 2. 결과 텍스트 추출
+    // 2. 결과 가공
     const simplifiedResults: OCRResult[] = Array.isArray(rawResults)
       ? rawResults.map((item: unknown) => {
-          // PaddleOCR의 다양한 응답 형식을 안전하게 처리
           let text = '';
           let score = 0;
-
           if (item && typeof item === 'object') {
             const resultItem = item as { text?: string; confidence?: number; score?: number };
             text = resultItem.text || '';
@@ -155,7 +165,6 @@ export async function executeOcrAction(formData: FormData) {
             text = String(Array.isArray(item[1]) ? item[1][0] : item[1]);
             score = Number(Array.isArray(item[1]) ? item[1][1] : 0);
           }
-
           return { text, score, box: [] };
         })
       : [];
@@ -166,7 +175,7 @@ export async function executeOcrAction(formData: FormData) {
       .map((r) => r.text)
       .join('\n');
 
-    // 3. 백엔드(Spring -> FastAPI)에 정제 요청
+    // 3. 백엔드 정제 요청
     const refinedData = await callSpringToRefine(filteredText || allText, false);
 
     return {
@@ -180,7 +189,7 @@ export async function executeOcrAction(formData: FormData) {
       imageInfo: { width: info.width, height: info.height },
     };
   } catch (error) {
-    console.error('❌ Server Action OCR Error:', error);
+    console.error('❌ executeOcrAction Error:', error);
     return { success: false, error: '서버 분석 중 오류 발생', results: [] };
   }
 }
