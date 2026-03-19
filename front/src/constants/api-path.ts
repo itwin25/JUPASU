@@ -24,7 +24,6 @@ export const API_PATH = {
   USER: {
     PROFILE: '/users/profile',
     ONBOARDING: '/users/onboarding',
-    PREFERENCES: '/preferences', //
     ME: '/users/me',
     REVIEWS: '/users/reviews',
     WITHDRAW: '/users/withdraw',
