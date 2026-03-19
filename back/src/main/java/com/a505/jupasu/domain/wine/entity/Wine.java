@@ -49,6 +49,8 @@ public class Wine extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String description;
-    private String summary;
+
+    private String style;
+
     private String imageUrl;
 }
