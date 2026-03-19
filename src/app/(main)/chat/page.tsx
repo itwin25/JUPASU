@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Send, ChevronLeft, Heart } from 'lucide-react';
+import { Plus, Send, ChevronLeft } from 'lucide-react';
 
 interface Message {
   id: number;
@@ -19,197 +19,171 @@ interface Message {
   options?: string[];
 }
 
-const INITIAL_BOT_MESSAGE: Message = {
-  id: 1,
-  type: 'bot',
-  text: '어떤 와인을 추천해드릴까요?',
-  options: ['뭐랑 먹을까?', '비슷한 다른 와인', '칼로리가 궁금해'],
-};
-
 export default function ChatPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([INITIAL_BOT_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 1,
+      type: 'bot',
+      text: '어떤 와인을 추천해드릴까요?',
+      options: ['뭐랑 먹을까?', '비슷한 다른 와인', '칼로리가 궁금해'],
+    },
+  ]);
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
 
-  const latestBotMessage = useMemo(
-    () => [...messages].reverse().find((message) => message.type === 'bot') ?? INITIAL_BOT_MESSAGE,
-    [messages],
-  );
-
-  const userMessages = useMemo(
-    () => messages.filter((message) => message.type === 'user').slice(-3),
-    [messages],
-  );
-
   const handleSend = () => {
     if (!inputValue.trim()) return;
-
-    const question = inputValue.trim();
-    const newUserMsg: Message = {
-      id: Date.now(),
-      type: 'user',
-      text: question,
-    };
-
-    setMessages((prev) => [...prev, newUserMsg]);
+    
+    const newUserMsg: Message = { id: Date.now(), type: 'user', text: inputValue };
+    setMessages([...messages, newUserMsg]);
     setInputValue('');
-    setShowMenu(false);
 
-    window.setTimeout(() => {
-      const botResponse: Message = {
+    setTimeout(() => {
+      const botRes: Message = {
         id: Date.now() + 1,
         type: 'bot',
-        text: '달콤한 와인을 좋아하시는군요. 과일 디저트와 잘 어울리는 화이트 와인을 추천드릴게요.',
+        text: '달콤한 와인을 좋아하시는군요! 모스카토 다스티나 리슬링같은 와인이 딱입니다. 과일 디저트랑 같이 드시면 환상이에요!',
         recommendation: {
           name: 'Riesling Kabinett',
           category: 'German White',
           price: '32,000',
           match: 90,
-        },
-        options: ['비슷한 다른 와인', '칼로리가 궁금해'],
+        }
       };
-
-      setMessages((prev) => [...prev, botResponse]);
-    }, 700);
+      setMessages(prev => [...prev, botRes]);
+    }, 1000);
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#2E1E18]">
+    <div className="relative min-h-screen flex flex-col bg-black overflow-hidden">
+      {/* Background Image */}
       <div className="absolute inset-0 z-0">
-        <Image src="/chatbot.svg" alt="소믈리에 배경" fill className="object-cover" priority />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(25,16,12,0.28),rgba(25,16,12,0.1)_30%,rgba(25,16,12,0.18)_72%,rgba(25,16,12,0.5))]" />
+        <Image 
+          src="/chatbot.svg" 
+          alt="Chatbot Background" 
+          fill 
+          className="object-cover opacity-80"
+        />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <header className="flex items-center justify-between px-1 py-2 text-white">
-          <button
-            onClick={() => router.push('/home')}
-            className="flex items-center gap-1.5 rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
-          >
-            <ChevronLeft size={18} />
-            뒤로가기
-          </button>
-          <Link
-            href="/chat/history"
-            className="rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
-          >
-            전체 대화 보기
-          </Link>
-        </header>
+      {/* Header */}
+      <header className="relative z-10 flex items-center justify-between px-6 py-4 text-white">
+        <button 
+          onClick={() => router.push('/home')}
+          className="flex items-center gap-1 font-bold hover:text-white/70 transition-colors"
+        >
+          <ChevronLeft size={20} /> 뒤로가기
+        </button>
+        <Link href="/chat/history" className="font-bold">
+          전체 대화 보기
+        </Link>
+      </header>
 
-        <main className="flex flex-1 flex-col justify-between pt-3">
-          <section className="mx-auto w-full max-w-[22rem]">
-            <div className="relative rounded-[2rem] bg-white px-5 py-5 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#7BB181]" />
-                <span className="text-[0.95rem] font-black text-[#9B6A42]">소믈리에</span>
-              </div>
-
-              <p className="text-text-main text-[0.94rem] leading-6 font-medium whitespace-pre-line">
-                {latestBotMessage.text}
-              </p>
-
-              {latestBotMessage.recommendation && (
-                <div className="mt-4 rounded-[1.6rem] border border-[#F1D991] bg-[#FFF9EB] p-3.5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-xl">
-                      🍷
+      {/* Chat Area */}
+      <main className="relative z-10 flex-1 overflow-y-auto px-4 py-4 space-y-6 no-scrollbar pb-10">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex flex-col ${msg.type === 'user' ? 'items-end' : 'items-start'}`}>
+            <div className={`relative max-w-[85%] p-5 rounded-[32px] ${
+              msg.type === 'bot' 
+                ? 'bg-white/95 text-text-main rounded-tl-none ml-2' 
+                : 'bg-white/90 text-text-main rounded-tr-none mr-2'
+            }`}>
+              {msg.type === 'bot' && (
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                  <span className="text-sm font-black text-[#8B4513]">소믈리에</span>
+                </div>
+              )}
+              <p className="text-sm font-bold leading-relaxed">{msg.text}</p>
+              
+              {msg.recommendation && (
+                <div className="mt-4 p-4 bg-[#FFF9EB] rounded-3xl border border-[#FFD700]/30">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center font-black text-2xl text-[#8B4513]">
+                      I
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-text-main truncate text-[0.92rem] font-black">
-                        {latestBotMessage.recommendation.name}
-                      </h3>
-                      <p className="text-text-main/48 text-[0.7rem] font-semibold">
-                        {latestBotMessage.recommendation.category}
-                      </p>
-                      <p className="mt-0.5 text-[0.82rem] font-black text-[#B36262]">
-                        ₩{latestBotMessage.recommendation.price}
-                      </p>
+                    <div className="flex-1">
+                      <h4 className="font-black text-sm">{msg.recommendation.name}</h4>
+                      <p className="text-[10px] text-text-main/40 font-bold">{msg.recommendation.category}</p>
+                      <p className="text-xs font-black text-[#B36262] mt-0.5">₩{msg.recommendation.price}</p>
                     </div>
-                    <span className="rounded-full bg-[#C78354] px-2 py-1 text-[0.58rem] font-black text-white uppercase">
-                      {latestBotMessage.recommendation.match}% match
-                    </span>
+                    <div className="bg-[#B36262] text-white text-[8px] font-black px-2 py-1 rounded-full whitespace-nowrap">
+                      {msg.recommendation.match}% match
+                    </div>
                   </div>
                 </div>
               )}
 
-              {latestBotMessage.options && latestBotMessage.options.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {latestBotMessage.options.map((option) => (
-                    <button
-                      key={option}
-                      className="text-text-main/60 rounded-full bg-[#F7F4EF] px-4 py-2 text-[0.74rem] font-bold transition-colors hover:bg-[#F0EAE0]"
-                      onClick={() => setInputValue(option)}
+              {msg.options && (
+                <div className="mt-4 flex flex-col gap-2">
+                  {msg.options.map((opt) => (
+                    <button 
+                      key={opt}
+                      className="bg-gray-100/80 hover:bg-white px-5 py-3 rounded-full text-xs font-bold text-text-main/60 transition-colors text-left"
                     >
-                      {option}
+                      {opt}
                     </button>
                   ))}
                 </div>
               )}
 
-              {latestBotMessage.recommendation && (
-                <button className="text-text-main/52 mt-3 flex items-center gap-1.5 text-[0.74rem] font-semibold">
-                  <Heart size={13} className="fill-[#D16B74] text-[#D16B74]" />
-                  위시리스트에 추가하기
-                </button>
+              {msg.type === 'bot' && (
+                <div className="absolute -left-2 top-0 w-4 h-4 bg-white/95 clip-path-bot-tail" />
               )}
-
-              <div className="absolute right-8 bottom-0 h-5 w-5 translate-y-[70%] rotate-45 rounded-[0.35rem] bg-white" />
             </div>
-          </section>
-
-          <section className="px-1 pt-6 pb-4">
-            <div className="flex flex-col items-end gap-2.5">
-              {userMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className="text-text-main max-w-[14rem] rounded-full bg-white/90 px-4 py-3 text-[0.82rem] font-semibold shadow-[0_8px_20px_rgba(0,0,0,0.12)] backdrop-blur-sm"
-                >
-                  {message.text}
-                </div>
-              ))}
-            </div>
-          </section>
-        </main>
-
-        <div className="relative z-20">
-          {showMenu && (
-            <div className="absolute bottom-[4.8rem] left-1 w-[8.9rem] rounded-[1.35rem] bg-white/96 p-2 shadow-[0_18px_40px_rgba(0,0,0,0.18)] backdrop-blur-sm">
-              <button className="text-text-main hover:bg-primary-100/30 w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold transition-colors">
-                메뉴판 스캔
+            
+            {msg.recommendation && (
+              <button className="mt-3 ml-6 flex items-center gap-1.5 text-xs font-bold text-white/70">
+                <span className="text-rose-400">❤</span> 위시리스트에 추가하기
               </button>
-              <button className="hover:bg-primary-100/30 w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold text-[#7B4D9B] transition-colors">
-                라벨 스캔
-              </button>
-            </div>
-          )}
+            )}
+          </div>
+        ))}
+      </main>
 
-          <div className="mx-auto flex w-full max-w-[23rem] items-center gap-2 rounded-full bg-white px-3 py-2 shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
-            <button
-              onClick={() => setShowMenu((prev) => !prev)}
-              className="border-primary-100 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[#B36262] transition-transform active:scale-95"
-            >
-              <Plus size={18} />
+      {/* Input Area */}
+      <div className="relative z-10 p-4 bg-transparent pb-8">
+        {showMenu && (
+          <div className="absolute bottom-20 left-4 w-48 bg-white rounded-2xl shadow-xl border border-primary-100 p-2 animate-in slide-in-from-bottom-2">
+            <button className="w-full text-left px-4 py-3 text-sm font-bold text-text-main hover:bg-primary-100/30 rounded-xl">
+              메뉴판 스캔
             </button>
-
-            <input
-              className="text-text-main placeholder:text-text-main/35 min-w-0 flex-1 bg-transparent text-[0.86rem] font-medium focus:outline-none"
-              placeholder="소믈리에에게 물어보세요... (@김친구)"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            />
-
-            <button
-              onClick={handleSend}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#B36262] text-white transition-transform active:scale-95"
-            >
-              <Send size={16} fill="currentColor" />
+            <div className="h-px bg-gray-100 mx-2" />
+            <button className="w-full text-left px-4 py-3 text-sm font-bold text-[#7B4D9B] hover:bg-primary-100/30 rounded-xl">
+              라벨 스캔
             </button>
           </div>
+        )}
+
+        <div className="flex items-center gap-2 bg-white rounded-full px-4 py-2 shadow-lg border border-primary-100">
+          <button 
+            onClick={() => setShowMenu(!showMenu)}
+            className="w-10 h-10 rounded-full border border-primary-100 flex items-center justify-center text-[#B36262] active:scale-90 transition-transform"
+          >
+            <Plus size={24} />
+          </button>
+          <input 
+            className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold text-text-main placeholder:text-text-main/30"
+            placeholder="소믈리에에게 물어보세요... (@김친구)"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          />
+          <button 
+            onClick={handleSend}
+            className="text-[#B36262] active:scale-90 transition-transform"
+          >
+            <Send size={24} fill="currentColor" />
+          </button>
         </div>
       </div>
+
+      <style jsx>{`
+        .clip-path-bot-tail {
+          clip-path: polygon(100% 0, 0 0, 100% 100%);
+        }
+      `}</style>
     </div>
   );
 }

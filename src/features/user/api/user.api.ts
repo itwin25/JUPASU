@@ -1,12 +1,7 @@
 import { api } from '@/lib/axios';
 import { API_PATH } from '@/constants/api-path';
 
-import {
-  UpdateProfileRequest,
-  WithdrawRequest,
-  UserMyPageResponse,
-  UpdatePreferenceRequest,
-} from '@/types/user.types';
+import { UpdateProfileRequest, WithdrawRequest, UserMyPageResponse } from '@/types/user.types';
 import { AuthResponse } from '@/features/auth/types/auth.types';
 
 export const userApi = {
@@ -27,10 +22,5 @@ export const userApi = {
   withdrawUser: async (data: WithdrawRequest): Promise<AuthResponse<null>> => {
     const { data: responseData } = await api.post<AuthResponse<null>>(API_PATH.USER.WITHDRAW, data);
     return responseData;
-  },
-
-  // 유저 취향(Preference) 수정
-  updatePreference: async (data: UpdatePreferenceRequest): Promise<void> => {
-    await api.patch(API_PATH.USER.PREFERENCES, data);
   },
 };
