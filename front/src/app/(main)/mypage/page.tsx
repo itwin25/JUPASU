@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useUserMyPage } from '@/features/user/hooks/useUserMyPage';
+import { useSearchUsersQuery } from '@/features/user/hooks/useUserQueries';
 import { useTasteReportQuery } from '@/features/report/hooks/useTasteReportQuery';
 import {
   ChevronLeft,
@@ -119,22 +120,9 @@ const WISHLIST_ITEMS: WishlistItem[] = [
   },
 ];
 
-const FRIENDS: FriendItem[] = [
-  { id: 1, name: 'zzz', winesTasted: 28, avatar: '/dog1.svg' },
-  { id: 2, name: '보르도매니아', winesTasted: 65, avatar: '/dog2.svg' },
-  { id: 3, name: '로제', winesTasted: 7, avatar: '/cat1.svg' },
-];
+const FRIENDS: FriendItem[] = [];
 
-const FRIEND_REQUESTS: FriendItem[] = [
-  { id: 11, name: '와인러버민지', winesTasted: 28, avatar: '/dog1.svg' },
-  { id: 12, name: '와인러버도희', winesTasted: 28, avatar: '/dog2.svg' },
-];
-
-const SEARCH_RESULTS: SearchFriendItem[] = [
-  { id: 21, name: '와인러버민지', winesTasted: 28, avatar: '/dog1.svg', status: 'friend' },
-  { id: 22, name: '보르도매니아', winesTasted: 28, avatar: '/dog2.svg', status: 'pending' },
-  { id: 23, name: '민지야술그만마셔라', winesTasted: 28, avatar: '/dog3.svg', status: 'pending' },
-];
+const FRIEND_REQUESTS: FriendItem[] = [];
 
 const PAGINATION = [1, 2, 3, 4, 5];
 
@@ -235,6 +223,8 @@ export default function MyPage() {
   const [editedContent, setEditedContent] = useState('');
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const { data: searchResults = [], isFetching: isSearching } =
+    useSearchUsersQuery(friendSearchQuery);
   const [reviewOverrides, setReviewOverrides] = useState<
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
   >({});
@@ -320,23 +310,6 @@ export default function MyPage() {
     [pendingFriendListData],
   );
 
-  const filteredFriendResults = useMemo<SearchFriendItem[]>(() => {
-    const friendIds = new Set(visibleFriends.map((friend) => friend.friendId ?? friend.id));
-    const pendingIds = new Set([
-      ...visiblePendingFriends.map((friend) => friend.friendId ?? friend.id),
-      ...sentInviteIds,
-    ]);
-
-    const searchResults: SearchFriendItem[] = SEARCH_RESULTS.map((friend) => ({
-      ...friend,
-      status: friendIds.has(friend.id) ? 'friend' : pendingIds.has(friend.id) ? 'pending' : 'idle',
-    }));
-
-    if (!friendSearchQuery.trim()) return searchResults;
-    const query = friendSearchQuery.toLowerCase();
-    return searchResults.filter((friend) => friend.name.toLowerCase().includes(query));
-  }, [friendSearchQuery, sentInviteIds, visibleFriends, visiblePendingFriends]);
-
   const handleLogout = () => {
     handleSignout();
   };
@@ -393,20 +366,12 @@ export default function MyPage() {
     setDeletingReviewId(null);
   };
 
-  const handleInviteFriend = async (friend: SearchFriendItem) => {
-    if (friend.status !== 'idle') return;
-    const receiverIdMap: Record<number, number> = {
-      21: 5,
-      22: 3,
-      23: 4,
-    };
-    const receiverId = receiverIdMap[friend.id] ?? friend.id;
-
+  const handleInviteFriend = async (userId: number, nickname: string) => {
     await inviteFriendMutation.mutateAsync({
-      receiverId,
-      receiverNickname: friend.name,
+      receiverId: userId,
+      receiverNickname: nickname,
     });
-    setSentInviteIds((prev) => [...prev, receiverId]);
+    setSentInviteIds((prev) => [...prev, userId]);
   };
 
   const handleFriendRequestResponse = async (
@@ -1167,37 +1132,66 @@ export default function MyPage() {
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {filteredFriendResults.map((friend) => (
-                <div
-                  key={friend.id}
-                  className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
-                      <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
+            <div className="max-h-[50vh] space-y-2.5 overflow-y-auto pr-1">
+              {searchResults.length > 0 ? (
+                searchResults.map((f) => {
+                  const isInvitedLocally = sentInviteIds.includes(f.userId);
+                  const displayStatus = isInvitedLocally ? 'PENDING' : f.friendStatus;
+
+                  return (
+                    <div
+                      key={f.userId}
+                      className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
+                          <Image
+                            src={resolveCharacterImage(f.character ?? undefined)}
+                            alt={f.nickname}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-text-main text-[13px] font-black">{f.nickname}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (displayStatus === 'NONE') handleInviteFriend(f.userId, f.nickname);
+                        }}
+                        className={cn(
+                          'rounded-full px-3.5 py-1.5 text-[10px] font-black transition-colors',
+                          displayStatus === 'ACCEPTED'
+                            ? 'bg-[#8B8B8B] text-white'
+                            : displayStatus === 'PENDING'
+                              ? 'text-text-main/55 bg-[#F3EFE8]'
+                              : 'bg-[#F6EAEA] text-[#B17672]',
+                        )}
+                        disabled={displayStatus !== 'NONE' || inviteFriendMutation.isPending}
+                      >
+                        {displayStatus === 'ACCEPTED'
+                          ? '친구'
+                          : displayStatus === 'PENDING'
+                            ? '요청 중'
+                            : '친구 요청'}
+                      </button>
                     </div>
-                    <div>
-                      <p className="text-text-main text-[13px] font-black">{friend.name}</p>
-                      <p className="text-text-main/45 text-[11px] font-medium">
-                        {friend.winesTasted}종 시음
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleInviteFriend(friend)}
-                    className={cn(
-                      'rounded-full px-3.5 py-1 text-[10px] font-black',
-                      friend.status === 'friend'
-                        ? 'bg-[#8B8B8B] text-white'
-                        : 'bg-[#F6EAEA] text-[#B17672]',
-                    )}
-                    disabled={friend.status !== 'idle'}
-                  >
-                    {friend.status === 'friend' ? '친구' : '친구 요청'}
-                  </button>
+                  );
+                })
+              ) : isSearching ? (
+                <div className="text-text-main/50 py-8 text-center text-[13px] font-medium">
+                  검색 중...
                 </div>
-              ))}
+              ) : friendSearchQuery.trim().length >= 2 ? (
+                <div className="text-text-main/50 py-8 text-center text-[13px] font-medium">
+                  검색 결과가 없습니다.
+                </div>
+              ) : (
+                <div className="text-text-main/50 py-8 text-center text-[13px] font-medium">
+                  닉네임을 2글자 이상 검색해 보세요.
+                </div>
+              )}
             </div>
           </div>
         )}

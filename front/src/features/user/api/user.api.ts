@@ -6,6 +6,7 @@ import {
   WithdrawRequest,
   UserMyPageResponse,
   UpdatePreferenceRequest,
+  UserSearchResponse,
 } from '@/types/user.types';
 import { AuthResponse } from '@/features/auth/types/auth.types';
 
@@ -32,5 +33,13 @@ export const userApi = {
   // 유저 취향(Preference) 수정
   updatePreference: async (data: UpdatePreferenceRequest): Promise<void> => {
     await api.patch(API_PATH.USER.PREFERENCES, data);
+  },
+
+  // 유저 검색
+  searchUsers: async (nickname: string): Promise<UserSearchResponse[]> => {
+    const { data } = await api.get<{ data: UserSearchResponse[] }>(API_PATH.USER.SEARCH, {
+      params: { nickname },
+    });
+    return data.data;
   },
 };
