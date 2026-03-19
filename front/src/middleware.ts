@@ -30,6 +30,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // api, 정적 리소스, 이미지 등을 제외한 모든 경로에서 미들웨어 실행
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)'],
+  // api, swagger, 정적 리소스 등을 제외한 모든 경로에서 미들웨어 실행
+  matcher: [
+    '/((?!api|swagger-ui|v3/api-docs|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)',
+  ],
 };
