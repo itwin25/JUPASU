@@ -7,26 +7,20 @@ import { useRouter } from 'next/navigation';
 import { Camera, ChevronLeft, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
-import Modal from '@/components/ui/modal/Modal';
 import { useSignout } from '@/features/auth/hooks/useSignout';
-import {
-  useUpdateProfileMutation,
-  useUserProfile,
-  useWithdrawMutation,
-} from '@/features/user/hooks/useUserQueries';
+import { useUpdateProfileMutation, useUserProfile } from '@/features/user/hooks/useUserQueries';
+import WithdrawModal from '@/features/user/components/WithdrawModal';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth.store';
+import { UserInfo } from '@/types/user.types';
 
 const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
 
 export default function ProfileEditPage() {
   const router = useRouter();
-  const clearAuth = useAuthStore((state) => state.clearAuth);
 
-  const { data: profile, isLoading } = useUserProfile();
+  const { data: profile, isLoading } = useUserProfile() as { data: UserInfo; isLoading: boolean };
   const updateProfileMutation = useUpdateProfileMutation();
   const { handleSignout, isLoading: isSignoutLoading } = useSignout();
-  const withdrawMutation = useWithdrawMutation();
 
   const [nickname, setNickname] = useState<string | null>(null);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
@@ -35,14 +29,15 @@ export default function ProfileEditPage() {
     new: '',
     confirm: '',
   });
-  const [withdrawPassword, setWithdrawPassword] = useState('');
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
-  const resolvedNickname = nickname ?? profile?.nickname ?? '';
-  const resolvedAvatar =
-    currentAvatar ??
-    (profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg');
+  const profileNickname = profile ? profile.nickname : '';
+  const profileCharacter =
+    profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg';
+
+  const resolvedNickname = nickname ?? profileNickname;
+  const resolvedAvatar = currentAvatar ?? profileCharacter;
 
   const handleUpdateProfile = async () => {
     const shouldChangePassword =
@@ -83,23 +78,6 @@ export default function ProfileEditPage() {
     handleSignout();
   };
 
-  const handleDeleteAccount = async () => {
-    if (!withdrawPassword.trim()) {
-      alert('계정 삭제를 위해 비밀번호를 입력해주세요.');
-      return;
-    }
-
-    try {
-      await withdrawMutation.mutateAsync({ password: withdrawPassword });
-      setIsDeleteConfirmOpen(false);
-      setWithdrawPassword('');
-      clearAuth();
-      router.push('/login');
-    } catch {
-      alert('회원 탈퇴 처리 중 오류가 발생했습니다.');
-    }
-  };
-
   if (isLoading) {
     return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
   }
@@ -118,7 +96,7 @@ export default function ProfileEditPage() {
         </h1>
       </header>
 
-      <main className="flex-1 space-y-8 px-4">
+      <main className="flex-1 space-y-8 px-4 pb-32">
         <div className="relative flex justify-center pt-2">
           <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
             <Image src={`/${resolvedAvatar}`} alt="Avatar" fill className="object-cover" />
@@ -232,55 +210,7 @@ export default function ProfileEditPage() {
         </div>
       )}
 
-      <Modal
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => {
-          setIsDeleteConfirmOpen(false);
-          setWithdrawPassword('');
-        }}
-        title="계정 삭제"
-        centerTitle
-        hideCloseButton
-        className="w-[calc(100vw-2rem)] max-w-[18.5rem] rounded-[1.55rem] bg-[#F7F5F1] px-3.5 py-4"
-        footer={
-          <div className="flex gap-2 px-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setIsDeleteConfirmOpen(false);
-                setWithdrawPassword('');
-              }}
-              className="flex-1 rounded-[1rem] py-2.5"
-            >
-              취소
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleDeleteAccount}
-              isLoading={withdrawMutation.isPending}
-              className="flex-1 rounded-[1rem] bg-[#D65F69] py-2.5 hover:bg-[#C44B56]"
-            >
-              확인
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3 py-2">
-          <div className="text-center">
-            <p className="text-text-main/75 text-sm font-bold">계정을 삭제하시겠습니까?</p>
-            <p className="text-text-main/50 mt-1 text-xs">삭제된 데이터는 복구되지 않습니다.</p>
-          </div>
-          <Input
-            label="비밀번호 확인"
-            type="password"
-            placeholder="계정 삭제를 위해 비밀번호 입력"
-            value={withdrawPassword}
-            onChange={(e) => setWithdrawPassword(e.target.value)}
-            className="rounded-[1rem] px-4 py-3 text-sm"
-          />
-        </div>
-      </Modal>
+      <WithdrawModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} />
     </div>
   );
 }

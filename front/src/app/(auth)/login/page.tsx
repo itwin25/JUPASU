@@ -1,7 +1,14 @@
 import Image from 'next/image';
 import SignInForm from '@/features/auth/components/SignInForm';
 
-export default function LoginPage() {
+interface LoginPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const error = typeof params.error === 'string' ? params.error : undefined;
+
   return (
     <div className="bg-background flex min-h-screen flex-col px-6 py-12">
       <div className="mt-12 mb-10 flex flex-col items-center justify-center space-y-6">
@@ -15,7 +22,7 @@ export default function LoginPage() {
       </div>
 
       <main className="mx-auto w-full max-w-md">
-        <SignInForm />
+        <SignInForm errorCode={error} />
       </main>
     </div>
   );

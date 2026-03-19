@@ -9,6 +9,8 @@ export interface UserInfo {
   friendCount: number;
 }
 
+export type UserMyPageResponse = UserInfo;
+
 /**
  * 프로필 수정 요청 타입
  */
@@ -22,6 +24,19 @@ export interface UpdateProfileRequest {
 
 export interface WithdrawRequest {
   password: string;
+}
+
+export interface UpdatePreferenceRequest {
+  sweetness?: number;
+  acidity?: number;
+  body?: number;
+  tannin?: number;
+  abv?: number;
+  preferredPriceMin?: number;
+  preferredPriceMax?: number;
+  preferredTypes?: string[];
+  preferredFlavors?: string[];
+  drinkingSituations?: string[];
 }
 
 export interface UserProfileResponse {

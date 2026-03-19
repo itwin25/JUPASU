@@ -22,14 +22,13 @@ public class UserMyPageResponse {
      * @param user 변환할 사용자 엔티티
      * @return 가공된 마이페이지 응답 DTO
      */
-    public static UserMyPageResponse from(User user) {
+    public static UserMyPageResponse from(User user, long wishlistCount, long friendCount, long reviewCount) {
         return UserMyPageResponse.builder()
                 .nickname(user.getNickname())
                 .character(user.getCharacter())
-                // TODO: 추후 수정 예정
-                .wishlistCount(8)
-                .reviewCount(user.getReviewCount() != null ? user.getReviewCount() : 0)
-                .friendCount(8)
+                .wishlistCount(wishlistCount)
+                .reviewCount(reviewCount)
+                .friendCount(friendCount)
                 .build();
     }
 }

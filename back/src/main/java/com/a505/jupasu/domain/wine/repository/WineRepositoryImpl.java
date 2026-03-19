@@ -3,16 +3,19 @@ package com.a505.jupasu.domain.wine.repository;
 import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.WineType;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.Order;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -26,33 +29,56 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Page<Wine> searchWines(WineSearchCondition condition, Pageable pageable) {
+    public Page<Wine> searchWines(WineSearchCondition condition, List<Long> matchingIds, Pageable pageable) {
 
-        List<Wine> content = queryFactory
+        BooleanBuilder builder = new BooleanBuilder();
+
+        if (matchingIds != null) {
+            builder.and(wine.id.in(matchingIds));
+        }
+
+        // 필터링
+        builder.and(typeEq(condition.type()));
+        builder.and(priceGoe(condition.minPrice()));
+        builder.and(priceLoe(condition.maxPrice()));
+        builder.and(ratingGoe(condition.minRate()));
+        builder.and(countryEq(condition.country()));
+
+        OrderSpecifier<?> [] orderSpecifiers = getOrderSpecifier(pageable);
+
+        // 조회 쿼리
+        JPAQuery<Wine> query = queryFactory
                 .selectFrom(wine)
-                .where(
-                        keywordContains(condition.getKeyword()),
-                        typeEq(condition.getType()),
-                        priceBetween(condition.getMinPrice(), condition.getMaxPrice()),
-                        ratingGoe(condition.getMinRate()),
-                        countryEq(condition.getCountry())
-                        )
-                .orderBy(getOrderSpecifier(pageable))
+                .where(builder)
                 .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch();
+                .limit(pageable.getPageSize());
 
-        JPAQuery<Long> countQuery = queryFactory
+        // 동적 정렬
+        if (StringUtils.hasText(condition.keyword())) {
+            NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
+                    "function('word_similarity', {0}, {1})", condition.keyword(), wine.nameKr);
+
+            query.orderBy(similarity.desc());
+            for (OrderSpecifier<?> orderSpecifier : orderSpecifiers) {
+                query.orderBy(orderSpecifier);
+            }
+        } else {
+            query.orderBy(orderSpecifiers);
+        }
+
+        List<Wine> content = query.fetch();
+
+        // 5. 카운트 쿼리
+        Long total = queryFactory
                 .select(wine.count())
                 .from(wine)
-                .where(
-                        keywordContains(condition.getKeyword()),
-                        typeEq(condition.getType()),
-                        priceBetween(condition.getMinPrice(), condition.getMaxPrice()),
-                        ratingGoe(condition.getMinRate()),
-                        countryEq(condition.getCountry())
-                );
-        return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
+                .where(builder) // 본 쿼리와 동일한 builder 적용
+                .fetchOne();
+
+        long totalCount = total != null ? total : 0L;
+
+        return new PageImpl<>(content, pageable, totalCount);
+
     }
 
     //=============================================================
@@ -61,12 +87,16 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     /**
      * 와인 이름에 키워드가 포함되어있는지 검사
      */
-    private BooleanExpression keywordContains(String keyword) {
+    private BooleanExpression keywordSimilarity(String keyword) {
         if (!StringUtils.hasText(keyword)) {
             return null;
         }
-        return wine.nameKr.containsIgnoreCase(keyword)
-                .or(wine.nameEn.containsIgnoreCase(keyword));
+        // PostgreSQL word_similarity 함수 호출
+        NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
+                "function('word_similarity', {0}, {1})", keyword, wine.nameKr);
+
+        // 유사도 점수 0.1 이상인 것만 필터링 (기존 <% 연산자와 동일한 역할)
+        return similarity.gt(0.1);
     }
 
     /**
@@ -79,29 +109,26 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     /**
      * 와인 가격 범위 검사
      */
-    private BooleanExpression priceBetween(Integer minPrice, Integer maxPrice) {
-        if(minPrice !=  null && maxPrice != null) {
-            return wine.price.between(minPrice, maxPrice);
-        } else if(minPrice != null) {
-            return wine.price.goe(minPrice);
-        } else if(maxPrice != null) {
-            return wine.price.loe(maxPrice);
-        }
-        return null;
+    private BooleanExpression priceGoe(Integer minPrice) {
+        return minPrice != null ? wine.priceAndRating.price.goe(minPrice) : null;
+    }
+
+    private BooleanExpression priceLoe(Integer maxPrice) {
+        return maxPrice != null ? wine.priceAndRating.price.loe(maxPrice) : null;
     }
 
     /**
      * 와인 평균 평점 범위 검사
      */
     private BooleanExpression ratingGoe(Double minRate) {
-        return minRate != null ? wine.averageRating.goe(minRate) : null;
+        return minRate != null ? wine.priceAndRating.averageRating.goe(minRate) : null;
     }
 
     /**
      * 와인 원산지 검사
      */
     private BooleanExpression countryEq (String country) {
-        return StringUtils.hasText(country) ? wine.country.eq(country) : null;
+        return StringUtils.hasText(country) ? wine.origin.country.eq(country) : null;
     }
 
     //===================================================
@@ -128,14 +155,14 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
                 case "price":
                     orderSpecifiers.add(new OrderSpecifier<>(
                             direction,
-                            wine.price,
+                            wine.priceAndRating.price,
                             OrderSpecifier.NullHandling.NullsLast
                     ));
                     break;
                 case "rating":
                     orderSpecifiers.add(new OrderSpecifier<>(
                             direction,
-                            wine.averageRating,
+                            wine.priceAndRating.averageRating,
                             OrderSpecifier.NullHandling.NullsLast));
                     break;
                 default:

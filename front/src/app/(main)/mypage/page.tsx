@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useUserMyPage } from '@/features/user/hooks/useUserMyPage';
+import { useTasteReportQuery } from '@/features/report/hooks/useTasteReportQuery';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,10 +19,28 @@ import {
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useSignout } from '@/features/auth/hooks';
+import {
+  useDeleteFriendMutation,
+  useFriendListQuery,
+  useInviteFriendMutation,
+  usePendingFriendListQuery,
+  useRespondFriendRequestMutation,
+} from '@/features/friend/hooks/useFriendQueries';
+import {
+  useDeleteReviewMutation,
+  useMyReviewsQuery,
+  useUpdateReviewMutation,
+} from '@/features/review/hooks/useWineReviewsQuery';
+import { ReviewModal } from '@/features/review/components';
+import {
+  useWineScrapListQuery,
+  useWineScrapMutation,
+} from '@/features/wine/hooks/useWineListQuery';
 import { cn } from '@/lib/utils';
 
 type ReviewItem = {
   id: number;
+  wineId?: number;
   author: string;
   wineName: string;
   subtitle: string;
@@ -32,6 +52,8 @@ type ReviewItem = {
 
 type WishlistItem = {
   id: number;
+  wineId?: number;
+  scrapId?: number;
   name: string;
   subtitle: string;
   rating: number;
@@ -42,19 +64,21 @@ type WishlistItem = {
 
 type FriendItem = {
   id: number;
+  requestId?: number;
+  friendId?: number;
   name: string;
   winesTasted: number;
   avatar: string;
 };
 
 type SearchFriendItem = FriendItem & {
-  status: 'friend' | 'pending';
+  status: 'friend' | 'pending' | 'idle';
 };
 
 const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 1,
-    author: '와인수인',
+    author: '와인초보',
     wineName: 'Cloudy Bay',
     subtitle: 'Sauvignon Blanc',
     rating: 4,
@@ -117,6 +141,36 @@ const PAGINATION = [1, 2, 3, 4, 5];
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
 
+function resolveCharacterImage(character?: string, level: number = 1) {
+  if (!character) return '/tiger1.png';
+  if (character.startsWith('/')) return character;
+  return `/${character}${level}.png`;
+}
+
+function getCountryCode(country?: string) {
+  switch (country?.toLowerCase()) {
+    case 'france':
+      return 'FR';
+    case 'italy':
+      return 'IT';
+    case 'spain':
+      return 'ES';
+    case 'new zealand':
+      return 'NZ';
+    case 'usa':
+    case 'united states':
+      return 'US';
+    case 'chile':
+      return 'CL';
+    case 'argentina':
+      return 'AR';
+    case 'australia':
+      return 'AU';
+    default:
+      return country?.slice(0, 2).toUpperCase() ?? '--';
+  }
+}
+
 function Pagination() {
   return (
     <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
@@ -141,11 +195,38 @@ function Pagination() {
   );
 }
 
+// 레이더 차트 (오각형) 좌표 계산을 위한 헬퍼 함수
+// value: 0 ~ maxVal 기준
+// maxXY: 배경 다각형의 각 꼭짓점 좌표 (x, y)
+function calculateRadarPoint(
+  value: number,
+  maxVal: number,
+  maxXY: [number, number],
+  centerXY = 120,
+) {
+  const scaledValue = Math.min(Math.max(value, 0), maxVal);
+  const ratio = scaledValue / maxVal;
+
+  const [maxX, maxY] = maxXY;
+  const x = centerXY + (maxX - centerXY) * ratio;
+  const y = centerXY + (maxY - centerXY) * ratio;
+
+  return `${x},${y}`;
+}
+
 export default function MyPage() {
+  const { data: profile, isLoading } = useUserMyPage();
+  const { data: myReviews = [] } = useMyReviewsQuery();
+  const { data: scrapListData } = useWineScrapListQuery();
+  const { data: friendListData } = useFriendListQuery();
+  const { data: pendingFriendListData } = usePendingFriendListQuery();
+  const { data: tasteReport, isLoading: isReportLoading } = useTasteReportQuery();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
-  const [activeModal, setActiveModal] = useState<'wishlist' | 'reviews' | 'friends' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    'wishlist' | 'reviews' | 'friends' | 'terms' | null
+  >(null);
   const [friendTab, setFriendTab] = useState<'list' | 'search' | 'requests'>('list');
   const [reviews, setReviews] = useState(INITIAL_REVIEWS);
   const [activeReviewMenuId, setActiveReviewMenuId] = useState<number | null>(null);
@@ -154,15 +235,107 @@ export default function MyPage() {
   const [editedContent, setEditedContent] = useState('');
   const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+  const [reviewOverrides, setReviewOverrides] = useState<
+    Record<number, Pick<ReviewItem, 'content' | 'rating'>>
+  >({});
+  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
+  const [sentInviteIds, setSentInviteIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
-  const editingReview = reviews.find((review) => review.id === editingReviewId) ?? null;
+  const inviteFriendMutation = useInviteFriendMutation();
+  const respondFriendRequestMutation = useRespondFriendRequestMutation();
+  const deleteFriendMutation = useDeleteFriendMutation();
+  const updateReviewMutation = useUpdateReviewMutation();
+  const deleteReviewMutation = useDeleteReviewMutation();
+  const wineScrapMutation = useWineScrapMutation();
+  const wishlistItems = useMemo<WishlistItem[]>(
+    () =>
+      scrapListData
+        ? scrapListData.map((item) => ({
+            id: item.scrapId,
+            wineId: item.wineId,
+            scrapId: item.scrapId,
+            name: item.wineName,
+            subtitle: item.wineType,
+            rating: item.averageRating,
+            price: `₩${item.price.toLocaleString('ko-KR')}`,
+            countryFlag: getCountryCode(item.country),
+            match: `${item.matchRate}%`,
+          }))
+        : WISHLIST_ITEMS,
+    [scrapListData],
+  );
+  const mappedReviews = useMemo<ReviewItem[]>(
+    () =>
+      myReviews.map((review) => {
+        const override = reviewOverrides[review.reviewId];
+        const createdDate = new Date(review.createdAt);
 
-  const filteredFriendResults = useMemo(() => {
-    if (!friendSearchQuery.trim()) return SEARCH_RESULTS;
+        return {
+          id: review.reviewId,
+          wineId: review.wineId,
+          author: review.nickname,
+          wineName: review.wineName,
+          subtitle: '작성한 리뷰',
+          rating: override?.rating ?? review.rating,
+          content: override?.content ?? review.content,
+          date: Number.isNaN(createdDate.getTime())
+            ? ''
+            : createdDate.toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
+          avatar: '/dog1.svg',
+        };
+      }),
+    [myReviews, reviewOverrides],
+  );
+  const visibleReviews = (myReviews.length > 0 ? mappedReviews : reviews).filter(
+    (review) => !deletedReviewIds.includes(review.id),
+  );
+  const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
+  const visibleFriends = useMemo<FriendItem[]>(
+    () =>
+      friendListData
+        ? friendListData.map((friend) => ({
+            id: friend.friendId,
+            requestId: friend.requestId,
+            friendId: friend.friendId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIENDS,
+    [friendListData],
+  );
+  const visiblePendingFriends = useMemo<FriendItem[]>(
+    () =>
+      pendingFriendListData
+        ? pendingFriendListData.map((friend) => ({
+            id: friend.requesterId,
+            requestId: friend.requestId,
+            friendId: friend.requesterId,
+            name: friend.nickname,
+            winesTasted: 0,
+            avatar: resolveCharacterImage(friend.character),
+          }))
+        : FRIEND_REQUESTS,
+    [pendingFriendListData],
+  );
+
+  const filteredFriendResults = useMemo<SearchFriendItem[]>(() => {
+    const friendIds = new Set(visibleFriends.map((friend) => friend.friendId ?? friend.id));
+    const pendingIds = new Set([
+      ...visiblePendingFriends.map((friend) => friend.friendId ?? friend.id),
+      ...sentInviteIds,
+    ]);
+
+    const searchResults: SearchFriendItem[] = SEARCH_RESULTS.map((friend) => ({
+      ...friend,
+      status: friendIds.has(friend.id) ? 'friend' : pendingIds.has(friend.id) ? 'pending' : 'idle',
+    }));
+
+    if (!friendSearchQuery.trim()) return searchResults;
     const query = friendSearchQuery.toLowerCase();
-    return SEARCH_RESULTS.filter((friend) => friend.name.toLowerCase().includes(query));
-  }, [friendSearchQuery]);
+    return searchResults.filter((friend) => friend.name.toLowerCase().includes(query));
+  }, [friendSearchQuery, sentInviteIds, visibleFriends, visiblePendingFriends]);
 
   const handleLogout = () => {
     handleSignout();
@@ -181,24 +354,107 @@ export default function MyPage() {
     setEditedRating(0);
   };
 
-  const saveReview = () => {
+  const saveReview = async () => {
     if (!editingReview) return;
+    const trimmedContent = editedContent.trim();
+    if (!trimmedContent || editedRating === 0) return;
 
-    setReviews((prev) =>
-      prev.map((review) =>
-        review.id === editingReview.id
-          ? { ...review, content: editedContent.trim(), rating: editedRating }
-          : review,
-      ),
-    );
+    if (myReviews.length > 0 && editingReview.wineId) {
+      await updateReviewMutation.mutateAsync({
+        wineId: editingReview.wineId,
+        reviewId: editingReview.id,
+        rating: editedRating,
+        content: trimmedContent,
+      });
+    } else {
+      setReviews((prev) =>
+        prev.map((review) =>
+          review.id === editingReview.id
+            ? { ...review, content: trimmedContent, rating: editedRating }
+            : review,
+        ),
+      );
+    }
     closeReviewEditModal();
   };
 
-  const deleteReview = () => {
+  const deleteReview = async () => {
     if (deletingReviewId === null) return;
-    setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    const deletingReview = visibleReviews.find((review) => review.id === deletingReviewId) ?? null;
+
+    if (myReviews.length > 0 && deletingReview?.wineId) {
+      await deleteReviewMutation.mutateAsync({
+        wineId: deletingReview.wineId,
+        reviewId: deletingReview.id,
+      });
+    } else {
+      setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    }
     setDeletingReviewId(null);
   };
+
+  const handleInviteFriend = async (friend: SearchFriendItem) => {
+    if (friend.status !== 'idle') return;
+    const receiverIdMap: Record<number, number> = {
+      21: 5,
+      22: 3,
+      23: 4,
+    };
+    const receiverId = receiverIdMap[friend.id] ?? friend.id;
+
+    await inviteFriendMutation.mutateAsync({
+      receiverId,
+      receiverNickname: friend.name,
+    });
+    setSentInviteIds((prev) => [...prev, receiverId]);
+  };
+
+  const handleFriendRequestResponse = async (
+    requestId: number | undefined,
+    status: 'ACCEPTED' | 'REJECTED',
+  ) => {
+    if (!requestId) return;
+
+    await respondFriendRequestMutation.mutateAsync({
+      requestId,
+      status,
+    });
+  };
+
+  const handleDeleteFriend = async (requestId: number | undefined) => {
+    if (!requestId) return;
+
+    await deleteFriendMutation.mutateAsync(requestId);
+  };
+
+  const handleToggleWishlist = async (wineId: number | undefined) => {
+    if (!wineId) return;
+
+    await wineScrapMutation.mutateAsync(wineId);
+  };
+
+  // 차트 좌표 생성 중심점 120, 베이스 기준 반경 75
+  const radarChartPoints = useMemo(() => {
+    if (!tasteReport?.radarChart) {
+      // 데이터가 없을 때의 기본 빈 오각형
+      return '120,45 191,97 164,181 76,181 49,97';
+    }
+
+    const radar = tasteReport.radarChart;
+    const p1 = calculateRadarPoint(radar.tannin, 100, [120, 30]); // 상단: 탄닌
+    const p2 = calculateRadarPoint(radar.acidity, 100, [195, 84]); // 우상단: 산미
+    const p3 = calculateRadarPoint(radar.body, 100, [166, 173]); // 우하단: 바디
+    const p4 = calculateRadarPoint(radar.sweetness, 100, [74, 173]); // 좌하단: 당도
+    const p5 = calculateRadarPoint(radar.alcohol, 20, [45, 84]); // 좌상단: 도수
+
+    return `${p1} ${p2} ${p3} ${p4} ${p5}`;
+  }, [tasteReport]);
+
+  // 레벨 계산: 리뷰 5개당 1레벨, 최대 5레벨
+  const currentReviewCount = profile?.reviewCount || 0;
+  const currentLevel = Math.min(Math.floor(currentReviewCount / 5) + 1, 5);
+  const progressInLevel = currentLevel === 5 ? 5 : currentReviewCount % 5;
+  const progressPercentage = (progressInLevel / 5) * 100;
 
   return (
     <div className="bg-background min-h-screen pb-24">
@@ -249,10 +505,17 @@ export default function MyPage() {
         <section className="border-primary-100 rounded-[1.5rem] border bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
-              <Image src="/dog1.svg" alt="프로필 이미지" fill className="object-cover" />
+              <Image
+                src={resolveCharacterImage(profile?.character ?? 'tiger', currentLevel)}
+                alt="프로필 이미지"
+                fill
+                className="object-cover"
+              />
             </div>
             <div>
-              <h2 className="text-text-main text-lg font-black">와인수인</h2>
+              <h2 className="text-text-main text-lg font-black">
+                {isLoading ? '로딩 중...' : profile?.nickname || '사용자'}
+              </h2>
               <p className="text-text-main/45 mt-1 text-sm font-medium">
                 오늘도 취향을 한 잔씩 쌓는 중
               </p>
@@ -260,21 +523,21 @@ export default function MyPage() {
           </div>
 
           <div className="mt-5 rounded-[1.25rem] bg-[#F9F7F2] p-3">
-            <div className="h-3 rounded-full bg-white">
+            <div className="relative h-3 overflow-hidden rounded-full bg-white">
               <div
-                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262]"
-                style={{ width: '15%' }}
+                className="h-3 rounded-full bg-gradient-to-r from-[#D65F69] to-[#B36262] transition-all duration-500"
+                style={{ width: `${progressPercentage}%` }}
               />
             </div>
           </div>
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
             <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">8</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.wishlistCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
             <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{reviews.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.reviewCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
             <button
@@ -284,7 +547,7 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
-              <p className="text-lg font-black text-[#B36262]">{FRIENDS.length}</p>
+              <p className="text-lg font-black text-[#B36262]">{profile?.friendCount ?? 0}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
@@ -296,7 +559,10 @@ export default function MyPage() {
           <div className="border-primary-100 mt-3 rounded-[1.5rem] border bg-white p-4 shadow-sm">
             <div className="bg-white px-1 py-1">
               <p className="text-text-main text-center text-[11px] leading-relaxed font-black">
-                와인초보님은 &apos;상큼하고 가벼운&apos; 화이트 와인 취향이에요!
+                {isReportLoading
+                  ? '리포트를 불러오는 중이에요...'
+                  : tasteReport?.mainTitle ||
+                    "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
               </p>
 
               <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
@@ -313,31 +579,66 @@ export default function MyPage() {
                     <line x1="120" y1="120" x2="74" y2="173" />
                     <line x1="120" y1="120" x2="45" y2="84" />
                   </g>
+                  {/* 동적으로 계산된 좌표로 다각형 생성 */}
                   <polygon
-                    points="120,73 171,98 157,157 86,163 61,97"
+                    points={radarChartPoints}
                     fill="rgba(196, 91, 91, 0.16)"
                     stroke="#C75B5B"
                     strokeWidth="4"
                     strokeLinejoin="round"
+                    className="transition-all duration-700 ease-in-out"
                   />
                 </svg>
 
-                <span className="text-text-main/55 absolute top-0 left-1/2 -translate-x-1/2 text-[10px] font-medium">
-                  탄닌
-                </span>
-                <span className="text-text-main/55 absolute top-[72px] right-[2px] text-[10px] font-medium">
-                  산미
-                </span>
-                <span className="text-text-main/55 absolute right-[34px] bottom-[28px] text-[10px] font-medium">
-                  바디
-                </span>
-                <span className="text-text-main/55 absolute bottom-[28px] left-[34px] text-[10px] font-medium">
-                  당도
-                </span>
-                <span className="text-text-main/55 absolute top-[72px] left-[0px] text-[10px] font-medium">
-                  도수
-                </span>
-                <button className="absolute right-[2px] bottom-[26px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white">
+                <div className="absolute top-[-10px] left-1/2 flex -translate-x-1/2 flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    탄닌
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.tannin ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute top-[68px] right-[-10px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    산미
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.acidity ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute right-[22px] bottom-[20px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    바디
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.body ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute bottom-[20px] left-[22px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    당도
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.sweetness ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                  </span>
+                </div>
+                <div className="absolute top-[68px] left-[-10px] flex flex-col items-center">
+                  <span className="text-text-main/55 mb-0.5 text-[10px] leading-none font-medium">
+                    도수
+                  </span>
+                  <span className="text-[10px] leading-none font-black text-[#C75B5B]">
+                    {tasteReport?.radarChart?.alcohol ?? 0}
+                    <span className="text-text-main/40 text-[8px] font-medium">/20</span>
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveModal('terms')}
+                  className="absolute right-[-10px] bottom-[16px] flex h-4 w-4 items-center justify-center rounded-full bg-[#A76B6B] text-[10px] font-bold text-white transition-transform hover:scale-110"
+                >
                   ?
                 </button>
               </div>
@@ -353,8 +654,9 @@ export default function MyPage() {
                   🧑🏻
                 </div>
                 <p className="text-text-main/80 text-[12px] leading-5 font-medium">
-                  과일향이 풍부하고 당도가 적절한 와인을 산미가 살아있는 와인에 높은 점수를
-                  주셨어요. 탄닌이 강하지 않은 미디엄 바디 스타일을 선호하는 편이에요.
+                  {isReportLoading
+                    ? '분석 결과를 불러오는 중...'
+                    : tasteReport?.content || '리포트 내용이 없습니다.'}
                 </p>
               </div>
 
@@ -376,7 +678,9 @@ export default function MyPage() {
                   </div>
                   {isBestOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.bestDescription || 'Best 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
@@ -398,7 +702,9 @@ export default function MyPage() {
                   </div>
                   {isWorstOpen && (
                     <p className="text-text-main/65 mt-2 text-[11px] leading-5 font-medium">
-                      피노 누아, 리슬링, 소비뇽 블랑 계열을 더 탐색해 보세요!
+                      {isReportLoading
+                        ? '불러오는 중...'
+                        : tasteReport?.worstDescription || 'Worst 와인 설명이 없습니다.'}
                     </p>
                   )}
                 </button>
@@ -407,6 +713,50 @@ export default function MyPage() {
           </div>
         </section>
       </main>
+
+      {/* 용어 설명 모달 */}
+      <Modal
+        isOpen={activeModal === 'terms'}
+        onClose={() => setActiveModal(null)}
+        title="와인 용어 설명"
+        hideDefaultFooter
+        className={modalClassName}
+      >
+        <div className="bg-primary-100/80 mb-4 h-px" />
+        <div className="text-text-main space-y-4 text-[13px] leading-relaxed">
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">탄닌 (Tannin)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              입안을 마르게 하거나 떫은 맛을 내는 성분이에요. 주로 포도 껍질과 씨에서 나옵니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">산미 (Acidity)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              포도의 산 성분으로 인해 느껴지는 신맛이에요. 와인에 상쾌함과 생기를 줍니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">바디 (Body)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              입안에서 느껴지는 와인의 무게감이나 질감이에요. 물(가벼움)과 우유(무거움)의 차이와
+              비슷해요.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">당도 (Sweetness)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              와인에서 느껴지는 단맛이에요. 발효 후 남은 잔당의 양에 따라 결정됩니다.
+            </p>
+          </div>
+          <div className="rounded-[1rem] border border-[#E9D5D1] bg-[#FBFAF7] p-3 shadow-sm">
+            <h4 className="mb-1 font-black text-[#A76B6B]">도수 (Alcohol)</h4>
+            <p className="text-text-main/80 text-[12px]">
+              와인에 포함된 알코올의 비율이에요. 효모가 당을 분해하여 생성합니다.
+            </p>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={activeModal === 'wishlist'}
@@ -417,7 +767,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {WISHLIST_ITEMS.map((item) => (
+          {wishlistItems.map((item) => (
             <div
               key={item.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
@@ -433,7 +783,9 @@ export default function MyPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 pt-0.5">
-                      <span className="text-xs">{item.countryFlag}</span>
+                      <span className="text-text-main/55 text-[10px] font-black">
+                        {item.countryFlag}
+                      </span>
                       <span className="text-[10px] font-black text-[#C87E7A]">{item.match}</span>
                     </div>
                   </div>
@@ -442,7 +794,10 @@ export default function MyPage() {
                       <span className="text-[11px] font-black text-[#D89A4F]">★ {item.rating}</span>
                       <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
                     </div>
-                    <button className="text-[#CC5C57]">
+                    <button
+                      onClick={() => handleToggleWishlist(item.wineId)}
+                      className="text-[#CC5C57]"
+                    >
                       <Heart size={16} fill="currentColor" />
                     </button>
                   </div>
@@ -466,7 +821,7 @@ export default function MyPage() {
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
         <div className="space-y-3">
-          {reviews.map((review) => (
+          {visibleReviews.map((review) => (
             <div
               key={review.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
@@ -535,8 +890,51 @@ export default function MyPage() {
         <Pagination />
       </Modal>
 
-      <Modal
+      <ReviewModal
+        key={`${editingReview?.id ?? 'closed'}-${editingReview?.rating ?? 0}`}
         isOpen={editingReview !== null}
+        onClose={closeReviewEditModal}
+        onSubmit={async ({ rating, content }) => {
+          if (!editingReview) return;
+
+          const trimmedContent = content.trim();
+          if (!trimmedContent || rating === 0) return;
+
+          if (myReviews.length > 0 && editingReview.wineId) {
+            await updateReviewMutation.mutateAsync({
+              wineId: editingReview.wineId,
+              reviewId: editingReview.id,
+              rating,
+              content: trimmedContent,
+            });
+          } else {
+            setReviews((prev) =>
+              prev.map((review) =>
+                review.id === editingReview.id
+                  ? { ...review, content: trimmedContent, rating }
+                  : review,
+              ),
+            );
+          }
+
+          closeReviewEditModal();
+        }}
+        initialData={
+          editingReview
+            ? {
+                rating: editingReview.rating,
+                content: editingReview.content,
+              }
+            : undefined
+        }
+        wineInfo={{
+          name: editingReview?.wineName ?? '',
+          category: editingReview?.subtitle ?? '',
+        }}
+      />
+
+      <Modal
+        isOpen={false && editingReview !== null}
         onClose={closeReviewEditModal}
         title="리뷰 수정"
         hideDefaultFooter
@@ -657,7 +1055,7 @@ export default function MyPage() {
                 onClick={() => setFriendTab('requests')}
                 className="rounded-full bg-[#C57070] px-3 py-1.5 text-[11px] font-black text-white"
               >
-                친구 요청 ({FRIEND_REQUESTS.length})
+                친구 요청 ({visiblePendingFriends.length})
               </button>
             </div>
 
@@ -680,9 +1078,11 @@ export default function MyPage() {
             </button>
 
             <div>
-              <p className="text-text-main/45 mb-3 text-sm font-medium">친구 {FRIENDS.length}명</p>
+              <p className="text-text-main/45 mb-3 text-sm font-medium">
+                친구 {visibleFriends.length}명
+              </p>
               <div className="max-h-[18rem] space-y-2.5 overflow-y-auto pr-1">
-                {FRIENDS.map((friend) => (
+                {visibleFriends.map((friend) => (
                   <div
                     key={friend.id}
                     className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-2.5"
@@ -707,7 +1107,10 @@ export default function MyPage() {
                       <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
                         프로필
                       </button>
-                      <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                      <button
+                        onClick={() => handleDeleteFriend(friend.requestId)}
+                        className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                      >
                         삭제
                       </button>
                     </div>
@@ -720,7 +1123,7 @@ export default function MyPage() {
 
         {friendTab === 'requests' && (
           <div className="space-y-2.5">
-            {FRIEND_REQUESTS.map((friend) => (
+            {visiblePendingFriends.map((friend) => (
               <div
                 key={friend.id}
                 className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
@@ -732,10 +1135,16 @@ export default function MyPage() {
                   <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'ACCEPTED')}
+                    className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]"
+                  >
                     수락
                   </button>
-                  <button className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black">
+                  <button
+                    onClick={() => handleFriendRequestResponse(friend.requestId, 'REJECTED')}
+                    className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                  >
                     거절
                   </button>
                 </div>
@@ -776,12 +1185,14 @@ export default function MyPage() {
                     </div>
                   </div>
                   <button
+                    onClick={() => handleInviteFriend(friend)}
                     className={cn(
                       'rounded-full px-3.5 py-1 text-[10px] font-black',
                       friend.status === 'friend'
                         ? 'bg-[#8B8B8B] text-white'
                         : 'bg-[#F6EAEA] text-[#B17672]',
                     )}
+                    disabled={friend.status !== 'idle'}
                   >
                     {friend.status === 'friend' ? '친구' : '친구 요청'}
                   </button>

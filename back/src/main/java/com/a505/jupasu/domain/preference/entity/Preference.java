@@ -42,7 +42,7 @@ public class Preference {
     // 선호 탄닌 (1~10 척도)
     private Integer tannin;
 
-    // 선호 도수 (1~10 척도)
+    // 선호 도수 (실제 도수 %, 예: 13)
     private Integer Abv;
 
     // 선호 가격대 최소 (단위: 원)
@@ -54,6 +54,10 @@ public class Preference {
     // AI가 생성한 유저 취향 요약 텍스트
     @Column(columnDefinition = "TEXT")
     private String preferSummary;
+
+    // 리포트 갱신 여부
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean isReportOutdated = true;
 
     // 선호 와인 종류 리스트 (다중 선택)
     @ElementCollection(targetClass = WineType.class)
@@ -123,5 +127,14 @@ public class Preference {
         if (wineTypes != null) this.preferredWineTypes = wineTypes;
         if (flavors != null) this.preferredFlavors = flavors;
         if (situations != null) this.drinkingSituations = situations;
+    }
+
+    public void markReportAsOutdated() {
+        this.isReportOutdated = true;
+    }
+
+    public void updateReportSummary(String summary) {
+        this.preferSummary = summary;
+        this.isReportOutdated = false;
     }
 }

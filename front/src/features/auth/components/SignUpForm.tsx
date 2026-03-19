@@ -2,22 +2,62 @@
 
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { UseMutationResult } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { AxiosError } from 'axios';
 
 import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
 import { signupSchema, SignupSchema } from '@/features/auth/schemas/auth.schema';
-import { useSignup } from '@/features/auth/hooks/useSignup';
-import { AuthErrorResponse } from '@/features/auth/types/auth.types';
+import { AuthErrorResponse, AuthResponse, SignupRequest } from '@/features/auth/types/auth.types';
 
-interface Step1FormProps {
-  mutations: ReturnType<typeof useSignup>['mutations'];
+type SignUpMutations = {
+  requestOtpAction: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    string,
+    unknown
+  >;
+  verifyOtp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    { email: string; code: string },
+    unknown
+  >;
+  signUp: UseMutationResult<
+    AuthResponse<null>,
+    AxiosError<AuthErrorResponse>,
+    SignupRequest,
+    unknown
+  >;
+};
+
+interface SignUpFormProps {
+  mutations: SignUpMutations;
+  setNickname: (nickname: string) => void;
+  nicknameMessage?: string;
+  isValidatingNickname: boolean;
+  isNicknameAvailable: boolean;
   onSuccess: () => void;
+  authCodeTimeLeft: string;
+  isAuthCodeExpired: boolean;
+  resendSeconds: number;
+  isSentOnce: boolean;
 }
 
-export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
+export default function SignUpForm({
+  mutations,
+  setNickname,
+  nicknameMessage,
+  isValidatingNickname,
+  isNicknameAvailable,
+  onSuccess,
+  authCodeTimeLeft,
+  isAuthCodeExpired,
+  resendSeconds,
+  isSentOnce,
+}: SignUpFormProps) {
   const [currentSubStep, setCurrentSubStep] = useState(1);
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
@@ -49,15 +89,26 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
 
   const isAgeChecked = useWatch({ control, name: 'isAgeChecked' });
 
+  const shouldShowEmail = isNicknameAvailable || currentSubStep >= 2;
+
   const handleAuthSend = async () => {
     if (!(await trigger('email'))) return;
     requestOtp.mutate(getValues('email'), {
       onSuccess: () => {
         clearErrors('email');
-        setCurrentSubStep(3);
+        setCurrentSubStep(3); // 성공 이벤트 시점에 상태 변경 (안전)
       },
-      onError: (error: AxiosError<AuthErrorResponse>) =>
-        setError('email', { message: error.response?.data?.message || '발송 실패' }),
+      onError: (error: AxiosError<AuthErrorResponse>) => {
+        const message = error.response?.data?.message || '발송 실패';
+        // 60초 관련 에러는 타이머 UI로 대체하므로 폼 에러에서 제외
+        if (!message.includes('60초')) {
+          setError('email', { message });
+        } else {
+          clearErrors('email');
+          // 60초 에러이지만 이미 가입된 이메일 여부 등은 subStep이 넘어가지 않은 상태여야 함
+          // 비밀번호 재설정과는 달리 회원가입은 subStep 3으로 넘어가면 이메일 수정이 안 되므로 주의
+        }
+      },
     });
   };
 
@@ -89,65 +140,98 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
   return (
     <form onSubmit={handleSubmit(onFinalSubmit)} className="space-y-8 pb-10">
       <h2 className="text-primary-700 text-sm font-black tracking-widest uppercase">
-        Step 1 - 기본 정보
+        Sign Up - 기본 정보
       </h2>
 
       <div className="space-y-6">
-        {/* 닉네임 */}
-        <Input
-          label="닉네임"
-          placeholder="와인을 사랑하는 사람"
-          {...register('nickname', {
-            onChange: (e) => {
-              if (e.target.value.length >= 2 && currentSubStep === 1) {
-                setCurrentSubStep(2);
-              }
-            },
-          })}
-          error={errors.nickname?.message}
-          required
-        />
-
-        {/* 이메일 */}
-        {currentSubStep >= 2 && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 flex items-start gap-2">
-            <div className="flex-1">
-              <Input
-                label="이메일"
-                type="email"
-                placeholder="example@email.com"
-                {...register('email')}
-                error={errors.email?.message}
-                disabled={currentSubStep > 2}
-                required
-              />
+        {/* 1. 닉네임 섹션 */}
+        <div className="space-y-1.5">
+          <Input
+            label="닉네임"
+            placeholder="와인을 사랑하는 사람"
+            {...register('nickname', {
+              onChange: (e) => setNickname(e.target.value),
+            })}
+            error={isValidatingNickname ? undefined : errors.nickname?.message || nicknameMessage}
+            required
+            suffix={isNicknameAvailable && <CheckCircle2 size={18} className="text-green-500" />}
+          />
+          {/* 상태 메시지 영역 (Type Error 해결을 위해 helperText 대신 별도 div 사용) */}
+          {!errors.nickname && !nicknameMessage && (
+            <div className="px-1 text-xs font-medium">
+              {isValidatingNickname && <span className="text-text-main/40">중복 확인 중...</span>}
+              {isNicknameAvailable && (
+                <span className="text-green-600">사용 가능한 닉네임입니다.</span>
+              )}
             </div>
-            {currentSubStep === 2 && (
-              <div className="pt-[26px]">
-                <Button
-                  type="button"
-                  onClick={handleAuthSend}
-                  isLoading={requestOtp.isPending}
-                  variant="secondary"
-                  className="h-[56px]"
-                >
-                  인증
-                </Button>
+          )}
+        </div>
+
+        {/* 2. 이메일 섹션 */}
+        {shouldShowEmail && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 space-y-1.5">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                <Input
+                  label="이메일"
+                  type="email"
+                  placeholder="example@email.com"
+                  {...register('email')}
+                  error={errors.email?.message}
+                  disabled={currentSubStep >= 3}
+                  required
+                />
+              </div>
+              {currentSubStep < 3 && (
+                <div className="pt-[26px]">
+                  <Button
+                    type="button"
+                    onClick={handleAuthSend}
+                    isLoading={requestOtp.isPending}
+                    disabled={resendSeconds > 0}
+                    variant="secondary"
+                    className="h-[56px] min-w-[80px]"
+                  >
+                    {isSentOnce ? '재전송' : '인증'}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {resendSeconds > 0 && currentSubStep < 3 && (
+              <div className="flex items-center justify-between bg-white p-4">
+                <p className="text-primary-600 animate-in fade-in ml-1 text-xs font-medium duration-300">
+                  메일을 못 받으셨나요?
+                </p>
+                <p className="text-primary-600 animate-in fade-in ml-1 text-xs font-medium duration-300">
+                  {resendSeconds}초 후 재전송
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* 인증번호 */}
+        {/* 3. 인증번호 섹션 */}
         {currentSubStep >= 3 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 flex items-end gap-2">
             <div className="flex-1">
               <Input
                 placeholder="인증번호"
                 {...register('authCode')}
-                error={errors.authCode?.message}
-                disabled={currentSubStep > 3}
+                error={
+                  isAuthCodeExpired
+                    ? '인증 시간이 만료되었습니다. 다시 시도해 주세요.'
+                    : errors.authCode?.message
+                }
+                disabled={currentSubStep >= 4}
                 required
+                suffix={
+                  currentSubStep === 3 &&
+                  !isAuthCodeExpired && (
+                    <span className="text-primary-600 mr-2 text-sm font-medium">
+                      {authCodeTimeLeft}
+                    </span>
+                  )
+                }
               />
             </div>
             {currentSubStep === 3 && (
@@ -163,7 +247,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           </div>
         )}
 
-        {/* 비밀번호 섹션 */}
+        {/* 4. 비밀번호 섹션 */}
         {currentSubStep >= 4 && (
           <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
             <Input
@@ -173,7 +257,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
               {...register('password')}
               error={errors.password?.message}
               suffix={
-                <button type="button" onClick={() => setShowPw(!showPw)}>
+                <button type="button" onClick={() => setShowPw(!showPw)} className="pr-2">
                   {showPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               }
@@ -187,7 +271,11 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
               error={errors.confirmPassword?.message}
               onBlur={handlePwGroupBlur}
               suffix={
-                <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPw(!showConfirmPw)}
+                  className="pr-2"
+                >
                   {showConfirmPw ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               }
@@ -196,7 +284,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
           </div>
         )}
 
-        {/* 연령 체크 */}
+        {/* 5. 연령 체크 섹션 */}
         {currentSubStep >= 5 && (
           <div
             onClick={() => setValue('isAgeChecked', !isAgeChecked, { shouldValidate: true })}
@@ -218,7 +306,7 @@ export default function Step1Form({ mutations, onSuccess }: Step1FormProps) {
       <Button
         type="submit"
         size="full"
-        disabled={!isAgeChecked || signUp.isPending}
+        disabled={!isAgeChecked || signUp.isPending || !isNicknameAvailable}
         isLoading={signUp.isPending}
       >
         다음

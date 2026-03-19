@@ -190,8 +190,10 @@ public class AuthService {
         // 계정 잠김 체크 (redis에서 수행)
         String lockoutCountStr = redisService.get(lockoutKey);
 
-        if (lockoutCountStr != null && Integer.parseInt(lockoutCountStr) >= 5) {
-            throw new CustomException(ErrorCode.ACCOUNT_LOCKED);
+        // 계정 잠김 -> 로그인 가능 시간
+        if (lockoutCountStr != null && Integer.parseInt(lockoutCountStr) >= MAX_LOGIN_ATTEMPTS) {
+            String unlockTime = redisService.getUnlockTimeAsString(lockoutKey, LOCKOUT_TTL_SECONDS);
+            throw new CustomException(ErrorCode.ACCOUNT_LOCKED, "(로그인 가능 시간: " + unlockTime + ")");
         }
 
         // 유저 및 암호 검증
@@ -199,11 +201,24 @@ public class AuthService {
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // 비밀번호 오류
+        // 1~4회: INCR + 2h TTL, 5회: TTL을 30분으로 리셋
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            // increment & expire 동시 호출
-            redisService.increment(lockoutKey);
-            redisService.expire(lockoutKey, 1800);
-            throw new CustomException(ErrorCode.INVALID_PASSWORD);
+            Long currentCount = redisService.executeScript(
+                LOGIN_LOCKOUT_SCRIPT,
+                List.of(lockoutKey),
+                String.valueOf(MAX_LOGIN_ATTEMPTS),
+                String.valueOf(LOCKOUT_TTL_SECONDS),
+                String.valueOf(COUNTER_TTL_SECONDS)
+            );
+
+            // 5번째 실패인 경우
+            if (currentCount >= MAX_LOGIN_ATTEMPTS) {
+                String unlockTime = redisService.getUnlockTimeAsString(lockoutKey, LOCKOUT_TTL_SECONDS);
+                throw new CustomException(ErrorCode.ACCOUNT_LOCKED, "(로그인 가능 시간: " + unlockTime + ")");
+            }
+
+            int remaining = MAX_LOGIN_ATTEMPTS - currentCount.intValue();
+            throw new CustomException(ErrorCode.INVALID_PASSWORD, "(남은 시도: " + remaining + "회)");
         }
 
         // 로그인 성공 -> 실패 기록 정리 및 토큰 발급
@@ -243,7 +258,7 @@ public class AuthService {
      * POST /api/auth/password/otp
      */
     public void sendPasswordResetOtp(SendOtpRequest request) {
-        // 가입된 이메일인지 확인 (계정 존재 확인 공격 방어를 위해 모호한 에러 사용)
+        // 가입된 이메일인지 확인
         if (!userRepository.existsByEmail(request.getEmail())) {
             throw new CustomException(ErrorCode.PASSWORD_RESET_NOT_FOUND);
         }

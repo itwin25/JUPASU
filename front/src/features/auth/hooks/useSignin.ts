@@ -6,10 +6,12 @@ import { authToken } from '@/features/auth/utils/auth-token';
 import { SigninSchema } from '@/features/auth/schemas/auth.schema';
 import { AuthResponse, AuthErrorResponse } from '@/features/auth/types/auth.types';
 import { useAuth } from '../api/context/AuthContext';
+import { useToastStore } from '@/stores/toast.store';
 
 export const useSignin = () => {
   const { login } = useAuth();
   const router = useRouter();
+  const addToast = useToastStore((state) => state.addToast);
 
   const signinMutation = useMutation<
     AxiosResponse<AuthResponse<null>>,
@@ -34,7 +36,7 @@ export const useSignin = () => {
       }
     },
     onError: (error) => {
-      alert(error.response?.data?.message || '로그인에 실패했습니다.');
+      addToast(error.response?.data?.message || '로그인에 실패했습니다.', 'error');
     },
   });
 

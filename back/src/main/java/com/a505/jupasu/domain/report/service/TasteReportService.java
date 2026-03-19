@@ -28,6 +28,33 @@ public class TasteReportService {
     private static final double PREFERENCE_WEIGHT = 5.0;
 
     /**
+     * 가장 최근에 생성된 유저의 취향 리포트를 반환하거나, 리포트가 만료되었으면 새로 생성하여 반환
+     */
+    @Transactional
+    public TasteReportResponse getOrCreateReport(User user) {
+        Preference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
+
+        // 1. 유저의 취향 또는 리뷰가 업데이트되어 리포트 갱신이 필요한 경우
+        if (preference != null && preference.isReportOutdated()) {
+            TasteReportResponse response = generateReport(user);
+            // 취향 엔티티의 최신 요약 업데이트 & outdated 플래그 초기화
+            preference.updateReportSummary(response.getContent());
+            return response;
+        }
+
+        // 2. 갱신이 필요 없으면 최신 캐시된 리포트를 찾거나, 없으면 최초 1회 생성
+        return tasteReportRepository.findTopByUserOrderByCreatedAtDesc(user)
+                .map(TasteReportResponse::from)
+                .orElseGet(() -> {
+                    TasteReportResponse response = generateReport(user);
+                    if (preference != null) {
+                        preference.updateReportSummary(response.getContent());
+                    }
+                    return response;
+                });
+    }
+
+    /**
      * 유저의 온보딩 데이터와 리뷰 히스토리를 결합하여 가중 평균 리포트를 생성
      */
     @Transactional
@@ -45,22 +72,22 @@ public class TasteReportService {
 
         if (preference != null) {
             totalWeight += PREFERENCE_WEIGHT;
-            sumSweet += PREFERENCE_WEIGHT * preference.getSweetness();
-            sumAcid += PREFERENCE_WEIGHT * preference.getAcidity();
-            sumBody += PREFERENCE_WEIGHT * preference.getBody();
-            sumTan += PREFERENCE_WEIGHT * preference.getTannin();
-            sumAlc += PREFERENCE_WEIGHT * preference.getAbv();
+            sumSweet += PREFERENCE_WEIGHT * (preference.getSweetness() != null ? preference.getSweetness() * 10 : 50);
+            sumAcid += PREFERENCE_WEIGHT * (preference.getAcidity() != null ? preference.getAcidity() * 10 : 50);
+            sumBody += PREFERENCE_WEIGHT * (preference.getBody() != null ? preference.getBody() * 10 : 50);
+            sumTan += PREFERENCE_WEIGHT * (preference.getTannin() != null ? preference.getTannin() * 10 : 50);
+            sumAlc += PREFERENCE_WEIGHT * (preference.getAbv() != null ? preference.getAbv() * 2.0 : 10.0);
         }
 
         for (Review review : reviews) {
             double rating = review.getRating();
             var wine = review.getWine();
 
-            sumSweet += rating * wine.getSweetness();
-            sumAcid += rating * wine.getAcidity();
-            sumBody += rating * wine.getBody();
-            sumTan += rating * wine.getTannin();
-            sumAlc += rating * normalizeAlcohol(Double.valueOf(wine.getAlcoholDegree())); // 도수 1~5 척도 변환
+            sumSweet += rating * wine.getTasteProfile().getSweetness();
+            sumAcid += rating * wine.getTasteProfile().getAcidity();
+            sumBody += rating * wine.getTasteProfile().getBody();
+            sumTan += rating * wine.getTasteProfile().getTannin();
+            sumAlc += rating * Double.valueOf(wine.getAlcoholDegree()); // 도수 실제 값 (최대 20)
 
             totalWeight += rating;
         }
@@ -90,18 +117,6 @@ public class TasteReportService {
     }
 
     /**
-     * 와인의 실제 알코올 도수(%)를 차트용 1~5점 척도로 변환하는 헬퍼 메서드
-     */
-    private double normalizeAlcohol(Double alcohol) {
-        if (alcohol == null) return 3.0;
-        if (alcohol < 11) return 1.0;
-        if (alcohol < 12.5) return 2.0;
-        if (alcohol < 13.5) return 3.0;
-        if (alcohol < 14.5) return 4.0;
-        return 5.0;
-    }
-
-    /**
      * AI API 호출 시 전달할 유저 데이터 텍스트를 생성
      */
     private String createPromptContext(List<Review> reviews) {
@@ -110,8 +125,8 @@ public class TasteReportService {
         for (Review review : reviews) {
             sb.append(String.format("- 와인: %s, 평점: %.1f, 맛(당/산/바/탄/알): %.1f/%.1f/%.1f/%.1f/%.1f\n",
                     review.getWine().getNameKr(), review.getRating(),
-                    review.getWine().getSweetness(), review.getWine().getAcidity(),
-                    review.getWine().getBody(), review.getWine().getTannin(),
+                    review.getWine().getTasteProfile().getSweetness(), review.getWine().getTasteProfile().getAcidity(),
+                    review.getWine().getTasteProfile().getBody(), review.getWine().getTasteProfile().getTannin(),
                     review.getWine().getAlcoholDegree()));
         }
         return sb.toString();

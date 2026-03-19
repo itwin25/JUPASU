@@ -10,12 +10,20 @@ import { useSignup } from '@/features/auth/hooks/useSignup';
 export default function SignupPage() {
   const {
     step,
+    setNickname,
+    nicknameMessage,
+    isValidatingNickname,
+    isNicknameAvailable,
     mutations,
     handleStep1Success,
     handleNext,
     handleBack,
     onboardingData,
     setOnboardingData,
+    authCodeTimeLeft,
+    isAuthCodeExpired,
+    resendSeconds,
+    isSentOnce,
   } = useSignup();
 
   return (
@@ -56,14 +64,22 @@ export default function SignupPage() {
 
       {/* Step Content */}
       <main className="mx-auto w-full max-w-md flex-1">
-        {step === 1 && <SignUpForm mutations={mutations} onSuccess={handleStep1Success} />}
-        {step === 2 && (
-          <Step2Taste
-            data={onboardingData}
-            setData={setOnboardingData}
-            onNext={handleNext}
-            onPrev={handleBack}
+        {step === 1 && (
+          <SignUpForm
+            mutations={mutations}
+            setNickname={setNickname}
+            nicknameMessage={nicknameMessage}
+            isValidatingNickname={isValidatingNickname}
+            isNicknameAvailable={isNicknameAvailable}
+            onSuccess={handleStep1Success}
+            authCodeTimeLeft={authCodeTimeLeft}
+            isAuthCodeExpired={isAuthCodeExpired}
+            resendSeconds={resendSeconds}
+            isSentOnce={isSentOnce}
           />
+        )}
+        {step === 2 && (
+          <Step2Taste data={onboardingData} setData={setOnboardingData} onNext={handleNext} />
         )}
         {step === 3 && <Step3WineReview onNext={handleNext} onPrev={handleBack} />}
       </main>

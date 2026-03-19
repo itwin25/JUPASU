@@ -5,11 +5,18 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 @Configuration
 public class SwaggerConfig {
+
+    @Value("${swagger.server-url:http://localhost:8080}")
+    private String serverUrl;
 
     @Bean
     public OpenAPI openAPI() {
@@ -29,8 +36,14 @@ public class SwaggerConfig {
                 .description("와인 추천 및 페어링 서비스 '주파수(JUPASU)'의 API 명세서 및 테스트 환경입니다.")
                 .version("v1.0.0");
 
+        // 현재 환경에 맞는 서버 객체 생성
+        Server server = new Server();
+        server.setUrl(serverUrl);
+        server.setDescription("API Server URL (" + serverUrl + ")");
+
         return new OpenAPI()
                 .info(info)
+                .servers(List.of(server))
                 .addSecurityItem(securityRequirement)
                 .components(components);
     }

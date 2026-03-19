@@ -52,6 +52,7 @@ services:
     container_name: backend-spring-dev
     restart: always
     environment:
+      Spring_Profiles_Active: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
@@ -61,8 +62,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+      ALLOWED_ORIGINS: "http://localhost,https://j14a505.p.ssafy.io:8443"
+      TARGET_IMAGE_DIR: /app/uploads/images/wines
+      DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
     ports:
       - "8081:8080"
+    volumes:
+      - ./back/uploads:/app/uploads
+      - ../data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -81,7 +88,7 @@ services:
     container_name: front-nextjs-dev
     restart: always
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_URL}
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     expose:

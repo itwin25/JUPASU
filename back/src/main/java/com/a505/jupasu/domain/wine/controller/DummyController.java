@@ -2,7 +2,7 @@ package com.a505.jupasu.domain.wine.controller;
 
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
-import com.a505.jupasu.domain.wine.service.WineDummyService;
+import com.a505.jupasu.domain.wine.service.DummyDataInitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class DummyController {
 
-    private final WineDummyService dummyService;
+    private final DummyDataInitService dummyService;
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
 
@@ -37,8 +37,8 @@ public class DummyController {
 
     @PostMapping("/wines")
     public String insertDummy() {
-        dummyService.insertDummyData();
-        return "100만 건 생성 시작! 콘솔 로그를 확인하세요.";
+        dummyService.generateDummyData();
+        return "더미 생성 시작! 콘솔 로그를 확인하세요.";
     }
 
 }

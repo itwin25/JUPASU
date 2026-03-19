@@ -1,11 +1,14 @@
 package com.a505.jupasu.global.redis;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -44,9 +47,23 @@ public class RedisService {
         stringRedisTemplate.expire(key, Duration.ofSeconds(ttlSeconds));
     }
 
+    /** TTL — 키의 남은 만료 시간(초) 반환 / 키 없음 또는 TTL 없음이면 -1 */
+    public long getTtl(String key) {
+        Long ttl = stringRedisTemplate.getExpire(key);
+        return (ttl == null || ttl < 0) ? -1 : ttl;
+    }
+
     /** EXISTS */
     public boolean exists(String key) {
         return Boolean.TRUE.equals(stringRedisTemplate.hasKey(key));
+    }
+
+    /** 키의 남은 시간(TTL)을 더해 "HH:mm" 형태의 잠금 해제 시각 문자열을 반환 */
+    public String getUnlockTimeAsString(String key, long defaultTtlIfMissing) {
+        long ttlSeconds = getTtl(key);
+        return LocalDateTime.now()
+                .plusSeconds(ttlSeconds > 0 ? ttlSeconds : defaultTtlIfMissing)
+                .format(DateTimeFormatter.ofPattern("HH:mm"));
     }
 
     /** DEL (단일 / 다수 키) */
@@ -65,5 +82,16 @@ public class RedisService {
             }
             return null;
         });
+    }
+
+    /**
+     * Lua 스크립트를 Redis에 전송
+     * @param script RedisScript (반환 타입 포함)
+     * @param keys   KEYS 목록
+     * @param args   ARGV 목록 (String)
+     * @return 스크립트 반환값
+     */
+    public <T> T executeScript(RedisScript<T> script, List<String> keys, String... args) {
+        return stringRedisTemplate.execute(script, keys, args);
     }
 }

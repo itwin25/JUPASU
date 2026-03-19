@@ -1,16 +1,19 @@
 package com.a505.jupasu.domain.wine.controller;
 
-import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
-import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
-import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
+import com.a505.jupasu.domain.preference.entity.DrinkingSituation;
+import com.a505.jupasu.domain.user.entity.User;
+import com.a505.jupasu.domain.user.repository.UserRepository;
+import com.a505.jupasu.domain.wine.dto.*;
 import com.a505.jupasu.domain.wine.service.WineService;
+import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
 import com.a505.jupasu.global.common.ApiResponse;
+import com.a505.jupasu.global.exception.CustomException;
+import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +25,8 @@ import java.util.List;
 public class WineController {
 
     private final WineService wineService;
+    private final UserRepository userRepository;
+    private final WineRecommendationCalculator wineRecommendationCalculator;
 
     /**
      * 와인 통합 검색 (초성/오타 허용 - 고도화 예정)
@@ -53,5 +58,24 @@ public class WineController {
         WineDetailResponse response = wineService.getWineDetail(userId, wineId);
         return ApiResponse.success("와인 상세 정보 조회 성공", response);
 
+    }
+
+    /**
+     * 상황에 맞는 퀵 추천 와인 리스트 반환
+     * 예: GET /api/wines/quick?situation=ALONE
+     */
+    @GetMapping("/quick")
+    public ApiResponse<WineQuickRecommendResponse> getQuickWines(
+            //TODO: 로그인한 사용자 확인 (Authentication 추가)
+            @RequestParam DrinkingSituation situation) {
+
+        Long userId = 1L; // 현재는 고정, 추후 인증 연동 예정
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        List<WineRecommendationItem> wineList = wineRecommendationCalculator.quickList(user, situation);
+
+        return ApiResponse.success("퀵 추천 와인 조회 성공",
+                WineQuickRecommendResponse.of(situation, wineList));
     }
 }

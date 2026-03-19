@@ -1,5 +1,8 @@
 package com.a505.jupasu.domain.wine.entity;
 
+import com.a505.jupasu.domain.wine.entity.vo.Origin;
+import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
+import com.a505.jupasu.domain.wine.entity.vo.WinePriceAndRating;
 import com.a505.jupasu.global.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -16,45 +19,38 @@ public class Wine extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // 이름은 메인 정보이므로 엔티티에 유지
     private String nameKr;
+    @Builder.Default private Boolean isRealNameKr = false;
 
     private String nameEn;
+    @Builder.Default private Boolean isRealNameEn = false;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private WineType type;
 
-    private String country;
+    // ⭐️ VO들을 Embedded로 선언
+    @Embedded
+    private Origin origin;
 
-    private String region;
+    @Embedded
+    private TasteProfile tasteProfile;
 
-    private String winery;
+    @Embedded
+    private WinePriceAndRating priceAndRating;
 
     private String grapeVariety;
 
     @Builder.Default
-    private Float sweetness = 0.0f;
-
+    private Float alcoholDegree = 0.0f;
     @Builder.Default
-    private Float acidity = 0.0f;
-
-    @Builder.Default
-    private Float body = 0.0f;
-
-    @Builder.Default
-    private Float tannin = 0.0f;
-
-    private Float alcoholDegree;
-
-    private Integer price;
-
-    private Double averageRating;
+    private Boolean isRealAlcoholDegree = false;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    private String summary;
+    private String style;
 
     private String imageUrl;
 }

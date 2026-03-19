@@ -10,27 +10,43 @@ import Input from '@/components/ui/input/Input';
 import Button from '@/components/ui/button/Button';
 import { signinSchema, SigninSchema } from '@/features/auth/schemas/auth.schema'; // 💡 SigninSchema와 동일한지 확인 필요
 import { useSignin } from '../hooks/useSignin';
+import { useToastStore } from '@/stores/toast.store';
+import { useEffect, useRef } from 'react';
 
-export default function LoginForm() {
+interface LoginFormProps {
+  errorCode?: string;
+}
+
+export default function LoginForm({ errorCode }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-
   const { signinMutation } = useSignin();
+  const addToast = useToastStore((state) => state.addToast);
+  const toastShown = useRef(false);
+
+  // 리다이렉트 에러용 토스트 (로그인 후 이용해주세요)
+  useEffect(() => {
+    if (!toastShown.current) {
+      if (errorCode === 'login_required') {
+        addToast('로그인 후 이용해주세요.', 'info');
+        toastShown.current = true;
+      }
+    }
+  }, [errorCode, addToast]);
 
   // React Hook Form 초기화
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<SigninSchema>({
     resolver: zodResolver(signinSchema),
-    mode: 'onBlur', // 포커스 아웃 시 검사 수행
+    mode: 'onChange', // 실시간 검증으로 버튼 활성화 상태 제어
   });
 
   // 폼 제출 핸들러
   const onSubmit = (data: SigninSchema) => {
     signinMutation.mutate(data);
   };
-
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
       <div className="space-y-4">
@@ -49,9 +65,13 @@ export default function LoginForm() {
           <Input
             label="비밀번호"
             type={showPassword ? 'text' : 'password'}
-            placeholder="********"
+            placeholder="대소문자, 숫자, 특수문자 포함 8자 이상"
             {...register('password')}
-            error={errors.password?.message}
+            error={
+              errors.password?.message === '비밀번호를 입력해주세요.'
+                ? errors.password.message
+                : undefined
+            }
             required
             suffix={
               <button
@@ -79,6 +99,7 @@ export default function LoginForm() {
         <Button
           type="submit"
           size="full"
+          disabled={!isValid}
           isLoading={signinMutation.isPending}
           className="text-lg shadow-sm"
         >

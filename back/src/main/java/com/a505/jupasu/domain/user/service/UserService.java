@@ -51,7 +51,10 @@ public class UserService {
      * @return 마이페이지 프로필 및 통계 응답 DTO
      */
     public UserMyPageResponse getMyPageInfo(User loginUser) {
-        return UserMyPageResponse.from(loginUser);
+        long wishlistCount = wineScrapRepository.countByUser(loginUser);
+        long friendCount = friendRepository.countByUserAndStatus(loginUser, FriendStatus.ACCEPTED);
+        long reviewCount = reviewRepository.countByUser(loginUser);
+        return UserMyPageResponse.from(loginUser, wishlistCount, friendCount, reviewCount);
     }
 
     /**
