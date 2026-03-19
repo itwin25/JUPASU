@@ -8,10 +8,11 @@ import Button from '@/components/ui/button/Button';
 import { cn } from '@/lib/utils';
 import { useUpdatePreferenceMutation } from '@/features/user/hooks/useUserQueries';
 import { UpdatePreferenceRequest } from '@/types/user.types';
+import TasteProfileForm, { TasteData } from '@/features/wine/components/TasteProfileForm';
 
 const TASTE_FACTORS = [
   { label: '당도', key: 'sweet' },
-  { label: '상큼함', key: 'fresh' },
+  { label: '상큼함', key: 'acid' },
   { label: '무게감', key: 'body' },
   { label: '타닌', key: 'tannin' },
   { label: '향', key: 'aroma' },
@@ -23,55 +24,67 @@ const DRINKING_SITUATIONS = ['선물', '혼술', '집들이', '데이트', '가�
 
 export default function TasteEditPage() {
   const router = useRouter();
-  const [tastes, setTastes] = useState({
-    sweet: 6,
-    fresh: 6,
-    body: 6,
-    tannin: 6,
-    aroma: 6,
+  const [tasteData, setTasteData] = useState<TasteData>({
+    tastes: {
+      sweet: 6,
+      acid: 6, // fresh -> acid로 통일
+      body: 6,
+      tannin: 6,
+      aroma: 6,
+    },
+    selectedWineTypes: ['레드', '화이트'],
+    selectedFlavorTags: ['과일향', '베리류'],
+    selectedSituations: ['집들이'],
   });
-  const [selectedWineTypes, setSelectedWineTypes] = useState<string[]>(['레드', '화이트']);
-  const [selectedFlavorTags, setSelectedFlavorTags] = useState<string[]>(['과일향', '베리류']);
-  const [selectedSituations, setSelectedSituations] = useState<string[]>(['집들이']);
 
   const updatePreferenceMutation = useUpdatePreferenceMutation();
 
   const handleTasteChange = (key: string, value: number) => {
-    setTastes((prev) => ({ ...prev, [key]: value }));
+    setTasteData((prev) => ({
+      ...prev,
+      tastes: { ...prev.tastes, [key]: value },
+    }));
   };
 
   const toggleWineType = (type: string) => {
-    setSelectedWineTypes((prev) =>
-      prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type],
-    );
+    setTasteData((prev) => ({
+      ...prev,
+      selectedWineTypes: prev.selectedWineTypes.includes(type)
+        ? prev.selectedWineTypes.filter((item) => item !== type)
+        : [...prev.selectedWineTypes, type],
+    }));
   };
 
   const toggleFlavorTag = (tag: string) => {
     if (!tag) return;
-    setSelectedFlavorTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag],
-    );
+    setTasteData((prev) => ({
+      ...prev,
+      selectedFlavorTags: prev.selectedFlavorTags.includes(tag)
+        ? prev.selectedFlavorTags.filter((item) => item !== tag)
+        : [...prev.selectedFlavorTags, tag],
+    }));
   };
 
   const toggleSituation = (situation: string) => {
-    setSelectedSituations((prev) =>
-      prev.includes(situation) ? prev.filter((item) => item !== situation) : [...prev, situation],
-    );
+    setTasteData((prev) => ({
+      ...prev,
+      selectedSituations: prev.selectedSituations.includes(situation)
+        ? prev.selectedSituations.filter((item) => item !== situation)
+        : [...prev.selectedSituations, situation],
+    }));
   };
 
   const handleSave = async () => {
     try {
-      // 1~9 범위인 tastes 값을 필요시 맞춰서 맵핑 (백엔드는 1~10 척도)
-      // tastes.sweet, tastes.fresh(acidity), tastes.body, tastes.tannin
       const payload: UpdatePreferenceRequest = {
-        sweetness: tastes.sweet,
-        acidity: tastes.fresh,
-        body: tastes.body,
-        tannin: tastes.tannin,
+        sweetness: tasteData.tastes.sweet,
+        acidity: tasteData.tastes.acid,
+        body: tasteData.tastes.body,
+        tannin: tasteData.tastes.tannin,
         // aroma는 백엔드에 직접적인 컬럼이 없으므로 preferredFlavors 등 다른 필드에 활용되거나 제외
-        preferredTypes: selectedWineTypes,
-        preferredFlavors: selectedFlavorTags,
-        drinkingSituations: selectedSituations,
+        preferredTypes: tasteData.selectedWineTypes,
+        preferredFlavors: tasteData.selectedFlavorTags,
+        drinkingSituations: tasteData.selectedSituations,
       };
 
       await updatePreferenceMutation.mutateAsync(payload);
@@ -80,6 +93,13 @@ export default function TasteEditPage() {
       console.error('Failed to update preferences:', error);
       alert('취향 정보를 저장하는 중 오류가 발생했습니다.');
     }
+  };
+
+  const handleDataChange = (newData: Partial<TasteData>) => {
+    setTasteData((prev) => ({
+      ...prev,
+      ...newData,
+    }));
   };
 
   return (
@@ -109,7 +129,8 @@ export default function TasteEditPage() {
                   <div className="absolute inset-0 flex items-center justify-between">
                     {Array.from({ length: 9 }).map((_, index) => {
                       const value = index + 1;
-                      const active = tastes[factor.key as keyof typeof tastes] === value;
+                      const active =
+                        tasteData.tastes[factor.key as keyof typeof tasteData.tastes] === value;
 
                       return (
                         <div
@@ -127,7 +148,7 @@ export default function TasteEditPage() {
                     min="1"
                     max="9"
                     step="1"
-                    value={tastes[factor.key as keyof typeof tastes]}
+                    value={tasteData.tastes[factor.key as keyof typeof tasteData.tastes]}
                     onChange={(event) => handleTasteChange(factor.key, Number(event.target.value))}
                     className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-transparent"
                   />
@@ -142,7 +163,7 @@ export default function TasteEditPage() {
           <p className="text-text-main/45 text-[13px]">좋아하는 와인 종류를 선택해주세요</p>
           <div className="grid grid-cols-2 gap-3">
             {WINE_TYPES.map((type) => {
-              const isActive = selectedWineTypes.includes(type);
+              const isActive = tasteData.selectedWineTypes.includes(type);
               const emoji =
                 type === '레드' ? '🍷' : type === '화이트' ? '🥂' : type === '로제' ? '🍇' : '✨';
 
@@ -179,7 +200,7 @@ export default function TasteEditPage() {
                 );
               }
 
-              const isActive = selectedFlavorTags.includes(tag);
+              const isActive = tasteData.selectedFlavorTags.includes(tag);
 
               return (
                 <button
@@ -201,7 +222,7 @@ export default function TasteEditPage() {
           <h3 className="text-text-main text-[1.1rem] font-black">주요 음용 상황 선택하기</h3>
           <div className="flex flex-wrap gap-2">
             {DRINKING_SITUATIONS.map((situation) => {
-              const isActive = selectedSituations.includes(situation);
+              const isActive = tasteData.selectedSituations.includes(situation);
 
               return (
                 <button
@@ -218,6 +239,7 @@ export default function TasteEditPage() {
             })}
           </div>
         </section>
+        <TasteProfileForm data={tasteData} onChange={handleDataChange} />
 
         <div className="pt-4 pb-10">
           <Button

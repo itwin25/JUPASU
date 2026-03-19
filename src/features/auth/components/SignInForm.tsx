@@ -65,7 +65,7 @@ export default function LoginForm({ errorCode }: LoginFormProps) {
           <Input
             label="비밀번호"
             type={showPassword ? 'text' : 'password'}
-            placeholder="********"
+            placeholder="대소문자, 숫자, 특수문자 포함 8자 이상"
             {...register('password')}
             error={
               errors.password?.message === '비밀번호를 입력해주세요.'
