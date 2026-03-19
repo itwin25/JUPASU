@@ -2,10 +2,8 @@ import BottomNav from '@/components/common/bottom-nav/BottomNav';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-1 pb-24">
-        {children}
-      </main>
+    <div className="bg-background min-h-screen">
+      <main className="app-shell bottom-nav-safe min-h-screen flex-1">{children}</main>
       <BottomNav />
     </div>
   );

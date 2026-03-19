@@ -96,7 +96,7 @@ export default function ProfileEditPage() {
         </h1>
       </header>
 
-      <main className="flex-1 space-y-8 px-4">
+      <main className="flex-1 space-y-8 px-4 pb-32">
         <div className="relative flex justify-center pt-2">
           <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
             <Image src={`/${resolvedAvatar}`} alt="Avatar" fill className="object-cover" />
