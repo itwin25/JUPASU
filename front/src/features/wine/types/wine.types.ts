@@ -31,3 +31,23 @@ export interface ScrapWine {
   imageUrl: string;
   isScraped: boolean;
 }
+
+export type DrinkingSituation = 'GIFT' | 'ALONE' | 'HOUSEWARMING' | 'PARTY' | 'DATE' | 'FAMILY';
+
+export interface WineRecommendationItem {
+  wineId: number;
+  nameKr: string;
+  matchRate: number;
+  recommendationReason: string;
+}
+
+export interface SituationResult {
+  situation: DrinkingSituation;
+  situationName: string;
+  recommendations: WineRecommendationItem[];
+}
+
+export interface WineQuickRecommendResponse {
+  general: WineRecommendationItem[];
+  bySituation: SituationResult[];
+}

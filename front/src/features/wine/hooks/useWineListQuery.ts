@@ -18,10 +18,10 @@ export function useWineDetailQuery(id: string | number) {
   });
 }
 
-export function useQuickWineQuery() {
+export function useWineQuickRecommendQuery() {
   return useQuery({
     queryKey: QUERY_KEY.WINE.RECOMMEND,
-    queryFn: wineApi.getQuickRecommendation,
+    queryFn: wineApi.getQuickRecommendations,
   });
 }
 
