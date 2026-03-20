@@ -52,7 +52,7 @@ public class WineDataParser {
         if (type.contains("RED")) return WineType.RED;
         if (type.contains("WHITE")) return WineType.WHITE;
         if (type.contains("SPARK")) return WineType.SPARKLING;
-        if (type.contains("ROSE")) return WineType.ROSE;
+        if (type.contains("ROSÉ")) return WineType.ROSE;
         if (type.contains("DESSERT") || type.contains("PORT")) return WineType.DESSERT;
         if (type.contains("FORTIFIED")) return WineType.FORTIFIED;
         return WineType.RED;

@@ -9,11 +9,13 @@ import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
 import com.a505.jupasu.global.common.ApiResponse;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
+import com.a505.jupasu.global.security.auth.LoginUserCustom;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,7 +37,7 @@ public class WineController {
      */
     @GetMapping
     public ApiResponse<Page<WineSearchResponse>> searchWines(
-            //TODO: 로그인한 사용자 확인 (Authentication 추가)
+            @AuthenticationPrincipal LoginUserCustom user,
             @ModelAttribute WineSearchCondition condition,
             @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable
     ) {
@@ -50,7 +52,7 @@ public class WineController {
      */
     @GetMapping("/{wine_id}")
     public ApiResponse<WineDetailResponse> getWineDetail(
-            //TODO: 로그인한 사용자 확인
+            @AuthenticationPrincipal LoginUserCustom user,
             @PathVariable("wine_id") Long wineId
     ) {
         //현재는 로그인한 유저 아이디 1L 로 고정
