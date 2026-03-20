@@ -14,7 +14,7 @@ public record WineRecommendationItem(
         return WineRecommendationItem.builder()
                 .wineId(wine.getId())
                 .nameKr(wine.getNameKr())
-                .matchRate(matchRate)
+                .matchRate(50 + matchRate/2)
                 .recommendationReason(recommendationReason)
                 .build();
     }
@@ -23,7 +23,7 @@ public record WineRecommendationItem(
         return WineRecommendationItem.builder()
                 .wineId(wine.getId())
                 .nameKr(wine.getNameKr())
-                .matchRate(matchRate)
+                .matchRate(50 + matchRate/2)
                 .recommendationReason("")
                 .build();
     }
