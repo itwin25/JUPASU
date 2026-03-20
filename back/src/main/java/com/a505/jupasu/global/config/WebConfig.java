@@ -4,17 +4,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.nio.file.Paths;
-
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-
-    private final String uploadImagePath = Paths.get("uploads", "images").toAbsolutePath().toString();
-
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 브라우저가 /images/... 로 요청하면 실제 uploads/images/... 폴더를 보여줌
+        // ⭐️ 슬래시를 1개로 줄입니다! (file:/app/...)
         registry.addResourceHandler("/images/**")
-                .addResourceLocations("file:" + uploadImagePath + "/");
+                .addResourceLocations("file:/app/uploads/images/");
     }
 }
