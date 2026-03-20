@@ -6,6 +6,7 @@ import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
 import com.a505.jupasu.domain.reviews.entity.Review;
 import com.a505.jupasu.domain.reviews.repository.ReviewRepository;
 import com.a505.jupasu.domain.user.entity.User;
+import com.a505.jupasu.domain.wine.dto.WineQuickRecommendResponse;
 import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
@@ -15,10 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.PriorityQueue;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -87,15 +85,74 @@ public class WineRecommendationCalculator {
         for (Wine wine : wineList) {
             int match = score(wine, situation, pref, calibrated);
             if (match == Integer.MIN_VALUE) continue; // 추천 제외 와인
-            if (minHeap.size() < 5) {
-                minHeap.offer(new WineScore(match, wine));
-            } else if (match > minHeap.peek().match()) {
-                minHeap.poll();
-                minHeap.offer(new WineScore(match, wine));
+            addToHeap(minHeap, new WineScore(match, wine), 5);
+        }
+
+        return heapToList(minHeap);
+    }
+
+    /**
+     * 상황 없이 취향 기반 추천도 계산
+     */
+    public int getMatch(User user, Wine wine) {
+        Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
+        List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
+        CalibratedProfile calibrated = calibrate(pref, reviews);
+        return score(wine, null, pref, calibrated);
+    }
+
+    /**
+     * 모든 상황별 + 상황 무관 종합 추천 목록 반환
+     */
+    public WineQuickRecommendResponse allQuickLists(User user) {
+        Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
+        List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
+        CalibratedProfile calibrated = calibrate(pref, reviews);
+
+        PriorityQueue<WineScore> generalHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
+        Map<DrinkingSituation, PriorityQueue<WineScore>> situationHeaps = new EnumMap<>(DrinkingSituation.class);
+        for (DrinkingSituation sit : DrinkingSituation.values()) {
+            situationHeaps.put(sit, new PriorityQueue<>(Comparator.comparingInt(WineScore::match)));
+        }
+
+        List<Wine> wineList = wineRepository.findAll();
+
+        for (Wine wine : wineList) {
+            // 1. 상황 무관 점수 계산
+            int generalMatch = score(wine, null, pref, calibrated);
+            if (generalMatch != Integer.MIN_VALUE) {
+                addToHeap(generalHeap, new WineScore(generalMatch, wine), 5);
+            }
+
+            // 2. 각 상황별 점수 계산
+            for (DrinkingSituation sit : DrinkingSituation.values()) {
+                int sitMatch = score(wine, sit, pref, calibrated);
+                if (sitMatch != Integer.MIN_VALUE) {
+                    addToHeap(situationHeaps.get(sit), new WineScore(sitMatch, wine), 5);
+                }
             }
         }
 
-        return minHeap.stream()
+        List<WineRecommendationItem> generalList = heapToList(generalHeap);
+        List<WineQuickRecommendResponse.SituationResult> bySituation = new ArrayList<>();
+        for (DrinkingSituation sit : DrinkingSituation.values()) {
+            bySituation.add(WineQuickRecommendResponse.SituationResult.of(sit, heapToList(situationHeaps.get(sit))));
+        }
+
+        return WineQuickRecommendResponse.of(generalList, bySituation);
+    }
+
+    private void addToHeap(PriorityQueue<WineScore> heap, WineScore wineScore, int limit) {
+        if (heap.size() < limit) {
+            heap.offer(wineScore);
+        } else if (wineScore.match() > heap.peek().match()) {
+            heap.poll();
+            heap.offer(wineScore);
+        }
+    }
+
+    private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap) {
+        return heap.stream()
                 .sorted(Comparator.comparingInt(WineScore::match).reversed())
                 .map(s -> WineRecommendationItem.of(s.wine(), s.match()))
                 .toList();
@@ -109,14 +166,6 @@ public class WineRecommendationCalculator {
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
         return score(wine, situation, pref, calibrated);
-    }
-
-    /**
-     * 상황 없이 사용자 취향 기반 추천도 계산
-     */
-    public int getMatch(User user, Wine wine) {
-        // TODO: 상황 없이 취향 기반 추천도 계산 구현 예정
-        return 0;
     }
 
     // ── calibrate: U_i^revealed · γ · Û_i · σ̂_t ────────────────────────────────
@@ -335,12 +384,16 @@ public class WineRecommendationCalculator {
 
         // ── ⑧ 상황별 가중치 적용 ────────────────────────────────────────────────
         float wPref, wPriceW, wSitW;
-        switch (situation) {
-            case ALONE -> { wPref = 0.50f; wPriceW = 0.30f; wSitW = 0.20f; }
-            case DATE  -> { wPref = 0.40f; wPriceW = 0.20f; wSitW = 0.40f; }
-            case PARTY -> { wPref = 0.30f; wPriceW = 0.20f; wSitW = 0.50f; }
-            // TODO: GIFT, HOUSEWARMING, FAMILY 상황별 가중치 정의 예정
-            default    -> { wPref = 0.50f; wPriceW = 0.30f; wSitW = 0.20f; }
+        if (situation == null) {
+            wPref = 0.70f; wPriceW = 0.30f; wSitW = 0.00f;
+        } else {
+            switch (situation) {
+                case ALONE -> { wPref = 0.50f; wPriceW = 0.30f; wSitW = 0.20f; }
+                case DATE  -> { wPref = 0.40f; wPriceW = 0.20f; wSitW = 0.40f; }
+                case PARTY -> { wPref = 0.30f; wPriceW = 0.20f; wSitW = 0.50f; }
+                // TODO: GIFT, HOUSEWARMING, FAMILY 상황별 가중치 정의 예정
+                default    -> { wPref = 0.50f; wPriceW = 0.30f; wSitW = 0.20f; }
+            }
         }
 
         // TODO: B_w (와인별 평균 편향 보정) 구현 예정
@@ -356,6 +409,7 @@ public class WineRecommendationCalculator {
     private float calcSSit(DrinkingSituation situation,
                            float wSweet, float wAcid, float wBody, float wTannin,
                            boolean validSweet, boolean validAcid, boolean validBody, boolean validTannin) {
+        if (situation == null) return 0f;
         return switch (situation) {
             case ALONE -> {
                 // 혼술: 가벼운 와인 — body↓, tannin↓ (유효 차원의 기하 평균)

@@ -79,7 +79,12 @@ export default function SignupPage() {
           />
         )}
         {step === 2 && (
-          <Step2Taste data={onboardingData} setData={setOnboardingData} onNext={handleNext} />
+          <Step2Taste
+            data={onboardingData}
+            setData={setOnboardingData}
+            onNext={handleNext}
+            isPending={mutations.updatePreference.isPending}
+          />
         )}
         {step === 3 && <Step3WineReview onNext={handleNext} onPrev={handleBack} />}
       </main>

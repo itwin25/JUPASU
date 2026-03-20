@@ -72,10 +72,6 @@ type FriendItem = {
   avatar: string;
 };
 
-type SearchFriendItem = FriendItem & {
-  status: 'friend' | 'pending' | 'idle';
-};
-
 const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 1,
@@ -228,10 +224,10 @@ export default function MyPage() {
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
   const { data: searchResults = [], isFetching: isSearching } =
     useSearchUsersQuery(friendSearchQuery);
-  const [reviewOverrides, setReviewOverrides] = useState<
+  const [reviewOverrides, _setReviewOverrides] = useState<
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
   >({});
-  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
+  const [deletedReviewIds, _setDeletedReviewIds] = useState<number[]>([]);
   const [sentInviteIds, setSentInviteIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
@@ -451,7 +447,7 @@ export default function MyPage() {
                 className="hover:bg-primary-100/30 flex items-center rounded-[0.8rem] px-2.5 py-2 transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className="text-text-main text-[13px] font-bold">취향 분석 보기</span>
+                <span className="text-text-main text-[13px] font-bold">와인 취향 설정</span>
               </Link>
 
               <div className="bg-primary-100 mx-3 my-1 h-px" />
