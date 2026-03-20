@@ -7,7 +7,6 @@ public record WineSearchCondition(
         WineType type,
         Integer minPrice,
         Integer maxPrice,
-        Double minRate,
-        String country
+        Double minRate
 ) {
 }
