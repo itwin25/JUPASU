@@ -66,6 +66,9 @@ export default function FriendsPage() {
               </div>
               <div className="flex flex-col">
                 <span className="text-text-main leading-tight font-black">{friend.nickname}</span>
+                <span className="text-text-main/30 text-xs font-bold">
+                  {friend.reviewCount ?? 0}종 시음
+                </span>
               </div>
             </div>
             <button className="rounded-2xl bg-gray-500 px-5 py-2.5 text-xs font-black text-white transition-all">
@@ -124,6 +127,9 @@ export default function FriendsPage() {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-text-main text-[13px] font-black">{f.nickname}</span>
+                      <span className="text-text-main/45 text-[11px] font-medium">
+                        {f.reviewCount ?? 0}종 시음
+                      </span>
                     </div>
                   </div>
                   <button

@@ -50,5 +50,6 @@ export interface UserSearchResponse {
   userId: number;
   nickname: string;
   character: string | null;
+  reviewCount: number;
   friendStatus: 'NONE' | 'PENDING' | 'ACCEPTED' | 'REJECTED';
 }

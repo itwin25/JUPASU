@@ -131,7 +131,10 @@ const modalClassName =
 
 function resolveCharacterImage(character?: string, level: number = 1) {
   if (!character) return '/tiger1.png';
-  if (character.startsWith('/')) return character;
+  if (character.startsWith('/') || character.includes('.')) {
+    // 이미 경로이거나 확장자가 포함된 경우 (예: cat1.svg) 그대로 반환하되, 슬래시가 없으면 추가
+    return character.startsWith('/') ? character : `/${character}`;
+  }
   return `/${character}${level}.png`;
 }
 
@@ -289,7 +292,7 @@ export default function MyPage() {
             requestId: friend.requestId,
             friendId: friend.friendId,
             name: friend.nickname,
-            winesTasted: 0,
+            winesTasted: friend.reviewCount,
             avatar: resolveCharacterImage(friend.character),
           }))
         : FRIENDS,
@@ -303,7 +306,7 @@ export default function MyPage() {
             requestId: friend.requestId,
             friendId: friend.requesterId,
             name: friend.nickname,
-            winesTasted: 0,
+            winesTasted: friend.reviewCount,
             avatar: resolveCharacterImage(friend.character),
           }))
         : FRIEND_REQUESTS,
@@ -1064,7 +1067,7 @@ export default function MyPage() {
                       <div>
                         <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                         <p className="text-text-main/45 text-[11px] font-medium">
-                          {friend.winesTasted}종 시음
+                          {friend.winesTasted ?? 0}종 시음
                         </p>
                       </div>
                     </div>
@@ -1154,6 +1157,9 @@ export default function MyPage() {
                         </div>
                         <div>
                           <p className="text-text-main text-[13px] font-black">{f.nickname}</p>
+                          <p className="text-text-main/45 text-[11px] font-medium">
+                            {f.reviewCount ?? 0}종 시음
+                          </p>
                         </div>
                       </div>
                       <button
