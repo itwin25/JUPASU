@@ -390,8 +390,8 @@ public class WineRecommendationCalculator {
         }
 
         // ── ⑦ 데이터 부재 와인 제외 ───────────────────────────────────────────
-        // 맛/도수 정보(isReal)가 하나도 없는 와인은 가격과 상관없이 추천에서 제외
-        if (nValid == 0) return Integer.MIN_VALUE;
+        // 맛/도수 정보(isReal)가 2개 이하인 와인은 데이터 신뢰도가 낮으므로 추천에서 제외 (최소 3개 필요)
+        if (nValid <= 2) return Integer.MIN_VALUE;
 
         // ── ⑧ 상황별 가중치 적용 ────────────────────────────────────────────────
         float wPref, wPriceW, wSitW;
