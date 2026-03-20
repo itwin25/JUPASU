@@ -77,6 +77,8 @@ services:
     build:
       context: ./front
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
     container_name: front-nextjs
     restart: always
     environment:
@@ -84,7 +86,7 @@ services:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
     ports:
-      - "80:80"
+      - "3000:80"
     depends_on:
       - backend
 
