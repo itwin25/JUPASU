@@ -26,7 +26,6 @@ public class Review extends BaseEntity {
     private Wine wine;
 
     @Lob
-    @Column(nullable = false)
     private String content;
 
     @Column(nullable = false)

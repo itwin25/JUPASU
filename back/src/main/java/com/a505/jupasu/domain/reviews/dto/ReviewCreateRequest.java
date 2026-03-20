@@ -16,6 +16,5 @@ public class ReviewCreateRequest {
     @Max(value = 5, message = "평점은 5점 이하이어야 합니다.")
     private Float rating;
 
-    @NotBlank(message = "리뷰 내용은 필수입니다.")
     private String content;
 }
