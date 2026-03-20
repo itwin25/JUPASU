@@ -69,6 +69,13 @@ public class WineRecommendationCalculator {
             float sigmaT       // σ̂_t (개인화 취향 폭)
     ) {}
 
+    // ── 구현된 추천 상황 리스트 ───────────────────────────────────────────────────
+    private final DrinkingSituation[] situationList = {
+            DrinkingSituation.ALONE,
+            DrinkingSituation.DATE,
+            DrinkingSituation.PARTY
+    };
+
     // ── 퀵 추천 목록 ──────────────────────────────────────────────────────────────
 
     /**
@@ -111,7 +118,7 @@ public class WineRecommendationCalculator {
 
         PriorityQueue<WineScore> generalHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
         Map<DrinkingSituation, PriorityQueue<WineScore>> situationHeaps = new EnumMap<>(DrinkingSituation.class);
-        for (DrinkingSituation sit : DrinkingSituation.values()) {
+        for (DrinkingSituation sit : situationList) {
             situationHeaps.put(sit, new PriorityQueue<>(Comparator.comparingInt(WineScore::match)));
         }
 
@@ -125,7 +132,7 @@ public class WineRecommendationCalculator {
             }
 
             // 2. 각 상황별 점수 계산
-            for (DrinkingSituation sit : DrinkingSituation.values()) {
+            for (DrinkingSituation sit : situationList) {
                 int sitMatch = score(wine, sit, pref, calibrated);
                 if (sitMatch != Integer.MIN_VALUE) {
                     addToHeap(situationHeaps.get(sit), new WineScore(sitMatch, wine), 5);
@@ -135,7 +142,7 @@ public class WineRecommendationCalculator {
 
         List<WineRecommendationItem> generalList = heapToList(generalHeap);
         List<WineQuickRecommendResponse.SituationResult> bySituation = new ArrayList<>();
-        for (DrinkingSituation sit : DrinkingSituation.values()) {
+        for (DrinkingSituation sit : situationList) {
             bySituation.add(WineQuickRecommendResponse.SituationResult.of(sit, heapToList(situationHeaps.get(sit))));
         }
 
