@@ -332,10 +332,10 @@ public class WineRecommendationCalculator {
 
         // ── ① 유효성 지시 함수 𝟙_i ──────────────────────────────────────────────
         // isReal* = false → 값 없음 → 𝟙 = 0, 해당 차원을 계산에서 제외
-        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness());
-        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity());
-        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody());
-        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin());
+        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness()) && tp.getSweetness() > 0;
+        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
+        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
+        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
         boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree());
         int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
                    + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
@@ -365,7 +365,6 @@ public class WineRecommendationCalculator {
             if (validAlc)                                       sum += gaussian(uAlc,             wAlc,    SIGMA_A);
             
             // 데이터 충실도 페널티 (정보가 많을수록 신뢰도 상승)
-            // nValid가 5(전체)일 때는 페널티 없음, 1개일 때는 0.6배로 감점
             float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
             sPref = (sum / nValid) * completenessFactor;
         }
@@ -376,7 +375,8 @@ public class WineRecommendationCalculator {
 
         // ── ⑥ S_price: 가격 점수 ────────────────────────────────────────────────
         boolean validPrice = wine.getPriceAndRating() != null
-                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice());
+                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice())
+                && wine.getPriceAndRating().getPrice() > 0;
         float sPrice;
         if (!validPrice) {
             sPrice = 0.5f;
@@ -390,8 +390,10 @@ public class WineRecommendationCalculator {
         }
 
         // ── ⑦ 데이터 부재 와인 제외 ───────────────────────────────────────────
-        // 맛/도수 정보(isReal)가 2개 이하인 와인은 데이터 신뢰도가 낮으므로 추천에서 제외 (최소 3개 필요)
-        if (nValid <= 2) return Integer.MIN_VALUE;
+        // (당도, 산도, 바디, 탄닌, 가격) 5가지 핵심 데이터가 모두 '진짜'이고 '0보다 큰' 와인만 추천
+        if (!(validSweet && validAcid && validBody && validTannin && validPrice)) {
+            return Integer.MIN_VALUE;
+        }
 
         // ── ⑧ 상황별 가중치 적용 ────────────────────────────────────────────────
         float wPref, wPriceW, wSitW;
