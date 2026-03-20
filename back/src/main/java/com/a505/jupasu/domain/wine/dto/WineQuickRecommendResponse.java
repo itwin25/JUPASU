@@ -7,13 +7,28 @@ import java.util.List;
 
 @Builder
 public record WineQuickRecommendResponse(
-        String situationName,
-        List<WineRecommendationItem> recommendations
+        List<WineRecommendationItem> general,
+        List<SituationResult> bySituation
 ) {
-    public static WineQuickRecommendResponse of(DrinkingSituation situation, List<WineRecommendationItem> recommendations) {
+    @Builder
+    public record SituationResult(
+            DrinkingSituation situation,
+            String situationName,
+            List<WineRecommendationItem> recommendations
+    ) {
+        public static SituationResult of(DrinkingSituation situation, List<WineRecommendationItem> recommendations) {
+            return SituationResult.builder()
+                    .situation(situation)
+                    .situationName(situation.getDescription())
+                    .recommendations(recommendations)
+                    .build();
+        }
+    }
+
+    public static WineQuickRecommendResponse of(List<WineRecommendationItem> general, List<SituationResult> bySituation) {
         return WineQuickRecommendResponse.builder()
-                .situationName(situation.getDescription())
-                .recommendations(recommendations)
+                .general(general)
+                .bySituation(bySituation)
                 .build();
     }
 }
