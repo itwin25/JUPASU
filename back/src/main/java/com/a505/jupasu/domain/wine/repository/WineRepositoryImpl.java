@@ -50,7 +50,7 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
         builder.and(priceGoe(condition.minPrice()));
         builder.and(priceLoe(condition.maxPrice()));
         builder.and(ratingGoe(condition.minRate()));
-        builder.and(countryEq(condition.country()));
+
 
         OrderSpecifier<?>[] orderSpecifiers = getOrderSpecifier(pageable);
 
@@ -126,12 +126,6 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
         return minRate != null ? wine.priceAndRating.averageRating.goe(minRate) : null;
     }
 
-    /**
-     * 와인 원산지 검사
-     */
-    private BooleanExpression countryEq (String country) {
-        return StringUtils.hasText(country) ? wine.origin.country.eq(country) : null;
-    }
 
     //===================================================
     //정렬을 위한 메서드
