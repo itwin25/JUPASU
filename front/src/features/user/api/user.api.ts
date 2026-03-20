@@ -33,4 +33,10 @@ export const userApi = {
   updatePreference: async (data: UpdatePreferenceRequest): Promise<void> => {
     await api.patch(API_PATH.USER.PREFERENCES, data);
   },
+
+  // 유저 취향(Preference) 조회
+  getPreference: async (): Promise<UpdatePreferenceRequest> => {
+    const { data } = await api.get<{ data: UpdatePreferenceRequest }>(API_PATH.USER.PREFERENCES);
+    return data.data;
+  },
 };
