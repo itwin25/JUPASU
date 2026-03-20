@@ -42,13 +42,10 @@ import { cn } from '@/lib/utils';
 type ReviewItem = {
   id: number;
   wineId?: number;
-  author: string;
   wineName: string;
-  subtitle: string;
   rating: number;
   content: string;
   date: string;
-  avatar: string;
 };
 
 type WishlistItem = {
@@ -75,23 +72,17 @@ type FriendItem = {
 const INITIAL_REVIEWS: ReviewItem[] = [
   {
     id: 1,
-    author: '와인초보',
     wineName: 'Cloudy Bay',
-    subtitle: 'Sauvignon Blanc',
     rating: 4,
     content: '여름에 시원하게 마시면 최고! 상큼하고 깔끔해요.',
     date: '2026.01.05',
-    avatar: '/dog1.svg',
   },
   {
     id: 2,
-    author: '와인러버민지',
     wineName: 'Chateau Margaux 2018',
-    subtitle: 'Bordeaux Red',
     rating: 5,
     content: '특별한 날에 열면 분위기가 확 살아나는 레드였어요.',
     date: '2025.12.28',
-    avatar: '/dog2.svg',
   },
 ];
 
@@ -263,15 +254,12 @@ export default function MyPage() {
         return {
           id: review.reviewId,
           wineId: review.wineId,
-          author: review.nickname,
           wineName: review.wineName,
-          subtitle: '작성한 리뷰',
           rating: override?.rating ?? review.rating,
           content: override?.content ?? review.content,
           date: Number.isNaN(createdDate.getTime())
             ? ''
             : createdDate.toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
-          avatar: '/dog1.svg',
         };
       }),
     [myReviews, reviewOverrides],
@@ -405,10 +393,10 @@ export default function MyPage() {
     }
 
     const radar = tasteReport.radarChart;
-    const p1 = calculateRadarPoint(radar.tannin, 100, [120, 30]); // 상단: 탄닌
-    const p2 = calculateRadarPoint(radar.acidity, 100, [195, 84]); // 우상단: 산미
-    const p3 = calculateRadarPoint(radar.body, 100, [166, 173]); // 우하단: 바디
-    const p4 = calculateRadarPoint(radar.sweetness, 100, [74, 173]); // 좌하단: 당도
+    const p1 = calculateRadarPoint(radar.tannin, 5, [120, 30]); // 상단: 탄닌
+    const p2 = calculateRadarPoint(radar.acidity, 5, [195, 84]); // 우상단: 산미
+    const p3 = calculateRadarPoint(radar.body, 5, [166, 173]); // 우하단: 바디
+    const p4 = calculateRadarPoint(radar.sweetness, 5, [74, 173]); // 좌하단: 당도
     const p5 = calculateRadarPoint(radar.alcohol, 20, [45, 84]); // 좌상단: 도수
 
     return `${p1} ${p2} ${p3} ${p4} ${p5}`;
@@ -560,7 +548,7 @@ export default function MyPage() {
                   </span>
                   <span className="text-[10px] leading-none font-black text-[#C75B5B]">
                     {tasteReport?.radarChart?.tannin ?? 0}
-                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                    <span className="text-text-main/40 text-[8px] font-medium">/5</span>
                   </span>
                 </div>
                 <div className="absolute top-[68px] right-[-10px] flex flex-col items-center">
@@ -569,7 +557,7 @@ export default function MyPage() {
                   </span>
                   <span className="text-[10px] leading-none font-black text-[#C75B5B]">
                     {tasteReport?.radarChart?.acidity ?? 0}
-                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                    <span className="text-text-main/40 text-[8px] font-medium">/5</span>
                   </span>
                 </div>
                 <div className="absolute right-[22px] bottom-[20px] flex flex-col items-center">
@@ -578,7 +566,7 @@ export default function MyPage() {
                   </span>
                   <span className="text-[10px] leading-none font-black text-[#C75B5B]">
                     {tasteReport?.radarChart?.body ?? 0}
-                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                    <span className="text-text-main/40 text-[8px] font-medium">/5</span>
                   </span>
                 </div>
                 <div className="absolute bottom-[20px] left-[22px] flex flex-col items-center">
@@ -587,7 +575,7 @@ export default function MyPage() {
                   </span>
                   <span className="text-[10px] leading-none font-black text-[#C75B5B]">
                     {tasteReport?.radarChart?.sweetness ?? 0}
-                    <span className="text-text-main/40 text-[8px] font-medium">/100</span>
+                    <span className="text-text-main/40 text-[8px] font-medium">/5</span>
                   </span>
                 </div>
                 <div className="absolute top-[68px] left-[-10px] flex flex-col items-center">
@@ -790,63 +778,72 @@ export default function MyPage() {
               key={review.id}
               className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-start gap-2.5">
-                  <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#7D4E3A]">
-                    <Image src={review.avatar} alt={review.author} fill className="object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-text-main text-[13px] font-black">{review.author}</h4>
-                    <div className="mt-0.5 flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          size={12}
-                          fill={star <= review.rating ? '#D89A4F' : '#E0DDD7'}
-                          className={star <= review.rating ? 'text-[#D89A4F]' : 'text-[#E0DDD7]'}
-                        />
-                      ))}
+              <div className="flex gap-2.5">
+                {/* 와인 이미지 플레이스홀더 */}
+                <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="min-w-0">
+                      {/* 와인 이름 - 클릭 시 상세 페이지 이동 */}
+                      <Link
+                        href={`/wines/${review.wineId}`}
+                        onClick={() => setActiveModal(null)}
+                        className="text-text-main block truncate text-[13px] font-black hover:underline"
+                      >
+                        {review.wineName}
+                      </Link>
+                      <div className="mt-0.5 flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            size={12}
+                            fill={star <= review.rating ? '#D89A4F' : '#E0DDD7'}
+                            className={star <= review.rating ? 'text-[#D89A4F]' : 'text-[#E0DDD7]'}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="relative shrink-0">
+                      <button
+                        onClick={() =>
+                          setActiveReviewMenuId((prev) => (prev === review.id ? null : review.id))
+                        }
+                        className="text-text-main rounded-full p-1"
+                      >
+                        <MoreHorizontal size={16} />
+                      </button>
+
+                      {activeReviewMenuId === review.id && (
+                        <div className="border-primary-100 absolute top-7 right-0 z-10 w-24 rounded-[0.9rem] border bg-white p-1 shadow-xl">
+                          <button
+                            onClick={() => openReviewEditModal(review)}
+                            className="text-text-main hover:bg-primary-100/40 w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold transition-colors"
+                          >
+                            수정하기
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveReviewMenuId(null);
+                              setDeletingReviewId(review.id);
+                            }}
+                            className="w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold text-[#D65F69] transition-colors hover:bg-red-50"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  <p className="text-text-main mt-1.5 text-[12px] leading-relaxed font-medium">
+                    {review.content}
+                  </p>
+                  <div className="mt-1 flex justify-end">
+                    <span className="text-[11px] font-medium text-[#B97B79]">{review.date}</span>
+                  </div>
                 </div>
-
-                <div className="relative">
-                  <button
-                    onClick={() =>
-                      setActiveReviewMenuId((prev) => (prev === review.id ? null : review.id))
-                    }
-                    className="text-text-main rounded-full p-1"
-                  >
-                    <MoreHorizontal size={16} />
-                  </button>
-
-                  {activeReviewMenuId === review.id && (
-                    <div className="border-primary-100 absolute top-7 right-0 z-10 w-24 rounded-[0.9rem] border bg-white p-1 shadow-xl">
-                      <button
-                        onClick={() => openReviewEditModal(review)}
-                        className="text-text-main hover:bg-primary-100/40 w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold transition-colors"
-                      >
-                        수정하기
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActiveReviewMenuId(null);
-                          setDeletingReviewId(review.id);
-                        }}
-                        className="w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold text-[#D65F69] transition-colors hover:bg-red-50"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-text-main mt-2.5 text-[13px] leading-relaxed font-medium">
-                {review.content}
-              </p>
-              <div className="mt-1.5 flex justify-end">
-                <span className="text-[11px] font-medium text-[#B97B79]">{review.date}</span>
               </div>
             </div>
           ))}
@@ -892,8 +889,9 @@ export default function MyPage() {
             : undefined
         }
         wineInfo={{
+          id: editingReview?.wineId,
           name: editingReview?.wineName ?? '',
-          category: editingReview?.subtitle ?? '',
+          category: '',
         }}
       />
 
@@ -913,9 +911,7 @@ export default function MyPage() {
                   <h4 className="text-text-main truncate text-sm font-black">
                     {editingReview.wineName}
                   </h4>
-                  <p className="text-text-main/35 mt-0.5 text-xs font-medium">
-                    {editingReview.subtitle}
-                  </p>
+                  <p className="text-text-main/35 mt-0.5 text-xs font-medium">{''}</p>
                 </div>
                 <span className="text-text-main/35 rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black">
                   수정 중
