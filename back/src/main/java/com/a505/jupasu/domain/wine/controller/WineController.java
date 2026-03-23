@@ -1,8 +1,6 @@
 package com.a505.jupasu.domain.wine.controller;
 
 import com.a505.jupasu.domain.preference.entity.DrinkingSituation;
-import com.a505.jupasu.domain.user.entity.User;
-import com.a505.jupasu.domain.user.repository.UserRepository;
 import com.a505.jupasu.domain.wine.dto.*;
 import com.a505.jupasu.domain.wine.service.WineService;
 import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
@@ -18,7 +16,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 
 @RestController
@@ -26,14 +26,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WineController {
 
+    private static final Set<DrinkingSituation> SUPPORTED_SITUATIONS =
+            EnumSet.of(DrinkingSituation.ALONE, DrinkingSituation.DATE, DrinkingSituation.PARTY);
+
     private final WineService wineService;
-    private final UserRepository userRepository;
     private final WineRecommendationCalculator wineRecommendationCalculator;
 
     /**
-     * 와인 통합 검색 (초성/오타 허용 - 고도화 예정)
-     *  현재는 필터 없이 와인 이름으로만 검색
-     *  추후 필터링 -> elasticSearch 고도화 예정
+     * 와인 통합 검색
+     *  필터링, 페이지네이션 적용
+     *  pg_trgm, gin index를 통한 고속 검색
      */
     @GetMapping
     public ApiResponse<Page<WineSearchResponse>> searchWines(
@@ -55,8 +57,8 @@ public class WineController {
             @AuthenticationPrincipal LoginUserCustom user,
             @PathVariable("wine_id") Long wineId
     ) {
-        //현재는 로그인한 유저 아이디 1L 로 고정
-        Long userId = 1L;
+
+        Long userId = user.getUser().getId();
         WineDetailResponse response = wineService.getWineDetail(userId, wineId);
         return ApiResponse.success("와인 상세 정보 조회 성공", response);
 
@@ -69,21 +71,21 @@ public class WineController {
      */
     @GetMapping("/quick")
     public ApiResponse<WineQuickRecommendResponse> getQuickWines(
-            //TODO: 로그인한 사용자 확인 (Authentication 추가)
+            @AuthenticationPrincipal LoginUserCustom loginUser,
             @RequestParam(required = false) DrinkingSituation situation) {
 
-        Long userId = 1L; // 현재는 고정, 추후 인증 연동 예정
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        if (situation != null && !SUPPORTED_SITUATIONS.contains(situation)) {
+            throw new CustomException(ErrorCode.SITUATION_NOT_FOUND);
+        }
 
         if (situation == null) {
-            WineQuickRecommendResponse response = wineRecommendationCalculator.allQuickLists(user);
+            WineQuickRecommendResponse response = wineRecommendationCalculator.allQuickLists(loginUser.getUser());
             return ApiResponse.success("종합 퀵 추천 와인 조회 성공", response);
         }
 
-        List<WineRecommendationItem> wineList = wineRecommendationCalculator.quickList(user, situation);
+        List<WineRecommendationItem> wineList = wineRecommendationCalculator.quickList(loginUser.getUser(), situation);
         WineQuickRecommendResponse response = WineQuickRecommendResponse.of(
-                null,
+                List.of(),
                 List.of(WineQuickRecommendResponse.SituationResult.of(situation, wineList))
         );
 

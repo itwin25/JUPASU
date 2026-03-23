@@ -32,19 +32,21 @@ services:
       - backend-network-dev
       - monitoring
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
+  # AI Service: Python 3.12 (Port 8000 표준화 완료)
   ai:
     image: ${DOCKER_USER}/jupasu:ai-dev
     container_name: ai-fastapi-dev
     restart: always
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
     networks:
       - backend-network-dev
       - monitoring
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - 8001:8000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
@@ -62,7 +64,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
-      ALLOWED_ORIGINS: "http://localhost,https://j14a505.p.ssafy.io:8443"
+      ALLOWED_ORIGINS: "http://localhost,http://localhost:8443,https://j14a505.p.ssafy.io:8443"
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
     ports:

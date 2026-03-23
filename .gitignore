@@ -2,6 +2,11 @@
 .vscode/
 .env
 .env.local
+__pycache__/
+*.py[cod]
+
+# Gemini CLI Internal
+.superpowers/
 
 # Temporary UI Analysis
 temp_ui/
@@ -16,9 +21,31 @@ node_modules/
 build/
 dist/
 
+# Infrastructure
 docker-compose.local.yml
+docker-compose.ai.yml
 nginx/nginx.local.conf
 
+# Documentation & Reports
+docs/
+
+# AI Models & Large Data
+ocr/
+ai/crawled-results/
+**/models/
+!front/public/models/
+
+# Sensitive Files
+*.pem
+
+# AI Local Test Scripts
+ai/test_gms_*.py
+
+# File System
+data/
 uploads/
 front/public/sw.js
 front/public/workbox-*.js
+
+# Local settings backup
+settings.local/

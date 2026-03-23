@@ -41,4 +41,25 @@ public class TasteReport {
     private String worstDescription;
 
     private LocalDateTime createdAt;
+
+    /**
+     * 리포트 데이터를 한꺼번에 업데이트하는 도메인 메서드
+     */
+    public void updateResult(double avgSweetness, double avgAcidity, double avgBody,
+                             double avgTannin, double avgAlcohol, String mainTitle, String content) {
+        this.avgSweetness = avgSweetness;
+        this.avgAcidity = avgAcidity;
+        this.avgBody = avgBody;
+        this.avgTannin = avgTannin;
+        this.avgAlcohol = avgAlcohol;
+        this.mainTitle = mainTitle;
+        this.content = content;
+    }
+
+    /**
+     * 생성 시간을 수동으로 업데이트하기 위한 Setter
+     */
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }
