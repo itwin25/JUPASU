@@ -56,11 +56,11 @@ $$
 
 ## ② 취향·도수 통합 점수 $S_{\text{pref}}$
 
-### `[수정]` 5차원 통합 — 도수 NULL도 동적 분모에 포함
+### `[수정]` 5차원 통합 — 차원별 σ̂_i 적용
 
 $$
 S_{\text{pref}} = \frac{1}{N_{\text{valid}}} \left(
-  \sum_{i \in \text{valid\_taste}} \exp\!\left(-\frac{(\hat{U}_i - W'_i)^2}{2\hat{\sigma}_t^2}\right)
+  \sum_{i \in \text{valid\_taste}} \exp\!\left(-\frac{(\hat{U}_i - W'_i)^2}{2\hat{\sigma}_i^2}\right)
   + \mathbb{1}_{\text{alc}} \cdot \exp\!\left(-\frac{\bigl(\text{COALESCE}(U_{\text{alc}},\, T_{\text{alc}}) - W_{\text{alc}}\bigr)^2}{2\sigma_a^2}\right)
 \right)
 $$
@@ -70,6 +70,9 @@ S_{\text{pref}} = 0 \qquad \text{if } N_{\text{valid}} = 0 \text{ (전체 NULL)}
 $$
 
 > **COALESCE**: 사용자 선호 도수 $U_{\text{alc}}$가 NULL이면 상황별 기본 도수 $T_{\text{alc}}$로 대체.
+
+> **σ̂_i**: 단일 전역 σ̂_t 대신 차원별로 독립 계산된 취향 폭 (Step 4 참조).
+> 예시: sweetness에 관대한 유저는 σ̂_sweet가 크고, tannin에 예민하면 σ̂_tannin이 작아짐.
 
 ---
 
@@ -145,7 +148,7 @@ $$
 
 ## ⑤ 비대칭 가격 점수 $S_{\text{price}}$
 
-### `[동일]` 구조 변경 없음
+### `[수정]` 상황별 비대칭 Gaussian — 코드 구현 반영
 
 $$
 S_{\text{price}} = \exp\!\left(-\frac{(W_{\text{price}} - T_{\text{price}})^2}{2\sigma_{\text{dir}}^2}\right),
@@ -157,34 +160,44 @@ S_{\text{price}} = \exp\!\left(-\frac{(W_{\text{price}} - T_{\text{price}})^2}{2
 \end{cases}
 $$
 
-| 상황 | $T_{\text{price}}$ | $\sigma_{\text{low}}$ | $\sigma_{\text{high}}$ |
-|------|-------------------|----------------------|------------------------|
+| 상황 | $T_{\text{price}}$ | $\sigma_{\text{low}}$ (저가 방향) | $\sigma_{\text{high}}$ (고가 방향) |
+|------|-------------------|----------------------------------|-----------------------------------|
 | 혼술 | $U_{\min}$ | $0.8 \times U_{\min}$ | $0.2 \times U_{\min}$ |
 | 기념일 | $1.1 \times U_{\max}$ | $0.25 \times U_{\max}$ | $0.2 \times T_{\text{price}}$ |
 | 파티 | $(U_{\min} + U_{\max})\,/\,2$ | $0.4 \times T_{\text{price}}$ | $0.3 \times T_{\text{price}}$ |
+| 상황 없음 | $(U_{\min} + U_{\max})\,/\,2$ | $\sigma_{\text{dir}} = 15{,}000$ | $\sigma_{\text{dir}} = 15{,}000$ |
+
+> 혼술: 예산 초과에 강한 페널티(σ_high가 매우 작음), 저렴한 와인은 관대하게 허용.
+> 기념일: 목표가를 최대 예산의 1.1배로 설정해 프리미엄 와인을 자연스럽게 유도.
+> 상황 없음: 대칭 Gaussian(σ_dir = 15,000원)으로 폴백.
 
 ---
 
 ## ⑥ Step 1 — 실증 선호 벡터 $U_i^{\text{revealed}}$
 
-### `[수정]` 차원별 NULL 오염 차단 — $\mathbb{1}_{ij}$ 지시 함수 적용
+### `[수정]` 긍정 리뷰 전용 + 차원별 NULL 오염 차단
 
 $$
 U_i^{\text{revealed}} =
-\frac{\displaystyle\sum_{j \in \text{Rated}} \tilde{r}_j \cdot \tau_j \cdot W'_{ij} \cdot \mathbb{1}_{ij}}
-     {\displaystyle\sum_{j \in \text{Rated}} |\tilde{r}_j| \cdot \tau_j \cdot \mathbb{1}_{ij}}
+\frac{\displaystyle\sum_{\substack{j:\,\tilde{r}_j > 0}} \tilde{r}_j \cdot \tau_j \cdot W'_{ij} \cdot \mathbb{1}_{ij}}
+     {\displaystyle\sum_{\substack{j:\,\tilde{r}_j > 0}} \tilde{r}_j \cdot \tau_j \cdot \mathbb{1}_{ij}}
 $$
 
 $$
 U_i^{\text{revealed}} = U_i^{\text{stated}}
-\qquad \text{if } \sum_j \mathbb{1}_{ij} = 0 \text{ (차원 } i \text{의 유효 평가 없음)}
+\qquad \text{if } \sum_{j:\,\tilde{r}_j>0} \mathbb{1}_{ij} = 0 \text{ (긍정 평가 없음)}
 $$
 
+> **긍정 리뷰만 사용하는 이유**: 부정 신호($\tilde{r} < 0$)를 전체 리뷰에 포함하면,
+> 속성값이 낮은 와인(예: sweetness=0.1)을 싫어했을 때 "낮은 속성 = 기피"가
+> 아닌 "해당 속성 선호도가 낮음"으로 잘못 추론되는 방향 모호성이 발생한다.
+> 기피 효과는 Gaussian 거리 감쇠($\hat{U}_i$와 $W'_i$의 차이)로 암묵적으로 처리.
+>
 > $\mathbb{1}_{ij}$: 와인 $j$의 차원 $i$ 유효성. NULL 와인이 역산을 오염시키는 것을 차단.
 
 ---
 
-### `[동일]` 별점 정규화 · 시간 감쇠
+### `[수정]` 별점 정규화 · 시간 감쇠
 
 $$
 \tilde{r}_j = \frac{r_j - 3}{2} \in [-1,\,+1]
@@ -192,7 +205,8 @@ $$
 \tau_j = e^{-\alpha \cdot \Delta t_j}, \quad \alpha = 0.008\,/\text{일}
 $$
 
-> $r_j \in \{1,2,3,4,5\}$. 3점 → 0 (중립), 5점 → +1 (강한 긍정), 1점 → −1 (강한 부정).  
+> $r_j \in \{1,2,3,4,5\}$. 3점 → 0 (중립), 5점 → +1 (강한 긍정), 1점 → −1 (강한 부정).
+> $\tilde{r}_j > 0$ 조건은 $r_j \ge 4$ (rating 4·5점)에 해당. 3점 이하는 U_rev 계산에서 제외.
 > $\alpha = 0.008$: 90일 후 가중치 ≈ 0.50.
 
 ---
@@ -229,9 +243,9 @@ $$
 
 ---
 
-## ⑨ Step 4 — 개인화 $\hat{\sigma}_t$
+## ⑨ Step 4 — 차원별 개인화 $\hat{\sigma}_i$
 
-### `[수정]` 차원별 독립 분산 후 평균 — NULL 차원 제외
+### `[수정]` 차원별 독립 σ̂_i — 전역 평균 폐기
 
 $$
 \mu_i = \frac{\displaystyle\sum_{j \in R^+} W'_{ij} \cdot \mathbb{1}_{ij}}{\displaystyle\sum_{j \in R^+} \mathbb{1}_{ij}},
@@ -240,24 +254,29 @@ $$
 $$
 
 $$
-\text{Var}(W'_{\text{rated}}) = \frac{1}{N_{\text{valid\_rated}}} \sum_{i \in \text{valid\_rated}} \text{Var}_i
+\hat{\sigma}_i = \sigma_{\text{base}} \cdot \sqrt{1 + \delta \cdot \frac{\text{Var}_i}{\sigma_{\text{base}}^2}}
+\qquad i \in \{\text{sweetness, acidity, body, tannin}\}
 $$
 
-> $R^+$: 4점 이상 평가 와인 집합.  
-> $N_{\text{valid\_rated}}$: $R^+$ 와인에서 유효값이 1개 이상인 차원 수.  
-> 모든 차원이 NULL이면 $\hat{\sigma}_t = \sigma_{\text{base}}$로 폴백.
+$$
+\hat{\sigma}_i = \sigma_{\text{base}} \qquad \text{if } \sum_{j \in R^+} \mathbb{1}_{ij} = 0 \text{ (긍정 평가 없음 → 폴백)}
+$$
+
+> $R^+$: 긍정 평가(rating ≥ 4) 와인 집합. Step 1의 U_rev 계산과 동일한 집합.
+
+> **기존 전역 $\hat{\sigma}_t$ 폐기 이유**: 단일 평균 분산은 sweetness에 관대하지만
+> tannin에 예민한 사용자의 차원별 취향 엄밀도 차이를 반영하지 못함.
+> 차원별 $\hat{\sigma}_i$로 각 차원의 취향 폭을 독립적으로 개인화.
+>
+> $\sigma_{\text{base}} = 0.7$ (0~2 스케일), $\delta = 0.5$
 
 ---
 
-### `[동일]` $\hat{\sigma}_t$ 계산
-
-$$
-\hat{\sigma}_t = \sigma_{\text{base}} \cdot \sqrt{1 + \delta \cdot \frac{\text{Var}(W'_{\text{rated}})}{\sigma_{\text{base}}^2}},
-\qquad \sigma_{\text{base}} = 3.5,\quad \delta = 0.5
-$$
-
-> 취향 폭이 넓은 사용자 → $\text{Var}$ 높음 → $\hat{\sigma}_t$ 커짐 → 다양한 와인에 관대.  
-> 취향 폭이 좁은 사용자 → $\text{Var}$ 낮음 → $\hat{\sigma}_t$ 작아짐 → 딱 맞는 와인만 고점수.
+| 상황 | $\text{Var}_i$ | $\hat{\sigma}_i$ | 해석 |
+|------|:---------:|:---------:|------|
+| 다양한 단맛 와인 좋아함 | 높음 | $> \sigma_{\text{base}}$ | sweetness 취향 폭 넓음 → 관대한 매칭 |
+| 특정 탄닌 범위만 좋아함 | 낮음 | $\approx \sigma_{\text{base}}$ | tannin 취향 폭 좁음 → 엄격한 매칭 |
+| 긍정 리뷰 없는 차원 | 없음 | $= \sigma_{\text{base}}$ | 정보 없음 → 기본 폴백 |
 
 ---
 
@@ -332,8 +351,8 @@ $$
 | $\mathbb{1}_{ij}$ | 와인 $j$의 차원 $i$ 유효성. $U_i^{\text{revealed}}$ 역산 시 NULL 오염 방지 |
 | $N_{\text{valid}}$ | 유효 특성 수. 범위 0~5. 0이면 극단값 처리 적용 |
 | $\text{valid\_sit}$ | 상황별 핵심 차원 중 NULL이 아닌 집합. 비면 $S_{\text{sit}} = 0.5$ |
-| $\text{Var}_i$ | 차원 $i$의 NULL 제외 분산. 차원별 독립 계산 |
-| $N_{\text{valid\_rated}}$ | $R^+$ 와인에서 유효값 ≥ 1인 차원 수. $\text{Var}$ 분모 |
+| $\text{Var}_i$ | 차원 $i$의 긍정 리뷰 기반 독립 분산. $\hat{\sigma}_i$ 계산에 사용 |
+| $\hat{\sigma}_i$ | 차원별 개인화 취향 폭. 기존 전역 $\hat{\sigma}_t$ 대체. 기본값 $\sigma_{\text{base}}$ |
 
 ### 기존 변수
 
@@ -342,9 +361,9 @@ $$
 | $U_i^{\text{stated}}$ | 설문 응답 취향값. 범위: 0–10 |
 | $U_i^{\text{revealed}}$ | 별점 역산 실증 선호값. 차원별 NULL 독립 처리 |
 | $\hat{U}_i$ | 교정된 최종 취향값. 모든 수식에서 $U_i$ 대체 |
-| $\gamma$ | 실증 신뢰 가중치. 0 (콜드 스타트) → 1 (이력 풍부) |
-| $\hat{\sigma}_t$ | 개인화 취향 폭. 기본값 $\sigma_{\text{base}} = 3.5$ |
-| $\tilde{r}_j$ | 정규화 별점. $(r_j - 3)\,/\,2$. 범위: $-1 \sim +1$ |
+| $\gamma$ | 실증 신뢰 가중치. 0 (콜드 스타트) → 1 (이력 풍부). 전체 리뷰 수 기반 |
+| $\hat{\sigma}_i$ | 차원별 개인화 취향 폭. 기본값 $\sigma_{\text{base}} = 0.7$ (0~2 스케일) |
+| $\tilde{r}_j$ | 정규화 별점. $(r_j - 3)\,/\,2$. 범위: $-1 \sim +1$. U_rev에는 $>0$만 사용 |
 | $\tau_j$ | 시간 감쇠 계수. $e^{-\alpha \cdot \Delta t_j}$. $\alpha = 0.008$/일 |
 | $W'_i$ | 정규화 와인 특성값. $W_i \times 2$ (NULL이면 연산 제외) |
 | $W_{\text{alc}}$ | 와인 도수 (%). NULL 허용. 없으면 $T_{\text{alc}}$ 대입 |
