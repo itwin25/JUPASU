@@ -1,5 +1,10 @@
 package com.a505.jupasu.domain.wine.service;
 
+import com.a505.jupasu.domain.preference.dto.response.PreferenceResponse;
+import com.a505.jupasu.domain.preference.entity.Preference;
+import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
+import com.a505.jupasu.domain.user.entity.User;
+import com.a505.jupasu.domain.user.repository.UserRepository;
 import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
 import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
@@ -24,6 +29,8 @@ import java.util.stream.Collectors;
 public class WineService {
 
     private final WineRepository wineRepository;
+    private final UserRepository userRepository;
+    private final PreferenceRepository preferenceRepository;
     private final WineFoodPairingRepository wineFoodPairingRepository;
 
     public Page<WineSearchResponse> searchWines(WineSearchCondition condition, Pageable pageable) {
@@ -47,10 +54,11 @@ public class WineService {
         Wine wine = wineRepository.findById(wineId)
                 .orElseThrow(() -> new CustomException(ErrorCode.WINE_NOT_FOUND));
 
-        //TODO: 추후 유저 추가시 주석 해재
-        // 2. 유저 정보 조회 (적중률 계산을 위함)
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+      
+        Preference preference = preferenceRepository.findByUserId(userId).orElse(null);
 
         // 3. 페어링 푸드 목록 조회
         List<String> pairingFoods = wineFoodPairingRepository.findFoodNamesByWineId(wineId);
@@ -59,6 +67,7 @@ public class WineService {
         //TODO: 취향 적중률 로직 추후 추가 예정
         int matchRate = 95;
 
-        return WineDetailResponse.of(wine, matchRate, pairingFoods);
+
+        return WineDetailResponse.of(wine, matchRate, pairingFoods, preference);
     }
 }

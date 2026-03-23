@@ -1,5 +1,6 @@
 package com.a505.jupasu.domain.wine.dto;
 
+import com.a505.jupasu.domain.preference.entity.Preference;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import lombok.Builder;
 
@@ -24,9 +25,10 @@ public record WineDetailResponse(
         Float body,
         Float tannin,
         Integer matchRate,
-        List<String> pairingFoods
+        List<String> pairingFoods,
+        UserPreferenceResponse userPreference
 ) {
-    public static WineDetailResponse of(Wine wine, Integer matchRate, List<String> pairingFoods) {
+    public static WineDetailResponse of(Wine wine, Integer matchRate, List<String> pairingFoods, Preference preference) {
         return WineDetailResponse.builder()
                 .wineId(wine.getId())
                 .nameKr(wine.getNameKr())
@@ -46,6 +48,7 @@ public record WineDetailResponse(
                 .tannin(wine.getTasteProfile() != null ? wine.getTasteProfile().getTannin() : 0.0f)
                 .matchRate(matchRate)
                 .pairingFoods(pairingFoods)
+                .userPreference(preference != null ? UserPreferenceResponse.from(preference) : null)
                 .build();
     }
 }
