@@ -1,0 +1,16 @@
+[project]
+name = "wine-pgvector-mini"
+version = "0.1.0"
+description = "Standalone mini prototype for wine recommendation with pgvector-ready documents."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.2.9",
+    "python-dotenv>=1.0.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
