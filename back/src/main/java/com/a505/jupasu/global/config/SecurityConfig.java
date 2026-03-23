@@ -66,6 +66,8 @@ public class SecurityConfig {
                                 ,"/api/admin/wines/**"
                                 // 이미지 서빙용
                                 , "/images/**"
+                                // 에러 페이지 허용
+                                , "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
