@@ -2,6 +2,8 @@
 .vscode/
 .env
 .env.local
+__pycache__/
+*.py[cod]
 
 # Gemini CLI Internal
 .superpowers/
