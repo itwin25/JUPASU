@@ -11,6 +11,10 @@ import {
   useWineScrapMutation,
 } from '@/features/wine/hooks/useWineListQuery';
 
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/axios';
+import { useWineReviewsQuery } from '@/features/review/hooks/useWineReviewsQuery';
+
 type ReviewItem = {
   id: number;
   user: string;
@@ -18,6 +22,66 @@ type ReviewItem = {
   content: string;
   date: string;
   avatar: string;
+};
+
+type SimilarWine = {
+  id: number;
+  name: string;
+  desc: string;
+  price: string;
+  match: number;
+};
+
+// ⭐️ 취향 타입 정의
+type TasteProfile = {
+  body: number;
+  sweet: number;
+  acid: number;
+  tannin: number;
+  alcoholDegree?: number;
+};
+
+type WineInfo = {
+  id: number;
+  name: string;
+  category: string;
+  country: string;
+  flagUrl: string | null; // ⭐️ 국기 텍스트 대신 안전한 이미지 URL을 담을 필드로 변경
+  match: number;
+  rating: string;
+  reviewCount: number;
+  price: string;
+  description: string;
+  tasteProfile: TasteProfile;
+  alcoholDegree: number;
+  reason: string | null;
+  tags: string[];
+  foods: string[];
+  similarWines: SimilarWine[];
+  imageUrl: string;
+  userPreference: TasteProfile | null;
+};
+
+// ⭐️ [추가] 윈도우 에러 방지용: 나라 이름에 맞춰 안전한 국기 이미지 URL을 반환하는 함수
+const getCountryFlagUrl = (countryName: string | undefined | null) => {
+  if (!countryName) return null;
+  const name = countryName.trim().toLowerCase();
+  
+  let code = null;
+  if (name.includes('프랑스') || name.includes('france') || name === 'fr') code = 'fr';
+  else if (name.includes('이탈리아') || name.includes('italy') || name === 'it') code = 'it';
+  else if (name.includes('스페인') || name.includes('spain') || name === 'es') code = 'es';
+  else if (name.includes('미국') || name.includes('usa') || name.includes('united states') || name === 'us') code = 'us';
+  else if (name.includes('칠레') || name.includes('chile') || name === 'cl') code = 'cl';
+  else if (name.includes('호주') || name.includes('australia') || name === 'au') code = 'au';
+  else if (name.includes('아르헨티나') || name.includes('argentina') || name === 'ar') code = 'ar';
+  else if (name.includes('독일') || name.includes('germany') || name === 'de') code = 'de';
+  else if (name.includes('뉴질랜드') || name.includes('new zealand') || name === 'nz') code = 'nz';
+  else if (name.includes('포르투갈') || name.includes('portugal') || name === 'pt') code = 'pt';
+  else if (name.includes('남아공') || name.includes('south africa') || name === 'za') code = 'za';
+  else if (name.includes('한국') || name.includes('korea') || name.includes('대한민국') || name === 'kr') code = 'kr';
+
+  return code ? `https://flagcdn.com/w40/${code}.png` : null;
 };
 
 export default function WineDetailPage({
@@ -38,52 +102,19 @@ export default function WineDetailPage({
   const [sortOrder, setSortOrder] = useState<'recent' | 'rating'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
-  const wineInfo = {
-    id: Number(params.wineId),
-    name: 'Chateau Margaux',
-    category: 'BORDEAUX RED',
-    country: '프랑스',
-    flag: 'FR',
-    match: 95,
-    rating: 4.8,
-    reviewCount: 2,
-    price: '120,000',
-    description:
-      '깊고 복합적인 향이 특징인 보르도 명품 와인입니다. 블랙커런트와 바이올렛, 삼나무 향이 어우러지며 실크 같은 탄닌이 매력적으로 남습니다.',
-    tasteProfile: {
-      body: 5,
-      sweet: 2,
-      acid: 3,
-      tannin: 5,
-    },
-    reason:
-      '무게감 있는 레드 와인을 좋아하는 취향과 잘 맞고, 스테이크나 진한 육류 요리와의 궁합이 좋아 추천해드려요.',
-    tags: ['과일향', '오크향', '스파이시', '부드러움'],
-    foods: ['스테이크', '양갈비', '하드 치즈'],
-    similarWines: [
-      {
-        id: 2,
-        name: '12 Crimes Red',
-        desc: '한잔의 피로를 녹여줄 한 잔',
-        price: '25,000',
-        match: 95,
-      },
-      {
-        id: 3,
-        name: '20 Crimes Red',
-        desc: '의주의 피로를 녹여줄 한 잔',
-        price: '250,000',
-        match: 95,
-      },
-      {
-        id: 4,
-        name: '190 Crimes Red',
-        desc: '10년의 피로를 녹여줄 한 잔',
-        price: '2,500,000',
-        match: 95,
-      },
-    ],
-  };
+  // ⭐️ API 1번만 호출 (와인 상세 정보 + 유저 취향 정보 한방에!)
+  const { data: wineDetail, isLoading: isWineLoading } = useQuery({
+    queryKey: ['wine-detail', params.wineId],
+    queryFn: () => api.get(`/wines/${params.wineId}`).then((res) => res.data.data),
+  });
+
+  const { data: reviewData } = useWineReviewsQuery(params.wineId);
+
+  const safeReviewList = useMemo<any[]>(() => {
+    if (!reviewData) return [];
+    const data = reviewData as any;
+    return Array.isArray(data) ? data : (data.content || []);
+  }, [reviewData]);
 
   const { data: scrapListData } = useWineScrapListQuery();
   const wineScrapMutation = useWineScrapMutation();
@@ -91,29 +122,103 @@ export default function WineDetailPage({
   const isScraped = useMemo(
     () =>
       (scrapListData ?? []).some(
-        (item) => item.wineId === wineInfo.id || item.scrapId === wineInfo.id,
+        (item) => item.wineId === Number(params.wineId) || item.scrapId === Number(params.wineId),
       ),
-    [scrapListData, wineInfo.id],
+    [scrapListData, params.wineId],
   );
 
-  const reviews: ReviewItem[] = [
-    {
-      id: 1,
-      user: '와인수인',
-      rating: 4,
-      content: '와인의 구조감과 향이 좋아서 만족스러웠어요. 스테이크랑 특히 잘 어울렸습니다.',
-      date: '2026.01.05',
+  const wineInfo = useMemo<WineInfo | null>(() => {
+    if (!wineDetail) return null;
+
+    return {
+      id: wineDetail.wineId,
+      name: wineDetail.nameKr || wineDetail.nameEn || '이름 없는 와인',
+      category: wineDetail.grapeVariety || 'WINE', 
+      country: wineDetail.country || '원산지 미상',
+      flagUrl: getCountryFlagUrl(wineDetail.country), // ⭐️ 변환 함수로 이미지 URL 매핑
+      match: wineDetail.matchRate || 0,
+      rating: Number(wineDetail.averageRating || 0).toFixed(1),
+      reviewCount: safeReviewList.length, 
+      price: wineDetail.price ? wineDetail.price.toLocaleString() : '-',
+      description: wineDetail.description || '와인에 대한 상세 설명이 없습니다.',
+      tasteProfile: {
+        body: wineDetail.body || 0,
+        sweet: wineDetail.sweetness || 0,
+        acid: wineDetail.acidity || 0,
+        tannin: wineDetail.tannin || 0,
+      },
+      alcoholDegree: wineDetail.alcoholDegree || 0,
+      reason: null, 
+      tags: [wineDetail.region, wineDetail.winery].filter(Boolean) as string[], 
+      foods: (wineDetail.pairingFoods || []) as string[],
+      similarWines: [], 
+      imageUrl: wineDetail.imageUrl,
+      userPreference: wineDetail.userPreference ? {
+        tannin: wineDetail.userPreference.tannin || 0,
+        body: wineDetail.userPreference.body || 0,
+        alcoholDegree: wineDetail.userPreference.alcoholDegree || 0,
+        sweet: wineDetail.userPreference.sweetness || 0,
+        acid: wineDetail.userPreference.acidity || 0,
+      } : null,
+    };
+  }, [wineDetail, safeReviewList]);
+
+  const reviews: ReviewItem[] = useMemo(() => {
+    let sortedReviews = [...safeReviewList];
+    if (sortOrder === 'rating') {
+      sortedReviews.sort((a, b) => b.rating - a.rating);
+    } else {
+      sortedReviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    return sortedReviews.map((r) => ({
+      id: r.id || r.reviewId,
+      user: r.userNickname || r.nickname || '익명', 
+      rating: r.rating,
+      content: r.content,
+      date: new Date(r.createdAt).toLocaleDateString('ko-KR', {
+        year: 'numeric', month: '2-digit', day: '2-digit'
+      }).replace(/\. /g, '.').slice(0, -1),
       avatar: '🍷',
-    },
-    {
-      id: 2,
-      user: '보르도매니아',
-      rating: 5,
-      content: '오크와 과실 향이 선명하고 밸런스가 좋아요. 특별한 날 마시기 정말 좋았습니다.',
-      date: '2025.12.20',
-      avatar: '🍇',
-    },
-  ];
+    }));
+  }, [safeReviewList, sortOrder]);
+
+  const dynamicPolygonPoints = useMemo(() => {
+    if (!wineInfo) return "";
+    const tasteValues = [
+      wineInfo.tasteProfile.tannin,
+      wineInfo.tasteProfile.body,
+      Math.min((wineInfo.alcoholDegree / 20) * 5, 5), 
+      wineInfo.tasteProfile.sweet,
+      wineInfo.tasteProfile.acid,
+    ];
+
+    return tasteValues.map((val, i) => {
+      const radius = (val / 5) * 40;
+      const angle = (i * 72 - 90) * (Math.PI / 180);
+      return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
+    }).join(' ');
+  }, [wineInfo]);
+
+  const userPolygonPoints = useMemo(() => {
+    if (!wineInfo || !wineInfo.userPreference) return "";
+    
+    const pref = wineInfo.userPreference;
+    const tasteValues = [
+      pref.tannin,
+      pref.body,
+      Math.min((pref.alcoholDegree! / 20) * 5, 5),
+      pref.sweet,
+      pref.acid,
+    ];
+
+    return tasteValues.map((val, i) => {
+      const radius = (val / 5) * 40;
+      const angle = (i * 72 - 90) * (Math.PI / 180);
+      return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
+    }).join(' ');
+  }, [wineInfo]);
+
 
   const handleOpenWriteModal = () => {
     setEditingReview(null);
@@ -138,11 +243,17 @@ export default function WineDetailPage({
 
   const handleScrapClick = async () => {
     try {
-      await wineScrapMutation.mutateAsync(wineInfo.id);
+      if (wineInfo?.id) {
+        await wineScrapMutation.mutateAsync(wineInfo.id);
+      }
     } catch (error) {
       console.error('Failed to toggle wine scrap', error);
     }
   };
+
+  if (isWineLoading || !wineInfo) {
+    return <div className="bg-background min-h-screen pb-28 flex items-center justify-center font-bold text-text-main/40">와인 정보를 불러오는 중입니다...</div>;
+  }
 
   return (
     <div className="bg-background min-h-screen pb-28">
@@ -184,7 +295,11 @@ export default function WineDetailPage({
           <section className="space-y-6">
             <div className="relative aspect-[1/0.78] overflow-hidden rounded-[1.9rem] bg-[#EBE2D5]">
               <div className="absolute inset-0 flex items-center justify-center text-[5.4rem]">
-                🍷
+                {wineInfo.imageUrl && wineInfo.imageUrl !== '/images/default_wine.png' ? (
+                  <img src={wineInfo.imageUrl} alt={wineInfo.name} className="w-full h-full object-contain p-4 drop-shadow-md" />
+                ) : (
+                  '🍷'
+                )}
               </div>
               <div className="absolute top-4 left-4 rounded-full bg-[#C96D72] px-3 py-1.5 text-[0.72rem] font-black text-white shadow-sm">
                 {wineInfo.match}% MATCH
@@ -202,7 +317,16 @@ export default function WineDetailPage({
                   </h1>
                 </div>
                 <span className="text-text-main pt-2 text-[0.8rem] font-black tracking-[0.02em]">
-                  {wineInfo.flag}
+                  {/* ⭐️ 국기 이미지 렌더링 부분 */}
+                  {wineInfo.flagUrl ? (
+                    <img 
+                      src={wineInfo.flagUrl} 
+                      alt={wineInfo.country} 
+                      className="h-4 rounded-[2px] shadow-sm inline-block" 
+                    />
+                  ) : (
+                    <span className="text-[1.1rem]">🍷</span>
+                  )}
                 </span>
               </div>
 
@@ -219,12 +343,14 @@ export default function WineDetailPage({
                 </span>
               </div>
 
-              <div className="rounded-[1.6rem] border border-[#F2C9CC] bg-[#F9E8E9] px-4 py-3">
-                <div className="text-[0.88rem] font-black text-[#C96D72]">AI 추천 이유</div>
-                <p className="text-text-main/62 mt-1.5 text-[0.9rem] leading-relaxed font-medium">
-                  {wineInfo.reason}
-                </p>
-              </div>
+              {wineInfo.reason && (
+                <div className="rounded-[1.6rem] border border-[#F2C9CC] bg-[#F9E8E9] px-4 py-3">
+                  <div className="text-[0.88rem] font-black text-[#C96D72]">AI 추천 이유</div>
+                  <p className="text-text-main/62 mt-1.5 text-[0.9rem] leading-relaxed font-medium">
+                    {wineInfo.reason}
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -282,10 +408,10 @@ export default function WineDetailPage({
                     ['TANNIN', wineInfo.tasteProfile.tannin],
                   ].map(([label, value]) => (
                     <div
-                      key={label}
+                      key={label as string}
                       className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
                     >
-                      <span className="text-text-main/58 text-[0.82rem] font-black">{label}</span>
+                      <span className="text-text-main/58 text-[0.82rem] font-black">{label as string}</span>
                       <div className="flex gap-1.5">
                         {[1, 2, 3, 4, 5].map((step) => (
                           <div
@@ -300,25 +426,43 @@ export default function WineDetailPage({
                   ))}
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {wineInfo.tags.map((tag, index) => (
-                    <div
-                      key={tag}
-                      className={cn(
-                        'rounded-full px-4 py-2 text-[0.76rem] font-black',
-                        index === 0 || index === wineInfo.tags.length - 1
-                          ? 'bg-[#C96D72] text-white'
-                          : 'text-text-main/62 bg-[#EFE8DD]',
-                      )}
-                    >
-                      {tag}
-                    </div>
-                  ))}
-                </div>
+                {wineInfo.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {wineInfo.tags.map((tag, index) => (
+                      <div
+                        key={tag}
+                        className={cn(
+                          'rounded-full px-4 py-2 text-[0.76rem] font-black',
+                          index === 0 || index === wineInfo.tags.length - 1
+                            ? 'bg-[#C96D72] text-white'
+                            : 'text-text-main/62 bg-[#EFE8DD]',
+                        )}
+                      >
+                        {tag}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-text-main text-[1.05rem] font-black">취향 그래프</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-text-main text-[1.05rem] font-black">취향 그래프</h3>
+                  
+                  {wineInfo.userPreference && (
+                    <div className="flex items-center gap-2 pr-1">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#D9AD70]"></div>
+                        <span className="text-text-main/50 text-[0.68rem] font-bold">내 취향</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#C96D72]"></div>
+                        <span className="text-text-main/50 text-[0.68rem] font-bold">와인</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="border-primary-100 aspect-[1/0.72] rounded-[1.6rem] border bg-white px-4 py-5 shadow-[0_8px_20px_rgba(51,34,17,0.035)]">
                   <div className="relative mx-auto h-full max-w-[15.5rem]">
                     <svg className="h-full w-full" viewBox="0 0 100 100">
@@ -350,70 +494,83 @@ export default function WineDetailPage({
                           />
                         );
                       })}
+                      
+                      {userPolygonPoints && (
+                        <polygon
+                          points={userPolygonPoints}
+                          className="fill-[#D9AD70]/30 stroke-[#D9AD70] stroke-[1.5]"
+                        />
+                      )}
+
                       <polygon
-                        points="50,18 76,38 70,73 37,80 22,43"
-                        className="fill-[#C96D72]/12 stroke-[#D86E73] stroke-[1.3]"
+                        points={dynamicPolygonPoints}
+                        className="fill-[#C96D72]/40 stroke-[#D86E73] stroke-[1.5]"
                       />
                     </svg>
-                    <span className="text-text-main/44 absolute top-[-0.3rem] left-1/2 -translate-x-1/2 text-[0.8rem] font-semibold">
+
+                    <span className="text-text-main/60 absolute top-[-0.3rem] left-1/2 -translate-x-1/2 text-[0.8rem] font-bold">
                       탄닌
                     </span>
-                    <span className="text-text-main/44 absolute top-[32%] right-[0.2rem] text-[0.8rem] font-semibold">
+                    <span className="text-text-main/60 absolute top-[32%] right-[0.2rem] text-[0.8rem] font-bold">
                       바디
                     </span>
-                    <span className="text-text-main/44 absolute right-[2.5rem] bottom-[2%] text-[0.8rem] font-semibold">
-                      아로마
+                    <span className="text-text-main/60 absolute right-[2.5rem] bottom-[2%] text-[0.8rem] font-bold">
+                      도수
                     </span>
-                    <span className="text-text-main/44 absolute bottom-[2%] left-[3.5rem] -translate-x-1/2 text-[0.8rem] font-semibold">
-                      과일
+                    <span className="text-text-main/60 absolute bottom-[2%] left-[3.5rem] -translate-x-1/2 text-[0.8rem] font-bold">
+                      당도
                     </span>
-                    <span className="text-text-main/44 absolute top-[32%] left-[0.2rem] text-[0.8rem] font-semibold">
+                    <span className="text-text-main/60 absolute top-[32%] left-[0.2rem] text-[0.8rem] font-bold">
                       산미
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-text-main text-[1.05rem] font-black">음식 페어링</h3>
-                <div className="flex flex-wrap gap-2.5">
-                  {wineInfo.foods.map((food) => (
-                    <div
-                      key={food}
-                      className="text-text-main/62 rounded-full bg-[#EFE8DD] px-4 py-2 text-[0.78rem] font-black"
-                    >
-                      {food}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-text-main text-[1.05rem] font-black">유사한 와인</h3>
-                <div className="space-y-3">
-                  {wineInfo.similarWines.map((wine) => (
-                    <Link key={wine.id} href={`/wines/${wine.id}`} className="block">
-                      <div className="border-primary-100 flex items-center gap-3 rounded-[1.45rem] border bg-white px-3 py-3 shadow-[0_8px_20px_rgba(51,34,17,0.035)] transition-transform active:scale-[0.985]">
-                        <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[1rem] bg-[#FCE7E7] text-[1.8rem]">
-                          🍷
-                        </div>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <h4 className="text-text-main truncate text-[0.92rem] font-black">
-                            {wine.name}
-                          </h4>
-                          <p className="text-text-main/42 truncate text-[0.7rem] font-medium">
-                            {wine.desc}
-                          </p>
-                          <p className="text-[0.88rem] font-black text-[#C96D72]">₩{wine.price}</p>
-                        </div>
-                        <div className="rounded-full bg-[#C96D72] px-2.5 py-1 text-[0.62rem] font-black text-white">
-                          {wine.match}% MATCH
-                        </div>
+              {wineInfo.foods.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-text-main text-[1.05rem] font-black">음식 페어링</h3>
+                  <div className="flex flex-wrap gap-2.5">
+                    {wineInfo.foods.map((food) => (
+                      <div
+                        key={food}
+                        className="text-text-main/62 rounded-full bg-[#EFE8DD] px-4 py-2 text-[0.78rem] font-black"
+                      >
+                        {food}
                       </div>
-                    </Link>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {wineInfo.similarWines.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-text-main text-[1.05rem] font-black">유사한 와인</h3>
+                  <div className="space-y-3">
+                    {wineInfo.similarWines.map((wine) => (
+                      <Link key={wine.id} href={`/wines/${wine.id}`} className="block">
+                        <div className="border-primary-100 flex items-center gap-3 rounded-[1.45rem] border bg-white px-3 py-3 shadow-[0_8px_20px_rgba(51,34,17,0.035)] transition-transform active:scale-[0.985]">
+                          <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[1rem] bg-[#FCE7E7] text-[1.8rem]">
+                            🍷
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <h4 className="text-text-main truncate text-[0.92rem] font-black">
+                              {wine.name}
+                            </h4>
+                            <p className="text-text-main/42 truncate text-[0.7rem] font-medium">
+                              {wine.desc}
+                            </p>
+                            <p className="text-[0.88rem] font-black text-[#C96D72]">₩{wine.price}</p>
+                          </div>
+                          <div className="rounded-full bg-[#C96D72] px-2.5 py-1 text-[0.62rem] font-black text-white">
+                            {wine.match}% MATCH
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           ) : (
             <section className="mt-7 space-y-5">
@@ -503,69 +660,74 @@ export default function WineDetailPage({
               </div>
 
               <div className="space-y-3">
-                {reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="border-primary-100 relative rounded-[1.7rem] border bg-white px-5 py-5 shadow-[0_8px_20px_rgba(51,34,17,0.035)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-primary-100 flex h-10 w-10 items-center justify-center rounded-full text-lg">
-                          {review.avatar}
+                {reviews.length > 0 ? (
+                  reviews.map((review) => (
+                    <div
+                      key={review.id}
+                      className="border-primary-100 relative rounded-[1.7rem] border bg-white px-5 py-5 shadow-[0_8px_20px_rgba(51,34,17,0.035)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-primary-100 flex h-10 w-10 items-center justify-center rounded-full text-lg">
+                            {review.avatar}
+                          </div>
+                          <div>
+                            <div className="text-text-main text-[0.88rem] font-black">
+                              {review.user}
+                            </div>
+                            <div className="mt-1 flex gap-0.5 text-[#FF9A3D]">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  size={12}
+                                  fill={star <= review.rating ? "#FF9A3D" : "none"}
+                                  className={star <= review.rating ? "text-[#FF9A3D]" : "text-primary-100"}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-text-main text-[0.88rem] font-black">
-                            {review.user}
-                          </div>
-                          <div className="mt-1 flex gap-0.5 text-[#FF9A3D]">
-                            {[1, 2, 3, 4].map((star) => (
-                              <Star
-                                key={star}
-                                size={12}
-                                fill="#FF9A3D"
-                                className="text-[#FF9A3D]"
-                              />
-                            ))}
-                            <Star size={12} fill="currentColor" className="text-primary-100" />
-                          </div>
+
+                        <div className="relative">
+                          <button
+                            onClick={() =>
+                              setActiveMenuId(activeMenuId === review.id ? null : review.id)
+                            }
+                            className="text-text-main/28 p-1"
+                          >
+                            <MoreHorizontal size={18} />
+                          </button>
+                          {activeMenuId === review.id && (
+                            <div className="border-primary-100 absolute top-full right-0 z-30 mt-1 w-20 rounded-[0.9rem] border bg-white p-1 shadow-xl">
+                              <button
+                                onClick={() => handleOpenEditModal(review)}
+                                className="text-text-main w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black hover:bg-gray-50"
+                              >
+                                수정
+                              </button>
+                              <div className="bg-primary-100/60 mx-1 h-px" />
+                              <button className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50">
+                                삭제
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      <div className="relative">
-                        <button
-                          onClick={() =>
-                            setActiveMenuId(activeMenuId === review.id ? null : review.id)
-                          }
-                          className="text-text-main/28 p-1"
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
-                        {activeMenuId === review.id && (
-                          <div className="border-primary-100 absolute top-full right-0 z-30 mt-1 w-20 rounded-[0.9rem] border bg-white p-1 shadow-xl">
-                            <button
-                              onClick={() => handleOpenEditModal(review)}
-                              className="text-text-main w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black hover:bg-gray-50"
-                            >
-                              수정
-                            </button>
-                            <div className="bg-primary-100/60 mx-1 h-px" />
-                            <button className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50">
-                              삭제
-                            </button>
-                          </div>
-                        )}
+                      <p className="text-text-main/68 mt-4 text-[0.9rem] leading-[1.7] font-medium whitespace-pre-wrap">
+                        {review.content}
+                      </p>
+
+                      <div className="text-text-main/28 mt-4 text-right text-[0.68rem] font-semibold">
+                        {review.date}
                       </div>
                     </div>
-
-                    <p className="text-text-main/68 mt-4 text-[0.9rem] leading-[1.7] font-medium">
-                      {review.content}
-                    </p>
-
-                    <div className="text-text-main/28 mt-4 text-right text-[0.68rem] font-semibold">
-                      {review.date}
-                    </div>
+                  ))
+                ) : (
+                  <div className="py-10 text-center text-text-main/40 font-bold text-sm">
+                    아직 작성된 리뷰가 없습니다.
                   </div>
-                ))}
+                )}
               </div>
             </section>
           )}
