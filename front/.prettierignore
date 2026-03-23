@@ -1,8 +1,8 @@
 .next/
-node_modules/
-public/
-dist/
-build/
 .pnpm-store/
+build/
+dist/
+node_modules/
 package-lock.json
 pnpm-lock.yaml
+public/

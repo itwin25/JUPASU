@@ -1,0 +1,64 @@
+{
+  "wine_name": "Anvers Anvers The Warrior Shiraz 2005",
+  "winery": "Anvers",
+  "country": "Australia",
+  "region": "Langhorne Creek",
+  "wine_type": "Red",
+  "images": {
+    "bottle": "//images.vivino.com/thumbs/juxnkimrSDaN6bzEUp6EvQ_pb_x960.png",
+    "label": "//images.vivino.com/thumbs/juxnkimrSDaN6bzEUp6EvQ_pl_375x500.png",
+    "main": "//images.vivino.com/thumbs/juxnkimrSDaN6bzEUp6EvQ_pl_375x500.png"
+  },
+  "all_facts": {
+    "Winery": "Anvers",
+    "Grapes": "Shiraz/Syrah",
+    "Region": "Langhorne Creek",
+    "Wine style": "South Australia Shiraz",
+    "Allergens": "Contains sulfites"
+  },
+  "food_pairings": [
+    "사냥 동물",
+    "소고기",
+    "양고기"
+  ],
+  "taste_profile": {
+    "acidity": "62%",
+    "boldness": "97%",
+    "sweetness": "44%",
+    "tannic": "61%"
+  },
+  "taste_notes": [
+    {
+      "group": "Black Fruit",
+      "keyword": "blackberry, black fruit, dark fruit, plum, black cherry, blueberry, jam, cassis",
+      "mentions": "17 mentions"
+    },
+    {
+      "group": "Oak",
+      "keyword": "chocolate, oak, cigar box, mocha, tobacco, vanilla, cinnamon",
+      "mentions": "15 mentions"
+    },
+    {
+      "group": "Spices",
+      "keyword": "pepper, cinnamon, eucalyptus, star anise, white pepper, vanilla",
+      "mentions": "10 mentions"
+    }
+  ],
+  "ratings": {
+    "average": 4.2,
+    "count": 268,
+    "distribution": {
+      "1": 0,
+      "2": 0,
+      "3": 1,
+      "4": 9,
+      "5": 3
+    }
+  },
+  "price": "₩221,840",
+  "url": "https://www.vivino.com/en/anvers-anvers-the-warrior-shiraz/w/2565611?year=2005&price_id=31545275",
+  "collected_at": "2026-03-16T12:27:07.072783",
+  "name_kr": "안베르 안베르 더 워리어 시라즈 2005",
+  "description": "Anvers The Warrior Shiraz 2005 reflects the terroir of Langhorne Creek with rich berry fruit, spice, and a long finish."
+}
+
