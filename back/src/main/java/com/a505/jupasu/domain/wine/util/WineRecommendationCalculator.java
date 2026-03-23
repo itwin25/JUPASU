@@ -98,7 +98,7 @@ public class WineRecommendationCalculator {
             addToHeap(minHeap, new WineScore(match, wine), 5);
         }
 
-        return heapToList(minHeap);
+        return heapToList(minHeap, situation);
     }
 
     /**
@@ -143,10 +143,10 @@ public class WineRecommendationCalculator {
             }
         }
 
-        List<WineRecommendationItem> generalList = heapToList(generalHeap);
+        List<WineRecommendationItem> generalList = heapToList(generalHeap, null);
         List<WineQuickRecommendResponse.SituationResult> bySituation = new ArrayList<>();
         for (DrinkingSituation sit : situationList) {
-            bySituation.add(WineQuickRecommendResponse.SituationResult.of(sit, heapToList(situationHeaps.get(sit))));
+            bySituation.add(WineQuickRecommendResponse.SituationResult.of(sit, heapToList(situationHeaps.get(sit), sit)));
         }
 
         return WineQuickRecommendResponse.of(generalList, bySituation);
@@ -161,10 +161,10 @@ public class WineRecommendationCalculator {
         }
     }
 
-    private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap) {
+    private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap, DrinkingSituation situation) {
         return heap.stream()
                 .sorted(Comparator.comparingInt(WineScore::match).reversed())
-                .map(s -> WineRecommendationItem.of(s.wine(), s.match()))
+                .map(s -> WineRecommendationItem.of(s.wine(), s.match(), situation))
                 .toList();
     }
 
