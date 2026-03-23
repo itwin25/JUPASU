@@ -49,8 +49,7 @@ public class ReviewService {
     /**
      * 리뷰 등록
      */
-    public Long createReview (Long userId, Long wineId, ReviewCreateRequest request){
-
+    public Long createReview(Long userId, Long wineId, ReviewCreateRequest request) {
         if (reviewRepository.existsByUserIdAndWineId(userId, wineId)) {
             throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
@@ -63,57 +62,72 @@ public class ReviewService {
                 .wine(wine)
                 .rating(request.getRating())
                 .content(request.getContent())
-                .isCounted(false) // 초기값
                 .build();
 
-        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
-            preference.markReportAsOutdated();
-        });
+        reviewRepository.save(review);
 
-        return reviewRepository.save(review).getId();
+        wine.addUserReviewRating(request.getRating());
+
+        preferenceRepository.findByUserId(userId).ifPresent(preference ->
+                preference.markReportAsOutdated()
+        );
+
+        return review.getId();
     }
 
     /**
      * 리뷰 수정
      */
-    public void updateReview (Long userId, Long wineId, Long reviewId, ReviewUpdateRequest request) {
+    public void updateReview(Long userId, Long wineId, Long reviewId, ReviewUpdateRequest request) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REVIEW_NOT_FOUND));
 
-        if(!review.getWine().getId().equals(wineId)) {
+        if (!review.getWine().getId().equals(wineId)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
-        if(!review.getUser().getId().equals(userId)) {
+        if (!review.getUser().getId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
         }
 
+        int oldRating = review.getRating();
+        int newRating = request.getRating();
+
         review.updateReview(request.getRating(), request.getContent());
-        
-        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
-            preference.markReportAsOutdated();
-        });
+
+        if (oldRating != newRating) {
+            review.getWine().updateUserReviewRating(oldRating, newRating);
+        }
+
+        preferenceRepository.findByUserId(userId).ifPresent(preference ->
+                preference.markReportAsOutdated()
+        );
     }
+
 
     /**
      * 리뷰 삭제
      */
-    public void deleteReview (Long userId, Long wineId, Long reviewId) {
+    public void deleteReview(Long userId, Long wineId, Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REVIEW_NOT_FOUND));
 
-        if(!review.getWine().getId().equals(wineId)) {
+        if (!review.getWine().getId().equals(wineId)) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
-        if(!review.getUser().getId().equals(userId)) {
+        if (!review.getUser().getId().equals(userId)) {
             throw new CustomException(ErrorCode.FORBIDDEN_ACCESS);
         }
-        
+
+        int oldRating = review.getRating();
+
+        review.getWine().removeUserReviewRating(oldRating);
         reviewRepository.delete(review);
-        
-        preferenceRepository.findByUserId(userId).ifPresent(preference -> {
-            preference.markReportAsOutdated();
-        });
+
+        preferenceRepository.findByUserId(userId).ifPresent(preference ->
+                preference.markReportAsOutdated()
+        );
     }
+
 
     /**
      * 현재 로그인한 사용자의 리뷰 목록을 조회하여 DTO로 반환

@@ -17,4 +17,8 @@ public class WinePriceAndRating {
     private Double averageRating = 0.0;
     @Builder.Default
     private Boolean isRealRating = false;
+
+    public void updateAverageRating(Double averageRating) {
+        this.averageRating = averageRating;
+    }
 }

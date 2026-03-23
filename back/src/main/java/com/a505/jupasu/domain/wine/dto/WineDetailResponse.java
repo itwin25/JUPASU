@@ -18,6 +18,12 @@ public record WineDetailResponse(
         String grapeVariety,
         Float alcoholDegree,
         Double averageRating,
+        Integer reviewCount,
+        Integer star5Count,
+        Integer star4Count,
+        Integer star3Count,
+        Integer star2Count,
+        Integer star1Count,
         Integer price,
         String description,
         Float sweetness,
@@ -28,7 +34,32 @@ public record WineDetailResponse(
         List<String> pairingFoods,
         UserPreferenceResponse userPreference
 ) {
-    public static WineDetailResponse of(Wine wine, Integer matchRate, List<String> pairingFoods, Preference preference) {
+    public static WineDetailResponse of(
+            Wine wine,
+            Integer matchRate,
+            List<String> pairingFoods,
+            Preference preference
+    ) {
+        Double averageRating = 0.0;
+        Integer reviewCount = 0;
+        Integer star5Count = 0;
+        Integer star4Count = 0;
+        Integer star3Count = 0;
+        Integer star2Count = 0;
+        Integer star1Count = 0;
+
+        if (wine.getRatingSummary() != null) {
+            averageRating = wine.getRatingSummary().getDisplayAverageRating();
+            reviewCount = wine.getRatingSummary().getDisplayReviewCount();
+            star5Count = wine.getRatingSummary().getDisplayStar5Count();
+            star4Count = wine.getRatingSummary().getDisplayStar4Count();
+            star3Count = wine.getRatingSummary().getDisplayStar3Count();
+            star2Count = wine.getRatingSummary().getDisplayStar2Count();
+            star1Count = wine.getRatingSummary().getDisplayStar1Count();
+        } else if (wine.getPriceAndRating() != null) {
+            averageRating = wine.getPriceAndRating().getAverageRating();
+        }
+
         return WineDetailResponse.builder()
                 .wineId(wine.getId())
                 .nameKr(wine.getNameKr())
@@ -39,7 +70,13 @@ public record WineDetailResponse(
                 .winery(wine.getOrigin() != null ? wine.getOrigin().getWinery() : null)
                 .grapeVariety(wine.getGrapeVariety())
                 .alcoholDegree(wine.getAlcoholDegree())
-                .averageRating(wine.getPriceAndRating() != null ? wine.getPriceAndRating().getAverageRating() : 0.0)
+                .averageRating(averageRating)
+                .reviewCount(reviewCount)
+                .star5Count(star5Count)
+                .star4Count(star4Count)
+                .star3Count(star3Count)
+                .star2Count(star2Count)
+                .star1Count(star1Count)
                 .price(wine.getPriceAndRating() != null ? wine.getPriceAndRating().getPrice() : 0)
                 .description(wine.getDescription())
                 .sweetness(wine.getTasteProfile() != null ? wine.getTasteProfile().getSweetness() : 0.0f)

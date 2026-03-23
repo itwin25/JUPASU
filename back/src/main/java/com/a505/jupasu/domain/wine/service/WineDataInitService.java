@@ -5,6 +5,7 @@ import com.a505.jupasu.domain.wine.entity.Food;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.WineFoodPairing;
 import com.a505.jupasu.domain.wine.entity.vo.Origin;
+import com.a505.jupasu.domain.wine.entity.vo.RatingSummary;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.entity.vo.WinePriceAndRating;
 import com.a505.jupasu.domain.wine.repository.FoodRepository;
@@ -81,8 +82,26 @@ public class WineDataInitService {
 
                 Object[] priceInfo = WineDataParser.parsePrice(raw.price());
                 Object[] alcInfo = WineDataParser.parseAlcohol(allFacts.get("Alcohol content"));
-                Double avgRating = (raw.ratings() != null && raw.ratings().get("average") != null)
-                        ? Double.valueOf(raw.ratings().get("average").toString()) : 0.0;
+                Map<String, Object> ratings = parseRatingsMap(raw);
+                double externalAverageRating = parseDouble(ratings.get("average"));
+                int externalRatingCount = parseInt(ratings.get("count"));
+
+                Map<String, Object> distribution =
+                        ratings.get("distribution") instanceof Map<?, ?> dist
+                                ? (Map<String, Object>) dist
+                                : Map.of();
+
+                int star1 = parseInt(distribution.get("1"));
+                int star2 = parseInt(distribution.get("2"));
+                int star3 = parseInt(distribution.get("3"));
+                int star4 = parseInt(distribution.get("4"));
+                int star5 = parseInt(distribution.get("5"));
+
+                int distributionSum = star1 + star2 + star3 + star4 + star5;
+                if (externalRatingCount > 0 && distributionSum > 0 && distributionSum != externalRatingCount) {
+                    log.warn("⚠️ rating count mismatch - wine: {}, count: {}, distributionSum: {}",
+                            raw.wineName(), externalRatingCount, distributionSum);
+                }
 
                 Object[] sweetnessInfo = WineDataParser.parseTaste(taste.get("sweetness"));
                 Object[] acidityInfo = WineDataParser.parseTaste(taste.get("acidity"));
@@ -108,11 +127,38 @@ public class WineDataInitService {
                         .imageUrl(finalImageUrl)
                         .alcoholDegree((Float) alcInfo[0])
                         .isRealAlcoholDegree((Boolean) alcInfo[1])
-                        .origin(Origin.builder().country(raw.country()).isRealCountry(StringUtils.hasText(raw.country())).region(region).isRealRegion(StringUtils.hasText(region)).winery(winery).isRealWinery(StringUtils.hasText(winery)).build())
-                        .priceAndRating(WinePriceAndRating.builder().price((Integer) priceInfo[0]).isRealPrice((Boolean) priceInfo[1]).averageRating(avgRating).isRealRating(avgRating > 0.0).build())
-                        .tasteProfile(TasteProfile.builder().sweetness((Float) sweetnessInfo[0]).isRealSweetness((Boolean) sweetnessInfo[1]).acidity((Float) acidityInfo[0]).isRealAcidity((Boolean) acidityInfo[1]).body((Float) bodyInfo[0]).isRealBody((Boolean) bodyInfo[1]).tannin((Float) tanninInfo[0]).isRealTannin((Boolean) tanninInfo[1]).build())
+                        .origin(Origin.builder()
+                                .country(raw.country())
+                                .isRealCountry(StringUtils.hasText(raw.country()))
+                                .region(region)
+                                .isRealRegion(StringUtils.hasText(region))
+                                .winery(winery)
+                                .isRealWinery(StringUtils.hasText(winery))
+                                .build())
+                        .priceAndRating(WinePriceAndRating.builder()
+                                .price((Integer) priceInfo[0])
+                                .isRealPrice((Boolean) priceInfo[1])
+                                .averageRating(externalAverageRating) // 초기값
+                                .isRealRating(externalRatingCount > 0)
+                                .build())
+                        .ratingSummary(RatingSummary.builder().build())
+                        .tasteProfile(TasteProfile.builder()
+                                .sweetness((Float) sweetnessInfo[0])
+                                .isRealSweetness((Boolean) sweetnessInfo[1])
+                                .acidity((Float) acidityInfo[0])
+                                .isRealAcidity((Boolean) acidityInfo[1])
+                                .body((Float) bodyInfo[0])
+                                .isRealBody((Boolean) bodyInfo[1])
+                                .tannin((Float) tanninInfo[0])
+                                .isRealTannin((Boolean) tanninInfo[1])
+                                .build())
                         .build();
 
+                wine.initializeExternalRatings(
+                        externalAverageRating,
+                        externalRatingCount,
+                        star1, star2, star3, star4, star5
+                );
                 wineBatch.add(wine);
                 rawBatch.add(raw);
 
@@ -192,5 +238,31 @@ public class WineDataInitService {
             log.error("이미지 복사 실패: {}", e.getMessage());
             return defaultImageUrl;
         }
+    }
+
+    private int parseInt(Object value) {
+        if (value == null) return 0;
+        if (value instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(value.toString().trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private double parseDouble(Object value) {
+        if (value == null) return 0.0;
+        if (value instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(value.toString().trim());
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseRatingsMap(VivinoRawData raw) {
+        if (raw.ratings() == null) return Map.of();
+        return (Map<String, Object>) raw.ratings();
     }
 }
