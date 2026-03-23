@@ -38,7 +38,7 @@ public class WineRecommendationCalculator {
     private static final float SIGMA_A    = 2.5f;
     // σ_s: 상황 Half-Gaussian 너비 (0~2 스케일, 원 수식 2.5 / 5 = 0.5)
     private static final float SIGMA_S    = 0.5f;
-    // σ_dir: 가격 가우시안 너비 (원)
+    // σ_dir: 가격 가우시안 너비 — 상황 없을 때 대칭 폴백용 (원)
     private static final float SIGMA_DIR  = 15000f;
     // 유저 도수 선호 없을 때 폴백 기본값 (%)
     private static final float T_ALC_DEFAULT = 13.0f;
@@ -48,7 +48,7 @@ public class WineRecommendationCalculator {
     private static final float N_0   = 10f;
     // α: 시간 감쇠 속도 (1/일, 90일 후 가중치 ≈ 0.50)
     private static final float ALPHA = 0.008f;
-    // δ: σ̂_t 교정 민감도
+    // δ: σ̂_i 교정 민감도 (차원별)
     private static final float DELTA = 0.5f;
 
     // ── S_sit 임계값 θ (W'_i 0~2 스케일) ────────────────────────────────────────
@@ -62,11 +62,14 @@ public class WineRecommendationCalculator {
 
     // ── 교정된 선호 프로필 (calibrate() 반환값) ───────────────────────────────────
     private record CalibratedProfile(
-            float uHatSweet,   // Û_sweet  (NaN이면 해당 차원 미설정)
-            float uHatAcid,    // Û_acid
-            float uHatBody,    // Û_body
-            float uHatTannin,  // Û_tannin
-            float sigmaT       // σ̂_t (개인화 취향 폭)
+            float uHatSweet,    // Û_sweet   (NaN이면 해당 차원 미설정)
+            float uHatAcid,     // Û_acid
+            float uHatBody,     // Û_body
+            float uHatTannin,   // Û_tannin
+            float sigmaSweet,   // σ̂_sweet  (차원별 개인화 취향 폭)
+            float sigmaAcid,    // σ̂_acid
+            float sigmaBody,    // σ̂_body
+            float sigmaTannin   // σ̂_tannin
     ) {}
 
     // ── 구현된 추천 상황 리스트 ───────────────────────────────────────────────────
@@ -175,23 +178,26 @@ public class WineRecommendationCalculator {
         return score(wine, situation, pref, calibrated);
     }
 
-    // ── calibrate: U_i^revealed · γ · Û_i · σ̂_t ────────────────────────────────
+    // ── calibrate: U_i^revealed · γ · Û_i · σ̂_i ────────────────────────────────
 
     /**
      * 유저 리뷰로부터 교정된 선호 프로필을 계산한다.
      *
-     * <p>Step 1 — 실증 선호 벡터 U_i^revealed
+     * <p>Step 1 — 실증 선호 벡터 U_i^revealed  (긍정 리뷰만 사용, r̃ > 0)
      * <pre>
-     *   U_i^revealed = Σ(r̃_j · τ_j · W'_ij · 𝟙_ij) / Σ(|r̃_j| · τ_j · 𝟙_ij)
-     *   r̃_j = (r_j − 3) / 2          ∈ [−1, +1]
+     *   U_i^revealed = Σ_{j: r̃_j>0}(r̃_j · τ_j · W'_ij · 𝟙_ij) / Σ_{j: r̃_j>0}(r̃_j · τ_j · 𝟙_ij)
+     *   r̃_j = (r_j − 3) / 2          ∈ (0, +1]  (r̃ > 0, 즉 rating ≥ 4만 포함)
      *   τ_j  = exp(−α · Δt_j)         (시간 감쇠, α=0.008/일)
      *   𝟙_ij = 와인 j의 차원 i 유효 여부 (isReal*)
      * </pre>
-     * 차원 i에 유효한 리뷰가 없으면(Σ𝟙_ij=0) → U_i^stated로 폴백.
+     * 부정 신호(r̃ ≤ 0) 제외 이유: 낮은 속성값을 가진 와인에 낮은 별점을 줬을 때
+     * "낮은 속성 = 기피"로 잘못 추론되는 방향 모호성을 막기 위함.
+     * 기피 효과는 Gaussian 거리 감쇠로 암묵적으로 처리됨.
+     * 차원 i에 긍정 리뷰가 없으면(분모=0) → U_i^stated로 폴백.
      *
      * <p>Step 2 — 신뢰도 가중치 γ
      * <pre>
-     *   γ = 1 − exp(−N_rated / N_0)   (N_0 = 10)
+     *   γ = 1 − exp(−N_rated / N_0)   (N_0 = 10, N_rated = 전체 리뷰 수)
      * </pre>
      *
      * <p>Step 3 — 교정된 취향값 Û_i
@@ -199,14 +205,13 @@ public class WineRecommendationCalculator {
      *   Û_i = (1 − γ) · U_i^stated + γ · U_i^revealed
      * </pre>
      *
-     * <p>Step 4 — 개인화 취향 폭 σ̂_t  (R⁺: 4점 이상 평가 와인 기준)
+     * <p>Step 4 — 차원별 개인화 취향 폭 σ̂_i  (R⁺: 긍정 리뷰 와인 기준)
      * <pre>
-     *   μ_i    = Σ(j∈R⁺) W'_ij · 𝟙_ij / Σ 𝟙_ij
-     *   Var_i  = Σ(j∈R⁺) (W'_ij − μ_i)² · 𝟙_ij / Σ 𝟙_ij
-     *   Var    = (1 / N_valid_rated) · Σ Var_i
-     *   σ̂_t   = σ_base · √(1 + δ · Var / σ_base²)
+     *   μ_i   = Σ(j∈R⁺) W'_ij · 𝟙_ij / Σ 𝟙_ij
+     *   Var_i = Σ(j∈R⁺) (W'_ij − μ_i)² · 𝟙_ij / Σ 𝟙_ij
+     *   σ̂_i  = σ_base · √(1 + δ · Var_i / σ_base²)   (차원별 독립 계산)
      * </pre>
-     * 모든 차원이 NULL이면 σ̂_t = σ_base 폴백.
+     * 해당 차원의 긍정 리뷰가 없으면 σ̂_i = σ_base 폴백.
      */
     private CalibratedProfile calibrate(Preference pref, List<Review> reviews) {
 
@@ -218,21 +223,22 @@ public class WineRecommendationCalculator {
 
         int nRated = reviews.size();
 
-        // 콜드 스타트: 리뷰 없음 → γ=0, σ̂_t=σ_base
+        // 콜드 스타트: 리뷰 없음 → γ=0, σ̂_i=σ_base (모든 차원)
         if (nRated == 0) {
-            return new CalibratedProfile(uStatedSweet, uStatedAcid, uStatedBody, uStatedTannin, SIGMA_BASE);
+            return new CalibratedProfile(uStatedSweet, uStatedAcid, uStatedBody, uStatedTannin,
+                                         SIGMA_BASE, SIGMA_BASE, SIGMA_BASE, SIGMA_BASE);
         }
 
-        // ── Step 1: U_i^revealed 누산 ────────────────────────────────────────────
-        // num_i: Σ r̃_j · τ_j · W'_ij · 𝟙_ij
-        // den_i: Σ |r̃_j| · τ_j · 𝟙_ij
+        // ── Step 1: U_i^revealed 누산 (긍정 리뷰만, r̃ > 0) ────────────────────
+        // num_i: Σ_{r̃>0} r̃_j · τ_j · W'_ij · 𝟙_ij
+        // den_i: Σ_{r̃>0} r̃_j · τ_j · 𝟙_ij  (r̃>0이므로 |r̃|=r̃)
         double numSweet = 0, denSweet = 0;
         double numAcid  = 0, denAcid  = 0;
         double numBody  = 0, denBody  = 0;
         double numTannin = 0, denTannin = 0;
 
-        // Step 4: σ̂_t 분산 누산 (R⁺: rating ≥ 4)
-        // E[X²]와 E[X]를 각각 누적해 Var = E[X²] - E[X]² 로 계산
+        // Step 4: σ̂_i 분산 누산 (동일한 긍정 리뷰 집합 R+ 사용)
+        // E[X²]와 E[X]를 각각 누적해 Var_i = E[X²] - E[X]² 로 계산
         double sumN_s = 0, sumX_s = 0, sumX2_s = 0;
         double sumN_a = 0, sumX_a = 0, sumX2_a = 0;
         double sumN_b = 0, sumX_b = 0, sumX2_b = 0;
@@ -250,8 +256,7 @@ public class WineRecommendationCalculator {
             long deltaDays = ChronoUnit.DAYS.between(review.getCreatedAt(), now);
             double tau   = Math.exp(-ALPHA * deltaDays);                            // 시간 감쇠
 
-            double absRTildeTau = Math.abs(rTilde) * tau;
-            double rTildeTau    = rTilde * tau;
+            double rTildeTau = rTilde * tau;
 
             // 𝟙_ij: 와인 j의 각 차원 유효 여부
             boolean vs = Boolean.TRUE.equals(tp.getIsRealSweetness());
@@ -265,14 +270,13 @@ public class WineRecommendationCalculator {
             double wB = vb ? tp.getBody()       * 2f : 0f;
             double wT = vt ? tp.getTannin()     * 2f : 0f;
 
-            // U_i^revealed 누산 (전체 리뷰 사용)
-            if (vs) { numSweet  += rTildeTau * wS; denSweet  += absRTildeTau; }
-            if (va) { numAcid   += rTildeTau * wA; denAcid   += absRTildeTau; }
-            if (vb) { numBody   += rTildeTau * wB; denBody   += absRTildeTau; }
-            if (vt) { numTannin += rTildeTau * wT; denTannin += absRTildeTau; }
+            // U_i^revealed 누산 + σ̂_i 분산 누산 (긍정 리뷰만: r̃ > 0, 즉 rating ≥ 4)
+            if (rTilde > 0f) {
+                if (vs) { numSweet  += rTildeTau * wS; denSweet  += rTildeTau; }
+                if (va) { numAcid   += rTildeTau * wA; denAcid   += rTildeTau; }
+                if (vb) { numBody   += rTildeTau * wB; denBody   += rTildeTau; }
+                if (vt) { numTannin += rTildeTau * wT; denTannin += rTildeTau; }
 
-            // σ̂_t 분산 누산 (R⁺만: rating ≥ 4)
-            if (r >= 4f) {
                 if (vs) { sumN_s++; sumX_s += wS; sumX2_s += wS * wS; }
                 if (va) { sumN_a++; sumX_a += wA; sumX2_a += wA * wA; }
                 if (vb) { sumN_b++; sumX_b += wB; sumX2_b += wB * wB; }
@@ -296,28 +300,16 @@ public class WineRecommendationCalculator {
         float uHatBody   = blendPreference(uStatedBody,   uRevBody,   gamma, denBody   > 0);
         float uHatTannin = blendPreference(uStatedTannin, uRevTannin, gamma, denTannin > 0);
 
-        // ── Step 4: σ̂_t ─────────────────────────────────────────────────────────
-        // Var_i = E[X²] − E[X]²  (분모=0이면 해당 차원 제외)
-        int nValidRated = 0;
-        double varSum   = 0.0;
-        double varS = variance(sumN_s, sumX_s, sumX2_s);
-        double varA = variance(sumN_a, sumX_a, sumX2_a);
-        double varB = variance(sumN_b, sumX_b, sumX2_b);
-        double varT = variance(sumN_t, sumX_t, sumX2_t);
-        if (varS >= 0) { nValidRated++; varSum += varS; }
-        if (varA >= 0) { nValidRated++; varSum += varA; }
-        if (varB >= 0) { nValidRated++; varSum += varB; }
-        if (varT >= 0) { nValidRated++; varSum += varT; }
+        // ── Step 4: σ̂_i — 차원별 개인화 취향 폭 ────────────────────────────────
+        // 차원마다 독립 분산으로 취향 엄밀도를 개인화.
+        // 긍정 리뷰가 없는 차원은 SIGMA_BASE로 폴백.
+        float sigmaSweet  = computeSigma(sumN_s, sumX_s, sumX2_s);
+        float sigmaAcid   = computeSigma(sumN_a, sumX_a, sumX2_a);
+        float sigmaBody   = computeSigma(sumN_b, sumX_b, sumX2_b);
+        float sigmaTannin = computeSigma(sumN_t, sumX_t, sumX2_t);
 
-        float sigmaT;
-        if (nValidRated == 0) {
-            sigmaT = SIGMA_BASE; // R⁺ 와인 전체 NULL → 기본값 폴백
-        } else {
-            double varMean = varSum / nValidRated;
-            sigmaT = (float)(SIGMA_BASE * Math.sqrt(1.0 + DELTA * varMean / (SIGMA_BASE * SIGMA_BASE)));
-        }
-
-        return new CalibratedProfile(uHatSweet, uHatAcid, uHatBody, uHatTannin, sigmaT);
+        return new CalibratedProfile(uHatSweet, uHatAcid, uHatBody, uHatTannin,
+                                     sigmaSweet, sigmaAcid, sigmaBody, sigmaTannin);
     }
 
     // ── score: 최종 추천 점수 계산 (calibrate 결과를 입력으로 받음) ────────────────
@@ -351,19 +343,18 @@ public class WineRecommendationCalculator {
         float uAlc = (pref != null && pref.getAbv() != null) ? pref.getAbv() : T_ALC_DEFAULT;
 
         // ── ④ S_pref: 취향·도수 통합 점수 ───────────────────────────────────────
-        // S_pref = (1/N_valid) × Σ exp(−(Û_i − W'_i)² / 2σ̂_t²)
+        // S_pref = (1/N_valid) × Σ exp(−(Û_i − W'_i)² / 2σ̂_i²)  (차원별 σ̂_i 사용)
         float sPref;
         if (nValid == 0) {
             sPref = 0f;
         } else {
-            float sigmaT = cal.sigmaT();
             float sum = 0f;
-            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  sum += gaussian(cal.uHatSweet(),  wSweet,  sigmaT);
-            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   sum += gaussian(cal.uHatAcid(),   wAcid,   sigmaT);
-            if (validBody   && !Float.isNaN(cal.uHatBody()))   sum += gaussian(cal.uHatBody(),   wBody,   sigmaT);
-            if (validTannin && !Float.isNaN(cal.uHatTannin())) sum += gaussian(cal.uHatTannin(), wTannin, sigmaT);
+            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  sum += gaussian(cal.uHatSweet(),  wSweet,  cal.sigmaSweet());
+            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   sum += gaussian(cal.uHatAcid(),   wAcid,   cal.sigmaAcid());
+            if (validBody   && !Float.isNaN(cal.uHatBody()))   sum += gaussian(cal.uHatBody(),   wBody,   cal.sigmaBody());
+            if (validTannin && !Float.isNaN(cal.uHatTannin())) sum += gaussian(cal.uHatTannin(), wTannin, cal.sigmaTannin());
             if (validAlc)                                       sum += gaussian(uAlc,             wAlc,    SIGMA_A);
-            
+
             // 데이터 충실도 페널티 (정보가 많을수록 신뢰도 상승)
             float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
             sPref = (sum / nValid) * completenessFactor;
@@ -373,21 +364,11 @@ public class WineRecommendationCalculator {
         float sSit = calcSSit(situation, wSweet, wAcid, wBody, wTannin,
                 validSweet, validAcid, validBody, validTannin);
 
-        // ── ⑥ S_price: 가격 점수 ────────────────────────────────────────────────
+        // ── ⑥ S_price: 상황별 비대칭 가격 점수 ─────────────────────────────────
         boolean validPrice = wine.getPriceAndRating() != null
                 && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice())
                 && wine.getPriceAndRating().getPrice() > 0;
-        float sPrice;
-        if (!validPrice) {
-            sPrice = 0.5f;
-        } else if (pref == null
-                || pref.getPreferredPriceMin() == null
-                || pref.getPreferredPriceMax() == null) {
-            sPrice = 0.5f;
-        } else {
-            float tPrice = (pref.getPreferredPriceMin() + pref.getPreferredPriceMax()) / 2f;
-            sPrice = gaussian(wine.getPriceAndRating().getPrice(), tPrice, SIGMA_DIR);
-        }
+        float sPrice = calcSPrice(wine, pref, situation, validPrice);
 
         // ── ⑦ 데이터 부재 와인 제외 ───────────────────────────────────────────
         // (당도, 산도, 바디, 탄닌, 가격) 5가지 핵심 데이터가 모두 '진짜'이고 '0보다 큰' 와인만 추천
@@ -415,6 +396,60 @@ public class WineRecommendationCalculator {
 
         float total = wPref * sPref + wPriceW * sPrice + wSitW * sSit + bW;
         return Math.round(total * 100);
+    }
+
+    // ── S_price 상황별 비대칭 가격 점수 ──────────────────────────────────────────
+
+    /**
+     * 상황별 비대칭 Gaussian으로 가격 점수를 계산한다.
+     *
+     * <ul>
+     *   <li>혼술: 목표가=uMin, 예산 초과(σ_high=0.2×uMin)에 강한 페널티 / 저렴할수록(σ_low=0.8×uMin) 관대</li>
+     *   <li>기념일: 목표가=1.1×uMax, 예산 이하(σ_low=0.25×uMax)는 적당히 허용</li>
+     *   <li>파티: 목표가=(uMin+uMax)/2, 양방향 비대칭 적용</li>
+     *   <li>상황 없음(null): 대칭 Gaussian, SIGMA_DIR 사용</li>
+     * </ul>
+     *
+     * @return [0,1] 가격 적합도 점수, 또는 0.5 (데이터 없음·선호 미입력)
+     */
+    private float calcSPrice(Wine wine, Preference pref, DrinkingSituation situation, boolean validPrice) {
+        if (!validPrice
+                || pref == null
+                || pref.getPreferredPriceMin() == null
+                || pref.getPreferredPriceMax() == null) {
+            return 0.5f;
+        }
+
+        float winePrice = wine.getPriceAndRating().getPrice();
+        float uMin      = pref.getPreferredPriceMin();
+        float uMax      = pref.getPreferredPriceMax();
+
+        if (situation == null) {
+            return gaussian(winePrice, (uMin + uMax) / 2f, SIGMA_DIR);
+        }
+
+        float tPrice, sigmaLow, sigmaHigh;
+        switch (situation) {
+            case ALONE -> {
+                tPrice    = uMin;
+                sigmaLow  = Math.max(1f, 0.8f * uMin);
+                sigmaHigh = Math.max(1f, 0.2f * uMin);
+            }
+            case DATE -> {
+                tPrice    = 1.1f * uMax;
+                sigmaLow  = Math.max(1f, 0.25f * uMax);
+                sigmaHigh = Math.max(1f, 0.2f  * tPrice);
+            }
+            case PARTY -> {
+                tPrice    = (uMin + uMax) / 2f;
+                sigmaLow  = Math.max(1f, 0.4f * tPrice);
+                sigmaHigh = Math.max(1f, 0.3f * tPrice);
+            }
+            default -> { return gaussian(winePrice, (uMin + uMax) / 2f, SIGMA_DIR); }
+        }
+
+        float sigma = (winePrice <= tPrice) ? sigmaLow : sigmaHigh;
+        return gaussian(winePrice, tPrice, sigma);
     }
 
     // ── S_sit 상황별 계산 ────────────────────────────────────────────────────────
@@ -491,6 +526,16 @@ public class WineRecommendationCalculator {
         if (n < 1) return -1.0;
         double mean = sumX / n;
         return sumX2 / n - mean * mean;
+    }
+
+    /**
+     * 차원별 개인화 취향 폭: σ̂_i = σ_base · √(1 + δ · Var_i / σ_base²).
+     * 긍정 리뷰 없는 차원(n < 1)은 SIGMA_BASE 폴백.
+     */
+    private float computeSigma(double n, double sumX, double sumX2) {
+        double var = variance(n, sumX, sumX2);
+        if (var < 0) return SIGMA_BASE;
+        return (float)(SIGMA_BASE * Math.sqrt(1.0 + DELTA * var / (SIGMA_BASE * SIGMA_BASE)));
     }
 
     /** 가우시안 유사도: exp(−(x − mean)² / 2σ²) */
