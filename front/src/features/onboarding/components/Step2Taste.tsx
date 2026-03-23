@@ -7,9 +7,10 @@ interface Step2TasteProps {
   data: TasteData;
   setData: React.Dispatch<React.SetStateAction<TasteData>>;
   onNext: () => void;
+  isPending?: boolean;
 }
 
-export default function Step2Taste({ data, setData, onNext }: Step2TasteProps) {
+export default function Step2Taste({ data, setData, onNext, isPending }: Step2TasteProps) {
   const handleDataChange = (newData: Partial<TasteData>) => {
     setData((prev) => ({
       ...prev,
@@ -30,11 +31,12 @@ export default function Step2Taste({ data, setData, onNext }: Step2TasteProps) {
       </div>
 
       <div className="space-y-4 pt-6">
-        <Button onClick={onNext} size="full" className="text-lg shadow-lg">
+        <Button onClick={onNext} size="full" className="text-lg shadow-lg" isLoading={isPending}>
           다음
         </Button>
         <button
           onClick={onNext}
+          disabled={isPending}
           className="text-text-main/40 hover:text-text-main w-full text-sm font-medium transition-colors"
         >
           건너뛰기

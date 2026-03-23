@@ -3,16 +3,41 @@
 import { cn } from '@/lib/utils';
 
 const TASTE_FACTORS = [
-  { label: '당도', key: 'sweet' as const },
-  { label: '상큼함', key: 'acid' as const },
-  { label: '무게감', key: 'body' as const },
-  { label: '타닌', key: 'tannin' as const },
-  { label: '향', key: 'aroma' as const },
+  {
+    label: '당도',
+    key: 'sweet' as const,
+    max: 5,
+    descriptions: ['완전 드라이', '드라이', '약간 달콤', '달콤', '매우 달콤'],
+  },
+  {
+    label: '산도',
+    key: 'acid' as const,
+    max: 5,
+    descriptions: ['거의 없음', '부드러움', '적당함', '상큼함', '매우 상큼'],
+  },
+  {
+    label: '무게감',
+    key: 'body' as const,
+    max: 5,
+    descriptions: ['아주 가벼움', '가벼움', '중간', '묵직함', '매우 묵직'],
+  },
+  {
+    label: '타닌',
+    key: 'tannin' as const,
+    max: 5,
+    descriptions: ['거의 없음', '매끄러움', '적당함', '조금 떫음', '많이 떫음'],
+  },
+  {
+    label: '도수',
+    key: 'abv' as const,
+    max: 5,
+    descriptions: ['0~5%', '5~10%', '10~15%', '15~20%', '20~25%'],
+  },
 ];
 
-const WINE_TYPES = ['레드', '화이트', '로제', '스파클링'];
-const FLAVOR_TAGS = ['과일향', '꽃향', '꿀향', '베리류', '초콜릿향', '오크향', '바닐라향']; // 마이페이지 기반으로 정리
-const DRINKING_SITUATIONS = ['선물', '혼술', '집들이', '데이트', '가족모임'];
+const WINE_TYPES = ['레드', '화이트', '로제', '스파클링', '디저트', '주정강화'];
+const FLAVOR_TAGS = ['과일향', '꽃향', '베리향', '스파이스', '오크'];
+const DRINKING_SITUATIONS = ['선물', '혼술', '집들이', '모임', '데이트', '가족모임'];
 
 export interface TasteData {
   tastes: {
@@ -20,7 +45,7 @@ export interface TasteData {
     acid: number;
     body: number;
     tannin: number;
-    aroma: number;
+    abv: number;
   };
   selectedWineTypes: string[];
   selectedFlavorTags: string[];
@@ -57,7 +82,7 @@ export default function TasteProfileForm({ data, onChange }: TasteProfileFormPro
               <div className="relative h-8">
                 <div className="bg-primary-100 absolute top-1/2 right-0 left-0 h-[2px] -translate-y-1/2" />
                 <div className="absolute inset-0 flex items-center justify-between">
-                  {Array.from({ length: 9 }).map((_, index) => {
+                  {Array.from({ length: factor.max }).map((_, index) => {
                     const value = index + 1;
                     const active = tastes[factor.key] === value;
 
@@ -75,12 +100,34 @@ export default function TasteProfileForm({ data, onChange }: TasteProfileFormPro
                 <input
                   type="range"
                   min="1"
-                  max="9"
+                  max={factor.max}
                   step="1"
-                  value={tastes[factor.key] || 5}
+                  value={tastes[factor.key] || 3}
                   onChange={(e) => handleTasteChange(factor.key, Number(e.target.value))}
                   className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-transparent"
                 />
+              </div>
+              <div className="relative mt-1.5 h-6">
+                {factor.descriptions.map((desc, i) => {
+                  const isActive = tastes[factor.key] === i + 1;
+                  const left = `${i * 25}%`;
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        'absolute top-0 text-[10px] font-bold whitespace-nowrap transition-all',
+                        isActive ? 'scale-110 text-[#B17672]' : 'text-text-main/20',
+                      )}
+                      style={{
+                        left,
+                        transform:
+                          i === 0 ? 'none' : i === 4 ? 'translateX(-100%)' : 'translateX(-50%)',
+                      }}
+                    >
+                      {desc}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -95,7 +142,17 @@ export default function TasteProfileForm({ data, onChange }: TasteProfileFormPro
           {WINE_TYPES.map((type) => {
             const isActive = selectedWineTypes.includes(type);
             const emoji =
-              type === '레드' ? '🍷' : type === '화이트' ? '🥂' : type === '로제' ? '🍇' : '✨';
+              type === '레드'
+                ? '🍷'
+                : type === '화이트'
+                  ? '🥂'
+                  : type === '로제'
+                    ? '🍇'
+                    : type === '스파클링'
+                      ? '✨'
+                      : type === '디저트'
+                        ? '🍰'
+                        : '🥃';
 
             return (
               <button

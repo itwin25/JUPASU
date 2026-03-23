@@ -1,5 +1,7 @@
 package com.a505.jupasu.domain.user.entity;
 
+import com.a505.jupasu.domain.preference.entity.Preference;
+import com.a505.jupasu.domain.report.entity.TasteReport;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -7,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * USER JPA 엔티티
@@ -26,6 +30,12 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     private Long id;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Preference preference;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TasteReport> tasteReports = new ArrayList<>();
 
     // 이메일
     @Column(nullable = false, unique = true, length = 100)

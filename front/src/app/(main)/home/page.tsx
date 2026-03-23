@@ -4,66 +4,77 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Chip from '@/components/ui/chip/Chip';
+import { useWineQuickRecommendQuery } from '@/features/wine/hooks/useWineListQuery';
+import { DrinkingSituation } from '@/features/wine/types/wine.types';
+import { ChevronRight } from 'lucide-react';
 
-const GALLERY_WINES = [
-  {
-    id: 1,
-    name: 'CHATEAU MARGAUX',
-    category: 'HEAVY & DRY',
-    match: 95,
-    desc: '스테이크와 찰떡궁합!',
-    body: 5,
-    sweet: 2,
-    acid: 3,
-  },
-  {
-    id: 2,
-    name: 'CLOUDY BAY',
-    category: 'FRESH & CRISP',
-    match: 95,
-    desc: '해산물 요리에 산뜻한 한 잔',
-    body: 3,
-    sweet: 2,
-    acid: 4,
-  },
-  {
-    id: 3,
-    name: 'OPUS ONE 2019',
-    category: 'RICH & BOLD',
-    match: 92,
-    desc: '특별한 날을 위한 진한 레드',
-    body: 5,
-    sweet: 1,
-    acid: 4,
-  },
-];
+const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 
-const RECOMMENDATIONS_BY_SITUATION: Record<
-  string,
-  Array<{ id: number; name: string; desc: string; price: number }>
-> = {
-  혼술: [
-    { id: 4, name: '19 Crimes Red', desc: '하루의 피로를 녹여줄 한 잔', price: 25000 },
-    { id: 5, name: 'Goreb Chandon', desc: '가볍게 즐기는 혼술 와인', price: 52000 },
-  ],
-  기념일: [
-    { id: 6, name: 'Dom Perignon', desc: '기념일 디너에 어울리는 샴페인', price: 320000 },
-    { id: 7, name: 'Krug Grande Cuvee', desc: '풍성한 버블과 긴 여운의 한 잔', price: 450000 },
-  ],
-  피자: [
-    { id: 8, name: 'Chianti Classico', desc: '토마토 소스와 좋은 밸런스', price: 38000 },
-    { id: 9, name: 'Primitivo', desc: '짙은 과실향으로 피자와 잘 어울려요', price: 29000 },
-  ],
-  파티: [
-    { id: 10, name: 'Moet & Chandon', desc: '가벼운 파티를 위한 밝은 샴페인', price: 75000 },
-    { id: 11, name: 'Veuve Clicquot', desc: '경쾌한 무드에 어울리는 스파클링', price: 89000 },
-  ],
+const SITUATION_MAP: Record<string, DrinkingSituation> = {
+  혼술: 'ALONE',
+  기념일: 'DATE',
+  파티: 'PARTY',
 };
 
-const SITUATIONS = ['혼술', '기념일', '피자', '파티'];
+const SITUATIONS = ['혼술', '기념일', '파티'];
+
+// 다이아몬드 게이지 표시 컴포넌트
+function TasteGauge({ label, value }: { label: string; value: number | undefined | null }) {
+  // 백엔드 데이터가 0.0 ~ 5.0 범위이므로 Math.ceil을 사용하여 1칸부터 채워지도록 함 (0이면 0칸)
+  const displayValue = value ? Math.ceil(value) : 0;
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-text-main/40 text-[10px] font-black tracking-tighter uppercase">
+        {label}
+      </span>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((level) => (
+          <div
+            key={level}
+            className={`h-1.5 w-1.5 rotate-45 ${
+              level <= displayValue ? 'bg-[#B36262]' : 'bg-primary-100'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WineImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+  const [imgSrc, setImgSrc] = useState(src || DEFAULT_WINE_IMAGE_URL);
+
+  return (
+    <img
+      src={imgSrc}
+      alt={alt}
+      className={className}
+      onError={() => setImgSrc(DEFAULT_WINE_IMAGE_URL)}
+    />
+  );
+}
 
 export default function HomePage() {
   const [activeSituation, setActiveSituation] = useState('혼술');
+  const { data: recommendations, isLoading } = useWineQuickRecommendQuery();
+
+  // 'VIBE GALLERY'용 일반 추천 리스트
+  const generalWines = recommendations?.general || [];
+
+  // 상황별 추천 리스트 (현재 선택된 상황에 맞는 데이터 추출)
+  const currentSituationEnum = SITUATION_MAP[activeSituation];
+  const situationResult = recommendations?.bySituation.find(
+    (s) => s.situation === currentSituationEnum,
+  );
+  const situationWines = situationResult?.recommendations || [];
+
+  if (isLoading) {
+    return (
+      <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#B36262]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen pb-28">
@@ -81,55 +92,52 @@ export default function HomePage() {
         </h2>
 
         <div className="no-scrollbar flex gap-4 overflow-x-auto px-1 pb-4">
-          {GALLERY_WINES.map((wine) => (
-            <Link key={wine.id} href={`/wines/${wine.id}`} className="shrink-0">
-              <article className="border-primary-100 relative min-w-[232px] overflow-hidden rounded-[22px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]">
-                <div className="absolute top-4 left-4 z-10 rounded-full bg-[#B36262] px-3.5 py-1.5 text-[11px] font-black text-white shadow-sm">
-                  {wine.match}% MATCH
-                </div>
-
-                <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8]">
-                  <span className="text-6xl">🍷</span>
-                </div>
-
-                <div className="space-y-3 p-5">
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-black tracking-[0.18em] text-[#B36262] uppercase">
-                      {wine.category}
-                    </p>
-                    <h3 className="text-text-main truncate text-[1.05rem] leading-none font-black">
-                      {wine.name}
-                    </h3>
-                    <p className="truncate text-xs font-bold text-[#FF8A00]">{wine.desc}</p>
+          {generalWines.length > 0 ? (
+            generalWines.map((wine) => (
+              <Link key={wine.wineId} href={`/wines/${wine.wineId}`} className="shrink-0">
+                <article className="border-primary-100 relative w-[232px] overflow-hidden rounded-[22px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]">
+                  <div className="absolute top-4 left-4 z-10 rounded-full bg-[#B36262] px-3.5 py-1.5 text-[11px] font-black text-white shadow-sm">
+                    {wine.matchRate}% MATCH
                   </div>
 
-                  <div className="space-y-1.5 pt-1">
-                    {[
-                      ['BODY', wine.body],
-                      ['SWEET', wine.sweet],
-                      ['ACID', wine.acid],
-                    ].map(([label, value]) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-text-main/40 text-[12px] font-black tracking-tighter">
-                          {label}
-                        </span>
-                        <div className="flex gap-1.5">
-                          {[1, 2, 3, 4, 5].map((diamond) => (
-                            <div
-                              key={diamond}
-                              className={`h-2 w-2 rotate-45 ${
-                                diamond <= Number(value) ? 'bg-[#B36262]' : 'bg-primary-100'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-6">
+                    <WineImage
+                      src={wine.imageUrl}
+                      alt={wine.nameKr}
+                      className="max-h-full max-w-full object-contain"
+                    />
                   </div>
-                </div>
-              </article>
-            </Link>
-          ))}
+
+                  <div className="min-w-0 space-y-3 p-5">
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="h-[15px] truncate text-[10px] font-black tracking-[0.1em] text-[#B36262] uppercase">
+                        {wine.style || ''}
+                      </p>
+                      <h3 className="text-text-main truncate text-[1rem] leading-tight font-black">
+                        {wine.nameKr}
+                      </h3>
+                      <p className="truncate text-[11px] font-bold text-[#FF8A00]">
+                        {wine.recommendationReason || '당신을 위한 추천 와인'}
+                      </p>
+                    </div>
+
+                    <div className="border-primary-100/50 space-y-1 border-t pt-1">
+                      {wine.sweetness != null && (
+                        <TasteGauge label="SWEET" value={wine.sweetness} />
+                      )}
+                      {wine.acidity != null && <TasteGauge label="ACID" value={wine.acidity} />}
+                      {wine.body != null && <TasteGauge label="BODY" value={wine.body} />}
+                      {wine.tannin != null && <TasteGauge label="TANNIN" value={wine.tannin} />}
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))
+          ) : (
+            <div className="text-text-main/40 w-full py-10 text-center font-bold">
+              추천 와인이 없습니다.
+            </div>
+          )}
         </div>
       </section>
 
@@ -153,29 +161,41 @@ export default function HomePage() {
         </div>
 
         <div className="space-y-2">
-          {RECOMMENDATIONS_BY_SITUATION[activeSituation].map((wine) => (
-            <Link key={wine.id} href={`/wines/${wine.id}`} className="block">
-              <article className="border-primary-100 flex min-h-[5.8rem] items-center gap-3 rounded-[22px] border bg-white px-3.5 py-2.5 shadow-[0_10px_24px_rgba(51,34,17,0.05)] transition-all active:scale-[0.985]">
-                <div className="flex h-[4.15rem] w-[4.15rem] shrink-0 items-center justify-center rounded-[1.1rem] bg-[#FCE7E7]">
-                  <span className="text-[1.65rem]">🍷</span>
-                </div>
+          {situationWines.length > 0 ? (
+            situationWines.map((wine) => (
+              <Link key={wine.wineId} href={`/wines/${wine.wineId}`} className="block">
+                <article className="border-primary-100 flex min-h-[6.5rem] items-center gap-3 rounded-[22px] border bg-white px-3.5 py-2.5 shadow-[0_10px_24px_rgba(51,34,17,0.05)] transition-all active:scale-[0.985]">
+                  <div className="flex h-[4.8rem] w-[4.8rem] shrink-0 items-center justify-center rounded-[1.1rem] bg-[#FCE7E7] p-2">
+                    <WineImage
+                      src={wine.imageUrl}
+                      alt={wine.nameKr}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-text-main truncate text-[0.9rem] leading-tight font-black">
-                    {wine.name}
-                  </h3>
-                  <p className="text-text-main/42 mt-0.5 truncate text-[0.78rem] leading-tight font-medium">
-                    {wine.desc}
-                  </p>
-                  <p className="mt-1.5 text-[0.9rem] leading-none font-black text-[#B36262]">
-                    ₩{wine.price.toLocaleString()}
-                  </p>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-text-main truncate text-[0.9rem] leading-tight font-black">
+                      {wine.nameKr}
+                    </h3>
+                    <p className="text-text-main/42 mt-1 truncate text-[0.75rem] leading-tight font-medium">
+                      {wine.recommendationReason || `${activeSituation} 상황에 추천하는 와인`}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[0.8rem] font-black text-[#B36262]">
+                        {wine.matchRate}% MATCH
+                      </span>
+                    </div>
+                  </div>
 
-                <ChevronRightIcon className="text-primary-100 shrink-0" size={18} />
-              </article>
-            </Link>
-          ))}
+                  <ChevronRight className="text-primary-100 shrink-0" size={18} />
+                </article>
+              </Link>
+            ))
+          ) : (
+            <div className="text-text-main/40 py-10 text-center font-bold">
+              해당 상황에 대한 추천 와인이 없습니다.
+            </div>
+          )}
         </div>
       </section>
 
@@ -189,23 +209,5 @@ export default function HomePage() {
         }
       `}</style>
     </div>
-  );
-}
-
-function ChevronRightIcon({ className, size }: { className?: string; size?: number }) {
-  return (
-    <svg
-      className={className}
-      width={size || 24}
-      height={size || 24}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
   );
 }
