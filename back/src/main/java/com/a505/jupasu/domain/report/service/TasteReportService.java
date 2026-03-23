@@ -104,13 +104,11 @@ public class TasteReportService {
         String content = String.format("평균적으로 당도 %.1f, 산도 %.1f의 와인을 선호하시네요.", avgSweetness, avgAcidity);
 
         // 4. 저장 및 반환
-        TasteReport report = TasteReport.builder()
-                .user(user)
-                .avgSweetness(avgSweetness).avgAcidity(avgAcidity)
-                .avgBody(avgBody).avgTannin(avgTannin).avgAlcohol(avgAlcohol)
-                .mainTitle(title).content(content)
-                .createdAt(LocalDateTime.now())
-                .build();
+        TasteReport report = tasteReportRepository.findByUser(user)
+                .orElseGet(() -> TasteReport.builder().user(user).build());
+
+        report.updateResult(avgSweetness, avgAcidity, avgBody, avgTannin, avgAlcohol, title, content);
+        report.setCreatedAt(LocalDateTime.now());
 
         tasteReportRepository.save(report);
         return TasteReportResponse.from(report);
