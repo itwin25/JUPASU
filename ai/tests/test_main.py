@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from main import app, get_settings
+from app.main import app, get_settings
 
 client = TestClient(app)
 

@@ -46,4 +46,8 @@ export const API_PATH = {
   REPORT: {
     TASTE: '/users/reports',
   },
+  AI: {
+    CHAT: '/ai/chat',
+    REFINE: '/ai/refine',
+  },
 } as const;

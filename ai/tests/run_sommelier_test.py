@@ -1,6 +1,14 @@
 import asyncio
 import os
-from services.sommelier.sommelier_agent import sommelier_agent
+import sys
+
+# 프로젝트 루트에서 실행 시 ai 디렉토리를 path에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
+from app.services.sommelier.sommelier_agent import sommelier_agent
 
 async def run_test():
     """

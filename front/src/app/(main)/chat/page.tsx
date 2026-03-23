@@ -5,73 +5,30 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Send, ChevronLeft, Heart } from 'lucide-react';
-
-interface Message {
-  id: number;
-  type: 'bot' | 'user';
-  text: string;
-  recommendation?: {
-    name: string;
-    category: string;
-    price: string;
-    match: number;
-  };
-  options?: string[];
-}
-
-const INITIAL_BOT_MESSAGE: Message = {
-  id: 1,
-  type: 'bot',
-  text: '어떤 와인을 추천해드릴까요?',
-  options: ['뭐랑 먹을까?', '비슷한 다른 와인', '칼로리가 궁금해'],
-};
+import { useChat } from '@/features/chat/hooks/use-chat';
 
 export default function ChatPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState<Message[]>([INITIAL_BOT_MESSAGE]);
+  const { messages, sendMessage, isLoading } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
 
-  const latestBotMessage = useMemo(
-    () => [...messages].reverse().find((message) => message.type === 'bot') ?? INITIAL_BOT_MESSAGE,
-    [messages],
-  );
+  // 마지막 봇 메시지 찾기 (스트리밍 중인 메시지 포함)
+  const latestBotMessage = useMemo(() => {
+    return [...messages].reverse().find((msg) => msg.type === 'bot');
+  }, [messages]);
 
-  const userMessages = useMemo(
-    () => messages.filter((message) => message.type === 'user').slice(-3),
-    [messages],
-  );
+  // 최근 사용자 메시지 3개 (UI용)
+  const userMessages = useMemo(() => {
+    return messages.filter((msg) => msg.type === 'user').slice(-3);
+  }, [messages]);
 
   const handleSend = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isLoading) return;
 
-    const question = inputValue.trim();
-    const newUserMsg: Message = {
-      id: Date.now(),
-      type: 'user',
-      text: question,
-    };
-
-    setMessages((prev) => [...prev, newUserMsg]);
+    sendMessage(inputValue.trim());
     setInputValue('');
     setShowMenu(false);
-
-    window.setTimeout(() => {
-      const botResponse: Message = {
-        id: Date.now() + 1,
-        type: 'bot',
-        text: '달콤한 와인을 좋아하시는군요. 과일 디저트와 잘 어울리는 화이트 와인을 추천드릴게요.',
-        recommendation: {
-          name: 'Riesling Kabinett',
-          category: 'German White',
-          price: '32,000',
-          match: 90,
-        },
-        options: ['비슷한 다른 와인', '칼로리가 궁금해'],
-      };
-
-      setMessages((prev) => [...prev, botResponse]);
-    }, 700);
   };
 
   return (
@@ -107,10 +64,11 @@ export default function ChatPage() {
               </div>
 
               <p className="text-text-main text-[0.94rem] leading-6 font-medium whitespace-pre-line">
-                {latestBotMessage.text}
+                {latestBotMessage?.text ||
+                  (isLoading ? '소믈리에가 생각 중입니다...' : '어떤 와인을 추천해드릴까요?')}
               </p>
 
-              {latestBotMessage.recommendation && (
+              {latestBotMessage?.recommendation && (
                 <div className="mt-4 rounded-[1.6rem] border border-[#F1D991] bg-[#FFF9EB] p-3.5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] bg-white text-xl">
@@ -134,7 +92,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {latestBotMessage.options && latestBotMessage.options.length > 0 && (
+              {latestBotMessage?.options && latestBotMessage.options.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {latestBotMessage.options.map((option) => (
                     <button
@@ -148,7 +106,7 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {latestBotMessage.recommendation && (
+              {latestBotMessage?.recommendation && (
                 <button className="text-text-main/52 mt-3 flex items-center gap-1.5 text-[0.74rem] font-semibold">
                   <Heart size={13} className="fill-[#D16B74] text-[#D16B74]" />
                   위시리스트에 추가하기
