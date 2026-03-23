@@ -27,9 +27,9 @@ public class WineRecommendationCalculator {
     private final ReviewRepository reviewRepository;
 
     // ── 스케일 정보 ──────────────────────────────────────────────────────────────
-    // W_i (TasteProfile): 0.0 ~ 1.0 (Vivino 정규화)
-    // W'_i = W_i × 2 → 0.0 ~ 2.0
-    // U_i^stated (Preference 1~10) → (val-1)/9 × 2 → 0.0 ~ 2.0 (동일 범위)
+    // W_i (TasteProfile): 0.0 ~ 5.0 (Vivino 원본 스케일)
+    // W'_i = W_i × 0.4 → 0.0 ~ 2.0
+    // U_i^stated (Preference 1~5) → (val-1)/4 × 2 → 0.0 ~ 2.0 (동일 범위)
     // W_alc / U_alc: 실제 도수(%), 정규화 없음
 
     // σ_base: 취향 가우시안 기본 너비 (0~2 스케일 기준, 원 수식 3.5 / 5 = 0.7)
@@ -264,11 +264,11 @@ public class WineRecommendationCalculator {
             boolean vb = Boolean.TRUE.equals(tp.getIsRealBody());
             boolean vt = Boolean.TRUE.equals(tp.getIsRealTannin());
 
-            // W'_ij = W_ij × 2
-            double wS = vs ? tp.getSweetness() * 2f : 0f;
-            double wA = va ? tp.getAcidity()   * 2f : 0f;
-            double wB = vb ? tp.getBody()       * 2f : 0f;
-            double wT = vt ? tp.getTannin()     * 2f : 0f;
+            // W'_ij = W_ij × 0.4  (0~5 스케일 → 0~2 정규화)
+            double wS = vs ? tp.getSweetness() * 0.4f : 0f;
+            double wA = va ? tp.getAcidity()   * 0.4f : 0f;
+            double wB = vb ? tp.getBody()       * 0.4f : 0f;
+            double wT = vt ? tp.getTannin()     * 0.4f : 0f;
 
             // U_i^revealed 누산 + σ̂_i 분산 누산 (긍정 리뷰만: r̃ > 0, 즉 rating ≥ 4)
             if (rTilde > 0f) {
@@ -328,36 +328,40 @@ public class WineRecommendationCalculator {
         boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
         boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
         boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
-        boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree());
+        boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree())
+                           && wine.getAlcoholDegree() != null && wine.getAlcoholDegree() > 0;
         int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
                    + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
 
-        // ── ② 와인 특성 정규화 W'_i = W_i × 2 (유효 차원만) ─────────────────────
-        float wSweet  = validSweet  ? tp.getSweetness() * 2f : 0f;
-        float wAcid   = validAcid   ? tp.getAcidity()   * 2f : 0f;
-        float wBody   = validBody   ? tp.getBody()       * 2f : 0f;
-        float wTannin = validTannin ? tp.getTannin()     * 2f : 0f;
+        // ── ② 와인 특성 정규화 W'_i = W_i × 0.4 (0~5 스케일 → 0~2, 유효 차원만) ──
+        float wSweet  = validSweet  ? tp.getSweetness() * 0.4f : 0f;
+        float wAcid   = validAcid   ? tp.getAcidity()   * 0.4f : 0f;
+        float wBody   = validBody   ? tp.getBody()       * 0.4f : 0f;
+        float wTannin = validTannin ? tp.getTannin()     * 0.4f : 0f;
         float wAlc    = wine.getAlcoholDegree(); // 실제 도수(%), 정규화 불필요
 
         // ── ③ 유저 도수 선호: Preference.Abv (실제 도수 %), 없으면 T_alc 폴백 ────
         float uAlc = (pref != null && pref.getAbv() != null) ? pref.getAbv() : T_ALC_DEFAULT;
 
         // ── ④ S_pref: 취향·도수 통합 점수 ───────────────────────────────────────
-        // S_pref = (1/N_valid) × Σ exp(−(Û_i − W'_i)² / 2σ̂_i²)  (차원별 σ̂_i 사용)
+        // S_pref = (1/N_sum) × Σ exp(−(Û_i − W'_i)² / 2σ̂_i²)  (차원별 σ̂_i 사용)
+        // N_sum: 실제 Gaussian 합산에 참여한 차원 수 (uHat NaN 차원 제외)
+        // N_valid: 와인 데이터 충실도 계산 기준 (completeness factor용)
         float sPref;
         if (nValid == 0) {
             sPref = 0f;
         } else {
+            int nSum = 0;
             float sum = 0f;
-            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  sum += gaussian(cal.uHatSweet(),  wSweet,  cal.sigmaSweet());
-            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   sum += gaussian(cal.uHatAcid(),   wAcid,   cal.sigmaAcid());
-            if (validBody   && !Float.isNaN(cal.uHatBody()))   sum += gaussian(cal.uHatBody(),   wBody,   cal.sigmaBody());
-            if (validTannin && !Float.isNaN(cal.uHatTannin())) sum += gaussian(cal.uHatTannin(), wTannin, cal.sigmaTannin());
-            if (validAlc)                                       sum += gaussian(uAlc,             wAlc,    SIGMA_A);
+            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  { sum += gaussian(cal.uHatSweet(),  wSweet,  cal.sigmaSweet());  nSum++; }
+            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   { sum += gaussian(cal.uHatAcid(),   wAcid,   cal.sigmaAcid());   nSum++; }
+            if (validBody   && !Float.isNaN(cal.uHatBody()))   { sum += gaussian(cal.uHatBody(),   wBody,   cal.sigmaBody());   nSum++; }
+            if (validTannin && !Float.isNaN(cal.uHatTannin())) { sum += gaussian(cal.uHatTannin(), wTannin, cal.sigmaTannin()); nSum++; }
+            if (validAlc)                                       { sum += gaussian(uAlc,             wAlc,    SIGMA_A);           nSum++; }
 
-            // 데이터 충실도 페널티 (정보가 많을수록 신뢰도 상승)
+            // 데이터 충실도 페널티: 와인 데이터 기준(nValid), 평균 분모는 실제 합산 수(nSum)
             float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
-            sPref = (sum / nValid) * completenessFactor;
+            sPref = nSum > 0 ? (sum / nSum) * completenessFactor : 0f;
         }
 
         // ── ⑤ S_sit: 상황 적합도 점수 ───────────────────────────────────────────
@@ -492,11 +496,11 @@ public class WineRecommendationCalculator {
     // ── 수식 헬퍼 ────────────────────────────────────────────────────────────────
 
     /**
-     * Preference (1~10) → W'_i 동일 스케일 (0~2)로 변환.
+     * Preference (1~5) → W'_i 동일 스케일 (0~2)로 변환.
      * null이면 NaN 반환 (해당 차원 미설정, S_pref 계산 시 제외).
      */
     private float toScale(Integer prefValue) {
-        return (prefValue != null) ? (prefValue - 1) / 9f * 2f : Float.NaN;
+        return (prefValue != null) ? (prefValue - 1) / 4f * 2f : Float.NaN;
     }
 
     /**
