@@ -12,6 +12,7 @@ import com.a505.jupasu.domain.wine.repository.FoodRepository;
 import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
 import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.domain.wine.util.WineDataParser;
+import org.springframework.cache.annotation.CacheEvict;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class WineDataInitService {
     @Value("${DATA_FILE_PATH:/app/data/vivino_ultra_results_kr_food.json}")
     private String dataFilePath;
 
+    @CacheEvict(value = "wines", allEntries = true, cacheManager = "localCacheManager")
     @Transactional
     public void importWineDataFromJson() {
         log.info("🍷 [1/4] 데이터 초기화 시작 및 폴더 점검...");

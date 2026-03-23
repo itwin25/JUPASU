@@ -10,7 +10,7 @@ import com.a505.jupasu.domain.wine.dto.WineQuickRecommendResponse;
 import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
-import com.a505.jupasu.domain.wine.repository.WineRepository;
+import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ import java.util.*;
 @Transactional
 public class WineRecommendationCalculator {
 
-    private final WineRepository wineRepository;
+    private final WineQueryService wineQueryService;
     private final PreferenceRepository preferenceRepository;
     private final ReviewRepository reviewRepository;
 
@@ -92,7 +92,7 @@ public class WineRecommendationCalculator {
         CalibratedProfile calibrated = calibrate(pref, reviews);
 
         PriorityQueue<WineScore> minHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
-        List<Wine> wineList = wineRepository.findAll();
+        List<Wine> wineList = wineQueryService.getAllWines();
 
         for (Wine wine : wineList) {
             int match = score(wine, situation, pref, calibrated);
@@ -127,7 +127,7 @@ public class WineRecommendationCalculator {
             situationHeaps.put(sit, new PriorityQueue<>(Comparator.comparingInt(WineScore::match)));
         }
 
-        List<Wine> wineList = wineRepository.findAll();
+        List<Wine> wineList = wineQueryService.getAllWines();
 
         for (Wine wine : wineList) {
             // 1. 상황 무관 점수 계산
