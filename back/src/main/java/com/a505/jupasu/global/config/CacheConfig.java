@@ -1,9 +1,12 @@
 package com.a505.jupasu.global.config;
 
 
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -22,6 +25,7 @@ import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 @Configuration
 public class CacheConfig {
 
+    @Primary
     @Bean
     public RedisCacheManager cacheManeger(RedisConnectionFactory redisConnectionFactory) {
 
@@ -64,5 +68,16 @@ public class CacheConfig {
                 .fromConnectionFactory(redisConnectionFactory)
                 .cacheDefaults(redisCacheConfiguration)
                 .build();
+    }
+
+    /**
+     * JVM 인메모리 캐시 — Wine 엔티티 목록 전용.
+     * JPA 엔티티를 Redis에 직렬화할 때 발생하는 VO 역직렬화 문제를 피하기 위해
+     * 별도 로컬 캐시를 사용한다. TTL 없이 유지되며, 와인 데이터 변경 시
+     * @CacheEvict 로 명시적으로 무효화한다.
+     */
+    @Bean
+    public CacheManager localCacheManager() {
+        return new ConcurrentMapCacheManager("wines");
     }
 }
