@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  ai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jupasu-ai-server
+    ports:
+      - "18000:18000"
+    env_file:
+      - .env
+    # Gemini 사용 및 OCR 비활성화를 위해 GPU 설정을 주석 처리합니다.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           device_ids: ['0']
+    #           capabilities: [gpu]
+    # environment:
+    #   - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+networks:
+  default:
+    name: jupasu-network

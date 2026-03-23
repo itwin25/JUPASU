@@ -32,19 +32,19 @@ services:
       - backend-network
       - monitoring
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
+  # AI Service: Python 3.12 (Port 8000 표준화)
   ai:
     image: ${DOCKER_USER}/jupasu:ai-latest
     container_name: ai-fastapi
     restart: always
+    expose:
+      - "8000"
     networks:
       - backend-network
       - monitoring
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - 8000:8000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:

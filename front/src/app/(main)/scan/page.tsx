@@ -1,207 +1,396 @@
 'use client';
 
-import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Camera, Upload, ChevronLeft, ChevronRight, Search, Star, X } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import NextImage from 'next/image';
+import { Camera, ChevronLeft, Star, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
+import { useOCR } from '@/features/scan/hooks/useOCR';
+import { useEffect } from 'react';
+import { OCRResult } from '@/features/scan/types';
 
 type ScanStatus = 'idle' | 'scanning' | 'confirming' | 'result';
 
 export default function ScanPage() {
   const [status, setStatus] = useState<ScanStatus>('idle');
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
+  const [imageInfo, setImageInfo] = useState<{ width: number; height: number } | null>(null);
+  const [scanData, setScanData] = useState({
+    winery: '',
+    wineName: '',
+    vintage: '',
+  });
 
-  const startScan = () => {
-    setStatus('scanning');
-    setTimeout(() => setStatus('confirming'), 2000);
+  // 디버깅: 데이터 변경 감시
+  useEffect(() => {
+    if (status === 'confirming') {
+      console.log('🔍 [Debug] Current OCR Results:', ocrResults);
+      console.log('🔍 [Debug] Current Image Info:', imageInfo);
+    }
+  }, [status, ocrResults, imageInfo]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // 서버 OCR을 사용하도록 훅에서 추출
+  const { executeOCR, error: modelError } = useOCR();
+
+  // 이미지 분석 및 데이터 매핑 (서버 연산 사용)
+  const handleImageAnalysis = useCallback(
+    async (imageFile: File) => {
+      setStatus('scanning');
+
+      try {
+        // 1. 이미지 로드 및 프리뷰 생성
+        const reader = new FileReader();
+        const imageLoadPromise = new Promise<void>((resolve) => {
+          reader.onload = (e) => {
+            setCapturedImage(e.target?.result as string);
+            resolve();
+          };
+          reader.readAsDataURL(imageFile);
+        });
+
+        await imageLoadPromise;
+
+        // 2. 서버 OCR 실행 (useOCR 훅 사용)
+        const result = await executeOCR(imageFile);
+
+        console.log('✅ 서버 분석 결과:', result);
+
+        // 3. 데이터 저장 및 매핑
+        if (result.success) {
+          setOcrResults(result.results || []);
+          setImageInfo(result.imageInfo || null);
+
+          if (result.refined) {
+            setScanData({
+              winery: result.refined.winery || '',
+              wineName: result.refined.wineName || '',
+              vintage: result.refined.vintage || '',
+            });
+          }
+        }
+
+        setStatus('confirming');
+      } catch (err) {
+        console.error('OCR Error:', err);
+        alert('이미지 분석에 실패했습니다. 다시 시도해주세요.');
+        setStatus('idle');
+      }
+    },
+    [executeOCR],
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageAnalysis(file);
+    }
   };
 
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  if (modelError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div className="space-y-4">
+          <p className="font-bold text-red-500">OCR 서비스 연결 실패</p>
+          <p className="text-text-main/60 text-sm">{modelError}</p>
+          <Button onClick={() => window.location.reload()}>새로고침</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex flex-col no-scrollbar">
+    <div className="bg-background no-scrollbar flex min-h-screen flex-col">
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+
       {/* Header */}
       {status !== 'idle' && status !== 'scanning' && (
-        <header className="flex items-center justify-between px-6 py-4 bg-background sticky top-0 z-20">
-          <button onClick={() => setStatus(status === 'confirming' ? 'idle' : 'confirming')} className="p-2 -ml-2">
+        <header className="bg-background sticky top-0 z-20 flex items-center justify-between px-6 py-4">
+          <button onClick={() => setStatus('idle')} className="-ml-2 p-2">
             {status === 'result' ? <X /> : <ChevronLeft />}
           </button>
-          <h1 className="text-lg font-bold text-text-main">
+          <h1 className="text-text-main text-lg font-bold">
             {status === 'confirming' ? '인식 정보 확인' : '스캔 검색 결과'}
           </h1>
           <div className="w-10" />
         </header>
       )}
 
-      <main className="flex-1 px-6 py-6 flex flex-col overflow-y-auto no-scrollbar">
+      <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6">
         {status === 'idle' && (
-          <div className="flex flex-col flex-1">
-            <h1 className="text-2xl font-black text-text-main mb-2">WINE SCAN</h1>
-            <p className="text-sm text-text-main/40 font-medium mb-10">와인 라벨을 스캔하면 정보를 알려드려요</p>
-
-            <div className="flex-1 border-2 border-dashed border-primary-500/30 rounded-[40px] flex flex-col items-center justify-center p-8 mb-8">
-              <div className="w-32 h-32 bg-[#FFE5E5] rounded-full mb-8 flex items-center justify-center">
-                <div className="w-8 h-20 bg-[#3D4B3D] rounded-full translate-x-2" />
-                <div className="w-16 h-16 bg-[#7B4D9B] rounded-full -translate-x-2" />
-              </div>
-              <h2 className="text-xl font-black text-text-main mb-3">와인 라벨을 찍어보세요!</h2>
-              <p className="text-sm text-text-main/40 text-center font-medium leading-relaxed px-4">
-                카메라로 와인 라벨을 스캔하면 어떤 와인인지,<br />어떤 음식과 어울리는지 쉽게 알 수 있어요.
+          <div className="flex flex-col py-2">
+            <header className="mb-2">
+              <h1 className="text-text-main mb-1 text-2xl font-black">WINE SCAN</h1>
+              <p className="text-text-main/40 text-sm font-medium">
+                와인 라벨을 스캔하면 정보를 알려드려요
               </p>
+            </header>
+
+            <div className="relative mx-auto mt-4 mb-4 aspect-square w-full overflow-hidden rounded-[40px]">
+              <NextImage
+                src="/Scanning.jpg"
+                alt="Scanning Guide"
+                fill
+                priority
+                className="object-contain"
+              />
             </div>
 
-            <div className="flex gap-3 mb-12">
-              <Button onClick={startScan} size="full" className="flex-1 gap-3 text-[18px]">
-                <Camera size={24} /> 카메라로 스캔
-              </Button>
-              <button className="w-16 h-16 bg-white border border-primary-100 rounded-3xl flex items-center justify-center text-text-main/30 hover:bg-gray-50 transition-colors">
-                <Upload size={24} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-black text-text-main italic">
-                <span className="text-[#FF8A00]">⚡</span> 이렇게 스캔해 보세요
-              </div>
-              {[
-                { n: 1, t: '와인 라벨이 잘 보이게 카메라를 맞춰주세요' },
-                { n: 2, t: '글자가 선명하게 보이도록 가까이 찍어주세요' },
-                { n: 3, t: '조명이 밝은 곳에서 스캔하면 더 정확해요' }
-              ].map((tip) => (
-                <div key={tip.n} className="bg-white p-4 rounded-full flex items-center gap-4 border border-primary-100">
-                  <span className="w-8 h-8 rounded-full bg-[#FFE5E5] text-[#B36262] font-black flex items-center justify-center text-sm">{tip.n}</span>
-                  <span className="text-sm font-bold text-text-main/60">{tip.t}</span>
+            <div className="space-y-6">
+              <div>
+                <div className="text-text-main mb-3 flex items-center gap-2 text-base font-black italic">
+                  <span className="text-lg text-[#FF8A00]">⚡</span> 이렇게 스캔해 보세요
                 </div>
-              ))}
+                <div className="mb-6 space-y-3">
+                  {[
+                    { n: 1, t: '라벨이 정면에서 잘 보이게 촬영해주세요' },
+                    { n: 2, t: '글자가 선명하게 보이도록 가까이 찍어주세요' },
+                    { n: 3, t: '조명이 밝은 곳에서 스캔하면 더 정확해요' },
+                  ].map((tip) => (
+                    <div
+                      key={tip.n}
+                      className="border-primary-100 flex items-center gap-4 rounded-full border bg-white px-5 py-2 shadow-sm"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFE5E5] text-sm font-black text-[#B36262]">
+                        {tip.n}
+                      </span>
+                      <span className="text-text-main/60 text-sm font-bold">{tip.t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                onClick={triggerUpload}
+                size="full"
+                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
+              >
+                <Camera size={24} />
+                와인 라벨 스캔하기
+              </Button>
             </div>
           </div>
         )}
 
         {status === 'scanning' && (
-          <div className="flex flex-col flex-1 items-center justify-center text-center">
-             <h1 className="text-2xl font-black text-text-main mb-2 absolute top-6 left-6">WINE SCAN</h1>
-             <p className="text-sm text-text-main/40 font-medium mb-10 absolute top-[64px] left-6">와인 라벨을 스캔하면 정보를 알려드려요</p>
-             
-             <div className="w-full aspect-square border-2 border-dashed border-primary-500/30 rounded-[40px] flex flex-col items-center justify-center p-8 mb-8 relative">
-                <div className="w-48 h-48 rounded-full border-[6px] border-[#FFE5E5] border-t-[#B36262] animate-spin mb-10" />
-                <h2 className="text-2xl font-black text-text-main mb-3">라벨을 분석하고 있어요...</h2>
-                <p className="text-lg text-text-main/40 font-bold">잠시만 기다려 주세요!</p>
-             </div>
+          <div className="animate-in fade-in flex flex-1 flex-col items-center justify-center py-6 text-center duration-500">
+            <div className="border-primary-500/30 relative mb-8 flex aspect-square w-full flex-col items-center justify-center rounded-[40px] border-2 border-dashed bg-white p-8">
+              <div className="mb-10 h-48 w-48 animate-spin rounded-full border-[6px] border-[#FFE5E5] border-t-[#B36262]" />
+              <h2 className="text-text-main mb-3 text-2xl font-black">라벨을 분석하고 있어요...</h2>
+              <p className="text-text-main/40 text-lg font-bold">잠시만 기다려 주세요!</p>
+            </div>
           </div>
         )}
 
         {status === 'confirming' && (
-          <div className="flex flex-col space-y-8 animate-in fade-in duration-500">
-            <div className="w-full aspect-video bg-gray-100 rounded-[40px] relative overflow-hidden">
-               {/* Preview Image Placeholder */}
-               <button className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm text-[#B36262] font-bold px-5 py-2.5 rounded-2xl text-sm border border-primary-100 shadow-sm">
-                 재촬영
-               </button>
+          <div className="animate-in fade-in flex flex-col py-2 duration-500">
+            <div className="border-primary-100 relative aspect-square w-full overflow-hidden rounded-[40px] border bg-gray-100 shadow-inner">
+              {capturedImage && (
+                <div className="relative h-full w-full">
+                  <NextImage src={capturedImage} alt="Preview" fill className="object-contain" />
+                  {/* 바운딩 박스 레이어 */}
+                  {ocrResults.length > 0 && (
+                    <svg
+                      className="pointer-events-none absolute top-0 left-0 z-50 h-full w-full"
+                      viewBox={`0 0 ${imageInfo?.width || 1080} ${imageInfo?.height || 1080}`}
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      {ocrResults.map((res, i) => {
+                        const box = res.box;
+                        if (!box) return null;
+
+                        let x = 0;
+                        let y = 0;
+                        let boxElement = null;
+
+                        // 1. 객체 형식 대응 { x, y, width, height }
+                        if (
+                          typeof box === 'object' &&
+                          !Array.isArray(box) &&
+                          box !== null &&
+                          'x' in box
+                        ) {
+                          const b = box as { x: number; y: number; width: number; height: number };
+                          x = b.x;
+                          y = b.y;
+                          boxElement = (
+                            <rect
+                              x={b.x}
+                              y={b.y}
+                              width={b.width}
+                              height={b.height}
+                              style={{
+                                fill: 'rgba(0, 255, 0, 0.1)',
+                                stroke: '#00FF00',
+                                strokeWidth: '2px',
+                                vectorEffect: 'non-scaling-stroke',
+                              }}
+                            />
+                          );
+                        }
+                        // 2. 배열 형식 대응 [[x,y], ...] 또는 [x,y,x,y]
+                        else if (Array.isArray(box) && box.length > 0) {
+                          let pointsString = '';
+                          if (Array.isArray(box[0])) {
+                            const pts = box as number[][];
+                            x = pts[0][0];
+                            y = pts[0][1];
+                            pointsString = pts.map((p) => `${p[0]},${p[1]}`).join(' ');
+                          } else {
+                            const pts = box as number[];
+                            x = pts[0];
+                            y = pts[1];
+                            for (let j = 0; j < pts.length; j += 2) {
+                              pointsString += `${pts[j]},${pts[j + 1]} `;
+                            }
+                          }
+                          boxElement = (
+                            <polygon
+                              points={pointsString.trim()}
+                              style={{
+                                fill: 'rgba(0, 255, 0, 0.1)',
+                                stroke: '#00FF00',
+                                strokeWidth: '2px',
+                                vectorEffect: 'non-scaling-stroke',
+                              }}
+                            />
+                          );
+                        }
+
+                        if (!boxElement) return null;
+
+                        return (
+                          <g key={i}>
+                            {boxElement}
+                            {res.text && (
+                              <text
+                                x={x}
+                                y={y - 2} // 간격도 살짝 줄임
+                                style={{
+                                  fill: '#00FF00',
+                                  fontSize: `${Math.max((imageInfo?.width || 1080) * 0.02, 8)}px`,
+                                  fontWeight: 'bold',
+                                  paintOrder: 'stroke',
+                                  stroke: '#000000',
+                                  strokeWidth: '1px', // 외곽선 두께 축소
+                                  strokeLinecap: 'round',
+                                  strokeLinejoin: 'round',
+                                }}
+                              >
+                                {res.text}
+                              </text>
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={triggerUpload}
+                className="border-primary-100 absolute right-4 bottom-4 rounded-2xl border bg-white/80 px-5 py-2.5 text-sm font-bold text-[#B36262] shadow-sm backdrop-blur-sm"
+              >
+                다시 찍기
+              </button>
             </div>
 
-            <div className="space-y-6">
-              <Input label="와이너리 (제조사)" defaultValue="Chelti Winery" />
-              <Input label="와인 이름" defaultValue="Saperavi Qvevri Family Collection" />
-              <Input label="생산 연도 (Vintage)" defaultValue="2020" />
+            <div className="mt-6 space-y-2">
+              <Input
+                label="와이너리 (제조사)"
+                value={scanData.winery}
+                placeholder="제조사 이름을 입력해 주세요 (예: Montes)"
+                onChange={(e) => setScanData({ ...scanData, winery: e.target.value })}
+              />
+              <Input
+                label="와인 이름"
+                value={scanData.wineName}
+                placeholder="와인 이름을 입력해 주세요 (예: Alpha)"
+                onChange={(e) => setScanData({ ...scanData, wineName: e.target.value })}
+              />
+              <Input
+                label="생산 연도 (Vintage)"
+                value={scanData.vintage}
+                placeholder="생산 연도를 입력해 주세요 (예: 2021)"
+                onChange={(e) => setScanData({ ...scanData, vintage: e.target.value })}
+              />
             </div>
 
-            <Button onClick={() => setStatus('result')} size="full" className="text-lg shadow-lg">
-              이 정보로 검색하기
-            </Button>
+            <div className="mt-6">
+              <Button
+                onClick={() => setStatus('result')}
+                size="full"
+                className="h-14 text-lg shadow-lg"
+              >
+                이 정보로 검색하기
+              </Button>
+            </div>
           </div>
         )}
 
         {status === 'result' && (
-          <div className="flex flex-col space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-18">
-             {/* Main Result Card */}
-             <div className="bg-white border border-primary-100 rounded-[20px] p-3 flex items-center gap-5">
-                {/* Left: Wine Image Area */}
-                <div className="w-22 h-24 bg-[#EBE6DF] rounded-[15px] flex items-center justify-center shrink-0">
-                   <span className="text-2xl">🍷</span>
+          <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-8 py-6 duration-500">
+            {/* Main Result Card */}
+            <div className="border-primary-100 flex items-center gap-5 rounded-[40px] border bg-white p-6 shadow-sm">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl bg-gray-100">
+                {capturedImage && (
+                  <NextImage src={capturedImage} alt="Wine" fill className="object-cover" />
+                )}
+              </div>
+              <div className="relative flex-1 space-y-1">
+                <h3 className="text-xl leading-tight font-black">
+                  {scanData.wineName || '분석된 와인'}
+                </h3>
+                <h4 className="text-text-main/40 text-sm font-medium">{scanData.winery}</h4>
+                <div className="flex items-center gap-4 pt-2">
+                  <div className="flex items-center gap-1 font-black text-[#FF8A00]">
+                    <Star size={16} fill="#FF8A00" /> 4.8
+                  </div>
+                  <span className="text-lg font-black text-[#B36262]">₩120,000</span>
                 </div>
-                
-                {/* Center & Right: Content */}
-                <div className="flex-1 min-w-0 flex items-center justify-between">
-                   <div className="space-y-1">
-                     <h3 className="text-[14px] font-black text-text-main leading-tight">Chateau Margaux 2018</h3>
-                     <p className="text-[12px] font-bold text-text-main/40 leading-tight">Bordeaux Red</p>
-                     <div className="flex items-center gap-4 pt-2">
-                        <div className="flex items-center gap-1 text-[#FF8A00] font-black text-sm">
-                           <Star size={12} fill="#FF8A00" /> 4.8
-                        </div>
-                        <span className="text-[14px] font-black text-[#B36262]">₩120,000</span>
-                     </div>
-                   </div>
-
-                   {/* Match Circle */}
-                   <div className="w-10 h-10 rounded-full bg-[#B36262]/5 flex items-center justify-center border border-[#B36262]/10 shrink-0">
-                      <span className="text-[10px] font-black text-[#B36262]">95%</span>
-                   </div>
+                <div className="bg-primary-100 absolute top-1/2 right-0 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black text-[#B36262]">
+                  95%
                 </div>
-             </div>
+              </div>
+            </div>
 
-             {/* Taste Profile */}
-             <div className="space-y-4">
-                <h4 className="text-lg font-black text-text-main uppercase tracking-tight">맛 프로필</h4>
-                <div className="bg-white rounded-[20px] p-8 border border-primary-100 shadow-sm space-y-5">
-                   {['BODY', 'SWEET', 'ACID', 'TANNIN'].map((label) => (
-                      <div key={label} className="flex items-center justify-between">
-                         <span className="text-sm font-black text-text-main/60 tracking-wider uppercase">{label}</span>
-                         <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((d) => (
-                               <div key={d} className={`w-2.5 h-2.5 rotate-45 transition-colors ${d <= 4 ? 'bg-[#B36262]' : 'bg-[#EBE6DF]'}`} />
-                            ))}
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </div>
+            {/* Taste Profile (Mockup) */}
+            <div className="space-y-4">
+              <h4 className="text-text-main text-lg font-black italic">맛 프로필</h4>
+              <div className="border-primary-100 space-y-4 rounded-[40px] border bg-white p-8 shadow-sm">
+                {['BODY', 'SWEET', 'ACID', 'TANNIN'].map((label) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-text-main/60 text-xs font-black">{label}</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3, 4, 5].map((d) => (
+                        <div
+                          key={d}
+                          className={`h-2.5 w-2.5 rotate-45 ${d <= 4 ? 'bg-[#B36262]' : 'bg-primary-100'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-             {/* Recommendation Banner */}
-             <div className="bg-[#FFE5E5] rounded-[20px] p-6 flex items-center gap-5 border border-[#B36262]/5">
-                <div className="w-14 h-14 bg-[#B36262]/20 rounded-full flex items-center justify-center shrink-0">
-                   <div className="w-10 h-10 bg-[#B36262]/40 rounded-full" />
-                </div>
-                <p className="text-sm font-bold text-text-main leading-relaxed">
-                   이런 와인을 찾으셨군요!<br />비슷한 와인도 함께 추천해드릴게요!
-                </p>
-             </div>
-
-             {/* Similar Wines */}
-             <div className="space-y-4">
-                <h4 className="text-lg font-black text-text-main uppercase tracking-tight">비슷한 와인 추천</h4>
-                <div className="flex flex-col gap-4">
-                   {[1, 2].map((i) => (
-                      <Link key={i} href="/wines/1" className="bg-white border border-primary-100 rounded-[20px] p-3 flex items-center gap-3 active:scale-[0.98] transition-all group">
-                         {/* Left: Wine Image Area */}
-                         <div className="w-20 h-20 bg-[#EBE6DF] rounded-[20px] flex items-center justify-center shrink-0">
-                            <span className="text-2xl opacity-50">🍷</span>
-                         </div>
-                         
-                         {/* Center: Content */}
-                         <div className="flex-1 min-w-0 space-y-1">
-                            <div className="flex items-center justify-between">
-                               <h4 className="text-[14px] font-black text-text-main truncate">Chateau Margaux 2018</h4>
-                               <div className="bg-[#B36262]/5 px-1 py-0.3 rounded-lg border border-[#B36262]/10 shrink-0">
-                                  <span className="text-[8px] font-black text-[#B36262]">95%</span>
-                               </div>
-                            </div>
-                            <p className="text-xs font-bold text-text-main/40">Bordeaux Red</p>
-                            <div className="flex items-center gap-4 pt-1">
-                               <div className="flex items-center gap-1 text-[#FF8A00] font-black text-xs">
-                                  <Star size={12} fill="#FF8A00" /> 4.8
-                               </div>
-                               <span className="text-[12px] font-black text-[#B36262]">₩120,000</span>
-                            </div>
-                         </div>
-
-                         {/* Right: Chevron */}
-                         <div className="text-text-main/20 group-hover:text-text-main/40 transition-colors">
-                            <ChevronRight size={16} />
-                         </div>
-                      </Link>
-                   ))}
-                </div>
-             </div>
+            <div className="flex items-center gap-4 rounded-[32px] border border-[#B36262]/10 bg-[#FFE5E5] p-6">
+              <div className="h-12 w-12 shrink-0 rounded-full bg-[#B36262]/30" />
+              <p className="text-text-main text-sm leading-relaxed font-bold">
+                이런 와인을 찾으셨군요! 비슷한 와인도 함께 추천해드릴게요!
+              </p>
+            </div>
           </div>
         )}
       </main>
