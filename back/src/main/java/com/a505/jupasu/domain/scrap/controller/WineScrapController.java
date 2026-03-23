@@ -23,11 +23,11 @@ public class WineScrapController {
      */
     @PostMapping("/{wine_id}/scraps")
     public ApiResponse<ScrapToggleResponse> toggleScrap(
-            //TODO: 로그인한 사용자 확인 (Authentication 추가)
+            @AuthenticationPrincipal LoginUserCustom user,
             @PathVariable("wine_id") Long wineId
     ) {
 
-        ScrapToggleResponse response = wineScrapService.toggleScrap(1L, wineId);
+        ScrapToggleResponse response = wineScrapService.toggleScrap(user.getUser().getId(), wineId);
 
         String message = response.isScrapped() ? "와인 찜하기 완료" : "와인 찜하기 취소";
 
