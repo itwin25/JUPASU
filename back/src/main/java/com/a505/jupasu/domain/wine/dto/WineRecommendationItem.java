@@ -60,22 +60,22 @@ public record WineRecommendationItem(
      *   display = round(100 / (1 + exp(−k · (s − μ))))
      *   s = rawScore / 100
      *   μ = 0.35  (50% 중립점: 원점수 35 이하는 50% 미만으로 표시)
-     *   k = 7     (경사도: μ 기준 ±0.1마다 약 15%p 변화)
+     *   k = 6     (경사도: μ 기준 ±0.1마다 약 12%p 변화; 7에서 낮춰 분포를 약간 펼침)
      * </pre>
      *
      * 추천 시스템에서 실제로 반환되는 top-5 와인의 원점수는 약 55~85 범위이며,
-     * 이 구간이 80~97%로 매핑되어 사용자에게 신뢰감 있는 점수를 제공한다.
+     * 이 구간이 77~95%로 매핑되어 사용자에게 신뢰감 있는 점수를 제공한다.
      * 상대적 순위(ranking)는 sigmoid의 단조증가 특성으로 원점수와 동일하게 보존된다.
      *
      * <ul>
-     *   <li>원점수 55 → 약 80%</li>
-     *   <li>원점수 65 → 약 89%</li>
-     *   <li>원점수 75 → 약 94%</li>
-     *   <li>원점수 85 → 약 97%</li>
+     *   <li>원점수 55 → 약 77%</li>
+     *   <li>원점수 65 → 약 86%</li>
+     *   <li>원점수 75 → 약 92%</li>
+     *   <li>원점수 85 → 약 95%</li>
      * </ul>
      */
     private static int sigmoid(int rawScore) {
         double s = rawScore / 100.0;
-        return (int) Math.round(100.0 / (1.0 + Math.exp(-7.0 * (s - 0.35))));
+        return (int) Math.round(100.0 / (1.0 + Math.exp(-6.0 * (s - 0.35))));
     }
 }
