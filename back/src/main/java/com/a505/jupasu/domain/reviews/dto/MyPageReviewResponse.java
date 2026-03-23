@@ -20,7 +20,7 @@ public class MyPageReviewResponse {
     private String nickname;
     private Long wineId;
     private String wineName;
-    private Float rating;
+    private Integer rating;
     private String content;
     private LocalDateTime createdAt;
 
