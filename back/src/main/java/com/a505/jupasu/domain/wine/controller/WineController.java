@@ -31,9 +31,9 @@ public class WineController {
     private final WineRecommendationCalculator wineRecommendationCalculator;
 
     /**
-     * 와인 통합 검색 (초성/오타 허용 - 고도화 예정)
-     *  현재는 필터 없이 와인 이름으로만 검색
-     *  추후 필터링 -> elasticSearch 고도화 예정
+     * 와인 통합 검색
+     *  필터링, 페이지네이션 적용
+     *  pg_trgm, gin index를 통한 고속 검색
      */
     @GetMapping
     public ApiResponse<Page<WineSearchResponse>> searchWines(
@@ -55,8 +55,8 @@ public class WineController {
             @AuthenticationPrincipal LoginUserCustom user,
             @PathVariable("wine_id") Long wineId
     ) {
-        //현재는 로그인한 유저 아이디 1L 로 고정
-        Long userId = 1L;
+
+        Long userId = user.getUser().getId();
         WineDetailResponse response = wineService.getWineDetail(userId, wineId);
         return ApiResponse.success("와인 상세 정보 조회 성공", response);
 

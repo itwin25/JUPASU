@@ -30,6 +30,7 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 리뷰입니다."),
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 작성한 리뷰입니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
+    PREFERENCE_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 취향 정보입니다."),
 
     // OTP / 이메일 인증 관련 예외
     OTP_EXPIRED_OR_INVALID(HttpStatus.BAD_REQUEST, "인증 코드가 유효하지 않거나 만료되었습니다."),
