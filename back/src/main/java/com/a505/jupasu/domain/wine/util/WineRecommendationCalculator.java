@@ -13,6 +13,7 @@ import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -20,6 +21,7 @@ import java.util.*;
 
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class WineRecommendationCalculator {
 
     private final WineQueryService wineQueryService;
