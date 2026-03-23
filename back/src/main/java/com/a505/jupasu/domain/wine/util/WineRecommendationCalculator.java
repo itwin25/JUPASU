@@ -69,6 +69,13 @@ public class WineRecommendationCalculator {
             float sigmaT       // σ̂_t (개인화 취향 폭)
     ) {}
 
+    // ── 구현된 추천 상황 리스트 ───────────────────────────────────────────────────
+    private final DrinkingSituation[] situationList = {
+            DrinkingSituation.ALONE,
+            DrinkingSituation.DATE,
+            DrinkingSituation.PARTY
+    };
+
     // ── 퀵 추천 목록 ──────────────────────────────────────────────────────────────
 
     /**
@@ -111,7 +118,7 @@ public class WineRecommendationCalculator {
 
         PriorityQueue<WineScore> generalHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
         Map<DrinkingSituation, PriorityQueue<WineScore>> situationHeaps = new EnumMap<>(DrinkingSituation.class);
-        for (DrinkingSituation sit : DrinkingSituation.values()) {
+        for (DrinkingSituation sit : situationList) {
             situationHeaps.put(sit, new PriorityQueue<>(Comparator.comparingInt(WineScore::match)));
         }
 
@@ -125,7 +132,7 @@ public class WineRecommendationCalculator {
             }
 
             // 2. 각 상황별 점수 계산
-            for (DrinkingSituation sit : DrinkingSituation.values()) {
+            for (DrinkingSituation sit : situationList) {
                 int sitMatch = score(wine, sit, pref, calibrated);
                 if (sitMatch != Integer.MIN_VALUE) {
                     addToHeap(situationHeaps.get(sit), new WineScore(sitMatch, wine), 5);
@@ -135,7 +142,7 @@ public class WineRecommendationCalculator {
 
         List<WineRecommendationItem> generalList = heapToList(generalHeap);
         List<WineQuickRecommendResponse.SituationResult> bySituation = new ArrayList<>();
-        for (DrinkingSituation sit : DrinkingSituation.values()) {
+        for (DrinkingSituation sit : situationList) {
             bySituation.add(WineQuickRecommendResponse.SituationResult.of(sit, heapToList(situationHeaps.get(sit))));
         }
 
@@ -325,10 +332,10 @@ public class WineRecommendationCalculator {
 
         // ── ① 유효성 지시 함수 𝟙_i ──────────────────────────────────────────────
         // isReal* = false → 값 없음 → 𝟙 = 0, 해당 차원을 계산에서 제외
-        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness());
-        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity());
-        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody());
-        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin());
+        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness()) && tp.getSweetness() > 0;
+        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
+        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
+        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
         boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree());
         int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
                    + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
@@ -356,7 +363,10 @@ public class WineRecommendationCalculator {
             if (validBody   && !Float.isNaN(cal.uHatBody()))   sum += gaussian(cal.uHatBody(),   wBody,   sigmaT);
             if (validTannin && !Float.isNaN(cal.uHatTannin())) sum += gaussian(cal.uHatTannin(), wTannin, sigmaT);
             if (validAlc)                                       sum += gaussian(uAlc,             wAlc,    SIGMA_A);
-            sPref = sum / nValid;
+            
+            // 데이터 충실도 페널티 (정보가 많을수록 신뢰도 상승)
+            float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
+            sPref = (sum / nValid) * completenessFactor;
         }
 
         // ── ⑤ S_sit: 상황 적합도 점수 ───────────────────────────────────────────
@@ -365,7 +375,8 @@ public class WineRecommendationCalculator {
 
         // ── ⑥ S_price: 가격 점수 ────────────────────────────────────────────────
         boolean validPrice = wine.getPriceAndRating() != null
-                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice());
+                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice())
+                && wine.getPriceAndRating().getPrice() > 0;
         float sPrice;
         if (!validPrice) {
             sPrice = 0.5f;
@@ -378,9 +389,11 @@ public class WineRecommendationCalculator {
             sPrice = gaussian(wine.getPriceAndRating().getPrice(), tPrice, SIGMA_DIR);
         }
 
-        // ── ⑦ N_valid = 0 극단값 처리 ───────────────────────────────────────────
-        if (nValid == 0 && !validPrice) return Integer.MIN_VALUE;
-        if (nValid == 0) return Math.round(sPrice * 100);
+        // ── ⑦ 데이터 부재 와인 제외 ───────────────────────────────────────────
+        // (당도, 산도, 바디, 탄닌, 가격) 5가지 핵심 데이터가 모두 '진짜'이고 '0보다 큰' 와인만 추천
+        if (!(validSweet && validAcid && validBody && validTannin && validPrice)) {
+            return Integer.MIN_VALUE;
+        }
 
         // ── ⑧ 상황별 가중치 적용 ────────────────────────────────────────────────
         float wPref, wPriceW, wSitW;

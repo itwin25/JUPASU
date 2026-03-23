@@ -1,6 +1,6 @@
 import { api } from '@/lib/axios';
 import { API_PATH } from '@/constants/api-path';
-import { ScrapWine, Wine, WineListParams } from '../types/wine.types';
+import { ScrapWine, Wine, WineListParams, WineQuickRecommendResponse } from '../types/wine.types';
 import { ApiResponse, PaginatedResponse } from '@/types/api.types';
 
 export const wineApi = {
@@ -12,7 +12,8 @@ export const wineApi = {
   getDetail: (id: string | number) =>
     api.get<ApiResponse<Wine>>(API_PATH.WINE.DETAIL(id)).then((res) => res.data.data),
 
-  getQuickRecommendation: () => api.get<Wine[]>(API_PATH.WINE.RECOMMEND).then((res) => res.data),
+  getQuickRecommendations: () =>
+    api.get<ApiResponse<WineQuickRecommendResponse>>('/wines/quick').then((res) => res.data.data),
 
   getScraps: () =>
     api.get<ApiResponse<ScrapWine[]>>(API_PATH.WINE.SCRAPS).then((res) => res.data.data),
