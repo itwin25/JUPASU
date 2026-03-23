@@ -39,6 +39,8 @@ services:
     restart: always
     ports:
       - "8001:8000"
+    env_file:
+      - .env
     networks:
       - backend-network-dev
       - monitoring

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     INTERNAL_API_KEY: str = "dev-secret-key"
     
     # LLM Provider: 'local', 'gemini', 'gms' 또는 'gms-sdk'
-    LLM_PROVIDER: Literal["local", "gemini", "gms", "gms-sdk"] = "gemini"
+    LLM_PROVIDER: Literal["local", "gemini", "gms", "gms-sdk"] = "gms-sdk"
     
     # Remote GPU Server (local 사용 시)
     LLM_API_BASE_URL: str = "http://localhost:8000/v1"
