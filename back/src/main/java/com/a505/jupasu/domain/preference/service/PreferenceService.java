@@ -1,6 +1,7 @@
 package com.a505.jupasu.domain.preference.service;
 
 import com.a505.jupasu.domain.preference.dto.request.PreferenceUpdateRequest;
+import com.a505.jupasu.domain.preference.dto.response.PreferenceResponse;
 import com.a505.jupasu.domain.preference.entity.Preference;
 import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
 import com.a505.jupasu.domain.user.entity.User;
@@ -45,5 +46,16 @@ public class PreferenceService {
 
         preference.markReportAsOutdated();
         preferenceRepository.save(preference);
+    }
+
+    /**
+     * 사용자의 현재 취향 정보를 조회
+     * @param user 현재 인증된 사용자 엔티티
+     * @return 취향 정보가 담긴 응답 DTO (정보가 없는 경우 null 필드를 포함한 기본 객체 또는 null 반환 가능)
+     */
+    public PreferenceResponse getPreference(User user) {
+        return preferenceRepository.findByUserId(user.getId())
+                .map(PreferenceResponse::from)
+                .orElse(null);
     }
 }

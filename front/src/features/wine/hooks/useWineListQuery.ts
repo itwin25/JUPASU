@@ -6,7 +6,7 @@ import { WineListParams } from '../types/wine.types';
 export function useWineListQuery(params?: WineListParams) {
   return useQuery({
     queryKey: QUERY_KEY.WINE.LIST(params),
-    queryFn: () => wineApi.getList(params),
+    queryFn: () => wineApi.searchWines(params),
   });
 }
 
@@ -18,10 +18,10 @@ export function useWineDetailQuery(id: string | number) {
   });
 }
 
-export function useQuickWineQuery() {
+export function useWineQuickRecommendQuery() {
   return useQuery({
     queryKey: QUERY_KEY.WINE.RECOMMEND,
-    queryFn: wineApi.getQuickRecommendation,
+    queryFn: wineApi.getQuickRecommendations,
   });
 }
 

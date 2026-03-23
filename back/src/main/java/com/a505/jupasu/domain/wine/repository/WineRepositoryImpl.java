@@ -33,52 +33,54 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
 
         BooleanBuilder builder = new BooleanBuilder();
 
-        if (matchingIds != null) {
-            builder.and(wine.id.in(matchingIds));
+        boolean hasKeyword = StringUtils.hasText(condition.keyword());
+
+        if (hasKeyword) {
+            if (matchingIds != null) {
+                if (matchingIds.isEmpty()) {
+                    return new PageImpl<>(List.of(), pageable, 0);
+                }
+                builder.and(wine.id.in(matchingIds));
+            } else {
+                builder.and(keywordSimilarity(condition.keyword()));
+            }
         }
 
-        // 필터링
         builder.and(typeEq(condition.type()));
         builder.and(priceGoe(condition.minPrice()));
         builder.and(priceLoe(condition.maxPrice()));
         builder.and(ratingGoe(condition.minRate()));
-        builder.and(countryEq(condition.country()));
 
-        OrderSpecifier<?> [] orderSpecifiers = getOrderSpecifier(pageable);
 
-        // 조회 쿼리
+        OrderSpecifier<?>[] orderSpecifiers = getOrderSpecifier(pageable);
+
         JPAQuery<Wine> query = queryFactory
                 .selectFrom(wine)
                 .where(builder)
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize());
 
-        // 동적 정렬
-        if (StringUtils.hasText(condition.keyword())) {
-            NumberExpression<Double> similarity = Expressions.numberTemplate(Double.class,
-                    "function('word_similarity', {0}, {1})", condition.keyword(), wine.nameKr);
-
-            query.orderBy(similarity.desc());
-            for (OrderSpecifier<?> orderSpecifier : orderSpecifiers) {
-                query.orderBy(orderSpecifier);
-            }
+        if (hasKeyword && pageable.getSort().isEmpty()) {
+            NumberExpression<Double> similarity = Expressions.numberTemplate(
+                    Double.class,
+                    "function('word_similarity', {0}, {1})",
+                    condition.keyword(),
+                    wine.nameKr
+            );
+            query.orderBy(similarity.desc(), wine.id.desc());
         } else {
             query.orderBy(orderSpecifiers);
         }
 
         List<Wine> content = query.fetch();
 
-        // 5. 카운트 쿼리
         Long total = queryFactory
                 .select(wine.count())
                 .from(wine)
-                .where(builder) // 본 쿼리와 동일한 builder 적용
+                .where(builder)
                 .fetchOne();
 
-        long totalCount = total != null ? total : 0L;
-
-        return new PageImpl<>(content, pageable, totalCount);
-
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
     //=============================================================
@@ -124,12 +126,6 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
         return minRate != null ? wine.priceAndRating.averageRating.goe(minRate) : null;
     }
 
-    /**
-     * 와인 원산지 검사
-     */
-    private BooleanExpression countryEq (String country) {
-        return StringUtils.hasText(country) ? wine.origin.country.eq(country) : null;
-    }
 
     //===================================================
     //정렬을 위한 메서드
