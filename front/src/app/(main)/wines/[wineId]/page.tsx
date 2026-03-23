@@ -13,7 +13,16 @@ import {
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
-import { useWineReviewsQuery } from '@/features/review/hooks/useWineReviewsQuery';
+
+import { 
+  useWineReviewsQuery,
+  useCreateReviewMutation,
+  useUpdateReviewMutation,
+  useDeleteReviewMutation
+} from '@/features/review/hooks/useWineReviewsQuery';
+
+// ⭐️ [추가] 디폴트 와인 이미지 URL 상수
+const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 
 type ReviewItem = {
   id: number;
@@ -32,7 +41,6 @@ type SimilarWine = {
   match: number;
 };
 
-// ⭐️ 취향 타입 정의
 type TasteProfile = {
   body: number;
   sweet: number;
@@ -46,7 +54,7 @@ type WineInfo = {
   name: string;
   category: string;
   country: string;
-  flagUrl: string | null; // ⭐️ 국기 텍스트 대신 안전한 이미지 URL을 담을 필드로 변경
+  flagUrl: string | null;
   match: number;
   rating: string;
   reviewCount: number;
@@ -59,10 +67,9 @@ type WineInfo = {
   foods: string[];
   similarWines: SimilarWine[];
   imageUrl: string;
-  userPreference: TasteProfile | null;
+  userPreference: TasteProfile | null; 
 };
 
-// ⭐️ [추가] 윈도우 에러 방지용: 나라 이름에 맞춰 안전한 국기 이미지 URL을 반환하는 함수
 const getCountryFlagUrl = (countryName: string | undefined | null) => {
   if (!countryName) return null;
   const name = countryName.trim().toLowerCase();
@@ -84,6 +91,29 @@ const getCountryFlagUrl = (countryName: string | undefined | null) => {
   return code ? `https://flagcdn.com/w40/${code}.png` : null;
 };
 
+const parseDateStr = (dateVal: any) => {
+  if (!dateVal) return 0;
+  if (Array.isArray(dateVal)) {
+    return new Date(dateVal[0], dateVal[1] - 1, dateVal[2], dateVal[3] || 0, dateVal[4] || 0, dateVal[5] || 0).getTime();
+  }
+  return new Date(dateVal).getTime();
+};
+
+const formatDateStr = (dateVal: any) => {
+  if (!dateVal) return '';
+  let d: Date;
+  if (Array.isArray(dateVal)) {
+    d = new Date(dateVal[0], dateVal[1] - 1, dateVal[2], dateVal[3] || 0, dateVal[4] || 0);
+  } else {
+    d = new Date(dateVal);
+  }
+  if (isNaN(d.getTime())) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}.${mm}.${dd}`;
+};
+
 export default function WineDetailPage({
   params: paramsPromise,
 }: {
@@ -91,6 +121,9 @@ export default function WineDetailPage({
 }) {
   const params = use(paramsPromise);
   const router = useRouter();
+  
+  const numericWineId = Number(params.wineId);
+
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [editingReview, setEditingReview] = useState<{
@@ -102,13 +135,16 @@ export default function WineDetailPage({
   const [sortOrder, setSortOrder] = useState<'recent' | 'rating'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
-  // ⭐️ API 1번만 호출 (와인 상세 정보 + 유저 취향 정보 한방에!)
   const { data: wineDetail, isLoading: isWineLoading } = useQuery({
-    queryKey: ['wine-detail', params.wineId],
-    queryFn: () => api.get(`/wines/${params.wineId}`).then((res) => res.data.data),
+    queryKey: ['wine-detail', numericWineId],
+    queryFn: () => api.get(`/wines/${numericWineId}`).then((res) => res.data.data),
   });
 
-  const { data: reviewData } = useWineReviewsQuery(params.wineId);
+  const { data: reviewData } = useWineReviewsQuery(numericWineId);
+
+  const createReviewMutation = useCreateReviewMutation();
+  const updateReviewMutation = useUpdateReviewMutation();
+  const deleteReviewMutation = useDeleteReviewMutation();
 
   const safeReviewList = useMemo<any[]>(() => {
     if (!reviewData) return [];
@@ -122,9 +158,9 @@ export default function WineDetailPage({
   const isScraped = useMemo(
     () =>
       (scrapListData ?? []).some(
-        (item) => item.wineId === Number(params.wineId) || item.scrapId === Number(params.wineId),
+        (item) => item.wineId === numericWineId || item.scrapId === numericWineId,
       ),
-    [scrapListData, params.wineId],
+    [scrapListData, numericWineId],
   );
 
   const wineInfo = useMemo<WineInfo | null>(() => {
@@ -135,7 +171,7 @@ export default function WineDetailPage({
       name: wineDetail.nameKr || wineDetail.nameEn || '이름 없는 와인',
       category: wineDetail.grapeVariety || 'WINE', 
       country: wineDetail.country || '원산지 미상',
-      flagUrl: getCountryFlagUrl(wineDetail.country), // ⭐️ 변환 함수로 이미지 URL 매핑
+      flagUrl: getCountryFlagUrl(wineDetail.country), 
       match: wineDetail.matchRate || 0,
       rating: Number(wineDetail.averageRating || 0).toFixed(1),
       reviewCount: safeReviewList.length, 
@@ -168,7 +204,7 @@ export default function WineDetailPage({
     if (sortOrder === 'rating') {
       sortedReviews.sort((a, b) => b.rating - a.rating);
     } else {
-      sortedReviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      sortedReviews.sort((a, b) => parseDateStr(b.createdAt) - parseDateStr(a.createdAt));
     }
 
     return sortedReviews.map((r) => ({
@@ -176,9 +212,7 @@ export default function WineDetailPage({
       user: r.userNickname || r.nickname || '익명', 
       rating: r.rating,
       content: r.content,
-      date: new Date(r.createdAt).toLocaleDateString('ko-KR', {
-        year: 'numeric', month: '2-digit', day: '2-digit'
-      }).replace(/\. /g, '.').slice(0, -1),
+      date: formatDateStr(r.createdAt),
       avatar: '🍷',
     }));
   }, [safeReviewList, sortOrder]);
@@ -231,14 +265,61 @@ export default function WineDetailPage({
     setIsReviewModalOpen(true);
   };
 
+  // ⭐️ [수정] 409 에러 등 실패 시 사용자에게 알림을 주도록 에러 핸들링 추가
   const handleReviewSubmit = (data: { rating: number; content: string }) => {
-    console.log('Submitted Review:', data, editingReview ? 'Editing' : 'Creating');
-    setIsReviewModalOpen(false);
+    if (editingReview) {
+      updateReviewMutation.mutate({
+        wineId: numericWineId,
+        reviewId: editingReview.id,
+        rating: data.rating,
+        content: data.content,
+      }, {
+        onSuccess: () => {
+          setIsReviewModalOpen(false);
+          setEditingReview(null);
+        },
+        onError: () => {
+          alert('리뷰 수정 중 오류가 발생했습니다.');
+        }
+      });
+    } else {
+      createReviewMutation.mutate({
+        wineId: numericWineId,
+        rating: data.rating,
+        content: data.content,
+      }, {
+        onSuccess: () => {
+          setIsReviewModalOpen(false);
+        },
+        onError: (error: any) => {
+          if (error?.response?.status === 409) {
+            alert('이미 이 와인에 대한 리뷰를 작성하셨습니다.');
+          } else {
+            alert('리뷰 등록 중 오류가 발생했습니다. 다시 시도해주세요.');
+          }
+        }
+      });
+    }
   };
 
-  const handleReviewDelete = () => {
-    console.log('Deleting review', editingReview?.id);
-    setIsReviewModalOpen(false);
+  const handleReviewDelete = (reviewId?: number) => {
+    const targetId = reviewId || editingReview?.id;
+    if (!targetId) return;
+
+    if (window.confirm('정말 삭제하시겠습니까?')) {
+      deleteReviewMutation.mutate({
+        wineId: numericWineId,
+        reviewId: targetId,
+      }, {
+        onSuccess: () => {
+          setIsReviewModalOpen(false);
+          setActiveMenuId(null);
+        },
+        onError: () => {
+          alert('리뷰 삭제 중 오류가 발생했습니다.');
+        }
+      });
+    }
   };
 
   const handleScrapClick = async () => {
@@ -294,12 +375,17 @@ export default function WineDetailPage({
         <div className="app-shell px-5 pb-10">
           <section className="space-y-6">
             <div className="relative aspect-[1/0.78] overflow-hidden rounded-[1.9rem] bg-[#EBE2D5]">
+              {/* ⭐️ [핵심 수정] 와인 이미지 없을 시 기본 이미지 렌더링 */}
               <div className="absolute inset-0 flex items-center justify-center text-[5.4rem]">
-                {wineInfo.imageUrl && wineInfo.imageUrl !== '/images/default_wine.png' ? (
-                  <img src={wineInfo.imageUrl} alt={wineInfo.name} className="w-full h-full object-contain p-4 drop-shadow-md" />
-                ) : (
-                  '🍷'
-                )}
+                <img 
+                  src={wineInfo.imageUrl && wineInfo.imageUrl !== '/images/default_wine.png' ? wineInfo.imageUrl : DEFAULT_WINE_IMAGE_URL} 
+                  alt={wineInfo.name} 
+                  className="w-full h-full object-contain p-4 drop-shadow-md"
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
+                    e.currentTarget.onerror = null;
+                  }}
+                />
               </div>
               <div className="absolute top-4 left-4 rounded-full bg-[#C96D72] px-3 py-1.5 text-[0.72rem] font-black text-white shadow-sm">
                 {wineInfo.match}% MATCH
@@ -312,12 +398,11 @@ export default function WineDetailPage({
                   <p className="text-[0.7rem] font-black tracking-[0.14em] text-[#C96D72] uppercase">
                     {wineInfo.category}
                   </p>
-                  <h1 className="text-text-main text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em]">
-                    {wineInfo.name}
+                 <h1 className="text-text-main break-words text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em]">
+                  {wineInfo.name}
                   </h1>
                 </div>
                 <span className="text-text-main pt-2 text-[0.8rem] font-black tracking-[0.02em]">
-                  {/* ⭐️ 국기 이미지 렌더링 부분 */}
                   {wineInfo.flagUrl ? (
                     <img 
                       src={wineInfo.flagUrl} 
@@ -706,7 +791,10 @@ export default function WineDetailPage({
                                 수정
                               </button>
                               <div className="bg-primary-100/60 mx-1 h-px" />
-                              <button className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50">
+                              <button 
+                                onClick={() => handleReviewDelete(review.id)}
+                                className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50"
+                              >
                                 삭제
                               </button>
                             </div>
@@ -739,13 +827,18 @@ export default function WineDetailPage({
         isOpen={isReviewModalOpen}
         onClose={() => setIsReviewModalOpen(false)}
         onSubmit={handleReviewSubmit}
-        onDelete={handleReviewDelete}
+        onDelete={() => handleReviewDelete()}
         initialData={
           editingReview
             ? { rating: editingReview.rating, content: editingReview.content }
             : undefined
         }
-        wineInfo={{ name: wineInfo.name, category: wineInfo.category }}
+        wineInfo={{
+          id: wineInfo.id,
+          name: wineInfo.name,
+          category: wineInfo.category,
+          image: wineInfo.imageUrl,
+        }}
       />
     </div>
   );

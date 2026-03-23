@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Star, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import Image from 'next/image';
+
+const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 
 interface ReviewModalProps {
   isOpen: boolean;
@@ -24,7 +27,22 @@ export default function ReviewModal({
 }: ReviewModalProps) {
   const [rating, setRating] = useState(initialData?.rating || 0);
   const [content, setContent] = useState(initialData?.content || '');
+  const [imageSrc, setImageSrc] = useState(DEFAULT_WINE_IMAGE_URL);
+
   const isEdit = !!initialData;
+
+  useEffect(() => {
+    setRating(initialData?.rating || 0);
+    setContent(initialData?.content || '');
+  }, [initialData, isOpen]);
+
+  useEffect(() => {
+    if (wineInfo.image && wineInfo.image !== '/images/default_wine.png') {
+      setImageSrc(wineInfo.image);
+    } else {
+      setImageSrc(DEFAULT_WINE_IMAGE_URL);
+    }
+  }, [wineInfo.image]);
 
   if (!isOpen) return null;
 
@@ -49,25 +67,47 @@ export default function ReviewModal({
         </header>
 
         <div className="space-y-4">
-          <div className="border-primary-100 rounded-[1.2rem] border bg-white p-2.5 shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-14 w-10 shrink-0 items-center justify-center rounded-[0.75rem] bg-[#DDD2C1] text-[1.2rem]">
-                🍷
+          <div className="border-primary-100 rounded-[1.2rem] border bg-white p-2.5 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-14 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[0.75rem] bg-white">
+                <div className="relative h-10 w-6">
+                  <Image
+                    src={imageSrc}
+                    alt={wineInfo.name}
+                    fill
+                    className="object-contain"
+                    onError={() => setImageSrc(DEFAULT_WINE_IMAGE_URL)}
+                    unoptimized
+                  />
+                </div>
               </div>
 
               <div className="min-w-0 flex-1">
-                <Link
-                  href={`/wines/${wineInfo.id}`}
-                  onClick={onClose} // 이동 시 모달을 닫아줍니다.
-                  className="text-text-main cursor-pointer truncate text-sm font-black hover:underline"
-                >
-                  {wineInfo.name}
-                </Link>
-                <p className="text-text-main/35 mt-0.5 text-xs font-medium">{wineInfo.category}</p>
+                {wineInfo.id ? (
+                  <Link
+                    href={`/wines/${wineInfo.id}`}
+                    onClick={onClose}
+                    className="text-text-main block w-full cursor-pointer truncate text-sm font-black hover:underline"
+                    title={wineInfo.name}
+                  >
+                    {wineInfo.name}
+                  </Link>
+                ) : (
+                  <span
+                    className="text-text-main block w-full truncate text-sm font-black"
+                    title={wineInfo.name}
+                  >
+                    {wineInfo.name}
+                  </span>
+                )}
+
+                <p className="text-text-main/35 mt-0.5 truncate text-xs font-medium">
+                  {wineInfo.category}
+                </p>
               </div>
 
               {isEdit ? (
-                <span className="text-text-main/35 rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black">
+                <span className="text-text-main/35 shrink-0 rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black">
                   수정 중
                 </span>
               ) : null}
