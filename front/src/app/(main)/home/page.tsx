@@ -97,7 +97,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="bg-background min-h-screen pb-28">
+    <div className="bg-background min-h-screen pb-0">
       <div className="bg-background/88 sticky top-0 z-30 px-6 pt-4 pb-3 backdrop-blur-xl">
         <div className="flex justify-center">
           <div className="relative h-14 w-14">
@@ -165,7 +165,7 @@ export default function HomePage() {
 
       <section className="px-6 py-3">
         <h2 className="text-text-main mb-4 text-xl font-black tracking-tight italic">
-          형선&apos;S PICK!
+          소믈리에 PICK
         </h2>
 
         <div className="no-scrollbar mb-4 flex gap-3 overflow-x-auto pb-1">
