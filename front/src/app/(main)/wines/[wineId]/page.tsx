@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star } from 'lucide-react';
+import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star, X } from 'lucide-react'; // ⭐️ X 아이콘 추가
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ReviewModal } from '@/features/review/components';
@@ -14,14 +14,13 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/axios';
 
-import { 
+import {
   useWineReviewsQuery,
   useCreateReviewMutation,
   useUpdateReviewMutation,
-  useDeleteReviewMutation
+  useDeleteReviewMutation,
 } from '@/features/review/hooks/useWineReviewsQuery';
 
-// ⭐️ [추가] 디폴트 와인 이미지 URL 상수
 const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 
 type ReviewItem = {
@@ -49,6 +48,14 @@ type TasteProfile = {
   alcoholDegree?: number;
 };
 
+type RatingDistribution = {
+  star5: number;
+  star4: number;
+  star3: number;
+  star2: number;
+  star1: number;
+};
+
 type WineInfo = {
   id: number;
   name: string;
@@ -58,22 +65,23 @@ type WineInfo = {
   match: number;
   rating: string;
   reviewCount: number;
+  ratingDistribution: RatingDistribution;
   price: string;
   description: string;
   tasteProfile: TasteProfile;
   alcoholDegree: number;
   reason: string | null;
-  tags: string[];
+  tasteGroups: string[];
   foods: string[];
   similarWines: SimilarWine[];
   imageUrl: string;
-  userPreference: TasteProfile | null; 
+  userPreference: TasteProfile | null;
 };
 
 const getCountryFlagUrl = (countryName: string | undefined | null) => {
   if (!countryName) return null;
   const name = countryName.trim().toLowerCase();
-  
+
   let code = null;
   if (name.includes('프랑스') || name.includes('france') || name === 'fr') code = 'fr';
   else if (name.includes('이탈리아') || name.includes('italy') || name === 'it') code = 'it';
@@ -94,7 +102,14 @@ const getCountryFlagUrl = (countryName: string | undefined | null) => {
 const parseDateStr = (dateVal: any) => {
   if (!dateVal) return 0;
   if (Array.isArray(dateVal)) {
-    return new Date(dateVal[0], dateVal[1] - 1, dateVal[2], dateVal[3] || 0, dateVal[4] || 0, dateVal[5] || 0).getTime();
+    return new Date(
+      dateVal[0],
+      dateVal[1] - 1,
+      dateVal[2],
+      dateVal[3] || 0,
+      dateVal[4] || 0,
+      dateVal[5] || 0,
+    ).getTime();
   }
   return new Date(dateVal).getTime();
 };
@@ -121,7 +136,7 @@ export default function WineDetailPage({
 }) {
   const params = use(paramsPromise);
   const router = useRouter();
-  
+
   const numericWineId = Number(params.wineId);
 
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
@@ -135,12 +150,22 @@ export default function WineDetailPage({
   const [sortOrder, setSortOrder] = useState<'recent' | 'rating'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
-  const { data: wineDetail, isLoading: isWineLoading } = useQuery({
+  // ⭐️ 툴팁 가시성 상태 관리 추가
+  const [showTasteTooltip, setShowTasteTooltip] = useState(false);
+
+  const {
+    data: wineDetail,
+    isLoading: isWineLoading,
+    refetch: refetchWineDetail,
+  } = useQuery({
     queryKey: ['wine-detail', numericWineId],
     queryFn: () => api.get(`/wines/${numericWineId}`).then((res) => res.data.data),
   });
 
-  const { data: reviewData } = useWineReviewsQuery(numericWineId);
+  const {
+    data: reviewData,
+    refetch: refetchReviews,
+  } = useWineReviewsQuery(numericWineId);
 
   const createReviewMutation = useCreateReviewMutation();
   const updateReviewMutation = useUpdateReviewMutation();
@@ -169,12 +194,19 @@ export default function WineDetailPage({
     return {
       id: wineDetail.wineId,
       name: wineDetail.nameKr || wineDetail.nameEn || '이름 없는 와인',
-      category: wineDetail.grapeVariety || 'WINE', 
+      category: wineDetail.grapeVariety || 'WINE',
       country: wineDetail.country || '원산지 미상',
-      flagUrl: getCountryFlagUrl(wineDetail.country), 
+      flagUrl: getCountryFlagUrl(wineDetail.country),
       match: wineDetail.matchRate || 0,
       rating: Number(wineDetail.averageRating || 0).toFixed(1),
-      reviewCount: safeReviewList.length, 
+      reviewCount: Number(wineDetail.reviewCount || 0),
+      ratingDistribution: {
+        star5: Number(wineDetail.star5Count || 0),
+        star4: Number(wineDetail.star4Count || 0),
+        star3: Number(wineDetail.star3Count || 0),
+        star2: Number(wineDetail.star2Count || 0),
+        star1: Number(wineDetail.star1Count || 0),
+      },
       price: wineDetail.price ? wineDetail.price.toLocaleString() : '-',
       description: wineDetail.description || '와인에 대한 상세 설명이 없습니다.',
       tasteProfile: {
@@ -184,20 +216,22 @@ export default function WineDetailPage({
         tannin: wineDetail.tannin || 0,
       },
       alcoholDegree: wineDetail.alcoholDegree || 0,
-      reason: null, 
-      tags: [wineDetail.region, wineDetail.winery].filter(Boolean) as string[], 
+      reason: null,
+      tasteGroups: (wineDetail.tasteGroups || []) as string[],
       foods: (wineDetail.pairingFoods || []) as string[],
-      similarWines: [], 
+      similarWines: [],
       imageUrl: wineDetail.imageUrl,
-      userPreference: wineDetail.userPreference ? {
-        tannin: wineDetail.userPreference.tannin || 0,
-        body: wineDetail.userPreference.body || 0,
-        alcoholDegree: wineDetail.userPreference.alcoholDegree || 0,
-        sweet: wineDetail.userPreference.sweetness || 0,
-        acid: wineDetail.userPreference.acidity || 0,
-      } : null,
+      userPreference: wineDetail.userPreference
+        ? {
+            tannin: wineDetail.userPreference.tannin || 0,
+            body: wineDetail.userPreference.body || 0,
+            alcoholDegree: wineDetail.userPreference.alcoholDegree || 0,
+            sweet: wineDetail.userPreference.sweetness || 0,
+            acid: wineDetail.userPreference.acidity || 0,
+          }
+        : null,
     };
-  }, [wineDetail, safeReviewList]);
+  }, [wineDetail]);
 
   const reviews: ReviewItem[] = useMemo(() => {
     let sortedReviews = [...safeReviewList];
@@ -209,7 +243,7 @@ export default function WineDetailPage({
 
     return sortedReviews.map((r) => ({
       id: r.id || r.reviewId,
-      user: r.userNickname || r.nickname || '익명', 
+      user: r.userNickname || r.nickname || '익명',
       rating: r.rating,
       content: r.content,
       date: formatDateStr(r.createdAt),
@@ -217,26 +251,44 @@ export default function WineDetailPage({
     }));
   }, [safeReviewList, sortOrder]);
 
+  const ratingBarTotal = useMemo(() => {
+    if (!wineInfo) return 0;
+    const d = wineInfo.ratingDistribution;
+    return d.star5 + d.star4 + d.star3 + d.star2 + d.star1;
+  }, [wineInfo]);
+
+  const getRatingBarWidth = (count: number) => {
+    if (ratingBarTotal === 0) return '0%';
+    return `${(count / ratingBarTotal) * 100}%`;
+  };
+
+  const summaryStarCount = useMemo(() => {
+    if (!wineInfo) return 0;
+    return Math.max(0, Math.min(5, Math.round(Number(wineInfo.rating))));
+  }, [wineInfo]);
+
   const dynamicPolygonPoints = useMemo(() => {
-    if (!wineInfo) return "";
+    if (!wineInfo) return '';
     const tasteValues = [
       wineInfo.tasteProfile.tannin,
       wineInfo.tasteProfile.body,
-      Math.min((wineInfo.alcoholDegree / 20) * 5, 5), 
+      Math.min((wineInfo.alcoholDegree / 20) * 5, 5),
       wineInfo.tasteProfile.sweet,
       wineInfo.tasteProfile.acid,
     ];
 
-    return tasteValues.map((val, i) => {
-      const radius = (val / 5) * 40;
-      const angle = (i * 72 - 90) * (Math.PI / 180);
-      return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
-    }).join(' ');
+    return tasteValues
+      .map((val, i) => {
+        const radius = (val / 5) * 40;
+        const angle = (i * 72 - 90) * (Math.PI / 180);
+        return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
+      })
+      .join(' ');
   }, [wineInfo]);
 
   const userPolygonPoints = useMemo(() => {
-    if (!wineInfo || !wineInfo.userPreference) return "";
-    
+    if (!wineInfo || !wineInfo.userPreference) return '';
+
     const pref = wineInfo.userPreference;
     const tasteValues = [
       pref.tannin,
@@ -246,13 +298,14 @@ export default function WineDetailPage({
       pref.acid,
     ];
 
-    return tasteValues.map((val, i) => {
-      const radius = (val / 5) * 40;
-      const angle = (i * 72 - 90) * (Math.PI / 180);
-      return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
-    }).join(' ');
+    return tasteValues
+      .map((val, i) => {
+        const radius = (val / 5) * 40;
+        const angle = (i * 72 - 90) * (Math.PI / 180);
+        return `${50 + radius * Math.cos(angle)},${50 + radius * Math.sin(angle)}`;
+      })
+      .join(' ');
   }, [wineInfo]);
-
 
   const handleOpenWriteModal = () => {
     setEditingReview(null);
@@ -265,40 +318,51 @@ export default function WineDetailPage({
     setIsReviewModalOpen(true);
   };
 
-  // ⭐️ [수정] 409 에러 등 실패 시 사용자에게 알림을 주도록 에러 핸들링 추가
+  const refreshAllReviewData = async () => {
+    await Promise.all([refetchWineDetail(), refetchReviews()]);
+  };
+
   const handleReviewSubmit = (data: { rating: number; content: string }) => {
     if (editingReview) {
-      updateReviewMutation.mutate({
-        wineId: numericWineId,
-        reviewId: editingReview.id,
-        rating: data.rating,
-        content: data.content,
-      }, {
-        onSuccess: () => {
-          setIsReviewModalOpen(false);
-          setEditingReview(null);
+      updateReviewMutation.mutate(
+        {
+          wineId: numericWineId,
+          reviewId: editingReview.id,
+          rating: data.rating,
+          content: data.content,
         },
-        onError: () => {
-          alert('리뷰 수정 중 오류가 발생했습니다.');
-        }
-      });
+        {
+          onSuccess: async () => {
+            await refreshAllReviewData();
+            setIsReviewModalOpen(false);
+            setEditingReview(null);
+          },
+          onError: () => {
+            alert('리뷰 수정 중 오류가 발생했습니다.');
+          },
+        },
+      );
     } else {
-      createReviewMutation.mutate({
-        wineId: numericWineId,
-        rating: data.rating,
-        content: data.content,
-      }, {
-        onSuccess: () => {
-          setIsReviewModalOpen(false);
+      createReviewMutation.mutate(
+        {
+          wineId: numericWineId,
+          rating: data.rating,
+          content: data.content,
         },
-        onError: (error: any) => {
-          if (error?.response?.status === 409) {
-            alert('이미 이 와인에 대한 리뷰를 작성하셨습니다.');
-          } else {
-            alert('리뷰 등록 중 오류가 발생했습니다. 다시 시도해주세요.');
-          }
-        }
-      });
+        {
+          onSuccess: async () => {
+            await refreshAllReviewData();
+            setIsReviewModalOpen(false);
+          },
+          onError: (error: any) => {
+            if (error?.response?.status === 409) {
+              alert('이미 이 와인에 대한 리뷰를 작성하셨습니다.');
+            } else {
+              alert('리뷰 등록 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }
+          },
+        },
+      );
     }
   };
 
@@ -307,18 +371,23 @@ export default function WineDetailPage({
     if (!targetId) return;
 
     if (window.confirm('정말 삭제하시겠습니까?')) {
-      deleteReviewMutation.mutate({
-        wineId: numericWineId,
-        reviewId: targetId,
-      }, {
-        onSuccess: () => {
-          setIsReviewModalOpen(false);
-          setActiveMenuId(null);
+      deleteReviewMutation.mutate(
+        {
+          wineId: numericWineId,
+          reviewId: targetId,
         },
-        onError: () => {
-          alert('리뷰 삭제 중 오류가 발생했습니다.');
-        }
-      });
+        {
+          onSuccess: async () => {
+            await refreshAllReviewData();
+            setIsReviewModalOpen(false);
+            setEditingReview(null);
+            setActiveMenuId(null);
+          },
+          onError: () => {
+            alert('리뷰 삭제 중 오류가 발생했습니다.');
+          },
+        },
+      );
     }
   };
 
@@ -333,7 +402,11 @@ export default function WineDetailPage({
   };
 
   if (isWineLoading || !wineInfo) {
-    return <div className="bg-background min-h-screen pb-28 flex items-center justify-center font-bold text-text-main/40">와인 정보를 불러오는 중입니다...</div>;
+    return (
+      <div className="bg-background min-h-screen pb-28 flex items-center justify-center font-bold text-text-main/40">
+        와인 정보를 불러오는 중입니다...
+      </div>
+    );
   }
 
   return (
@@ -375,11 +448,14 @@ export default function WineDetailPage({
         <div className="app-shell px-5 pb-10">
           <section className="space-y-6">
             <div className="relative aspect-[1/0.78] overflow-hidden rounded-[1.9rem] bg-[#EBE2D5]">
-              {/* ⭐️ [핵심 수정] 와인 이미지 없을 시 기본 이미지 렌더링 */}
               <div className="absolute inset-0 flex items-center justify-center text-[5.4rem]">
-                <img 
-                  src={wineInfo.imageUrl && wineInfo.imageUrl !== '/images/default_wine.png' ? wineInfo.imageUrl : DEFAULT_WINE_IMAGE_URL} 
-                  alt={wineInfo.name} 
+                <img
+                  src={
+                    wineInfo.imageUrl && wineInfo.imageUrl !== '/default_wine.png'
+                      ? wineInfo.imageUrl
+                      : DEFAULT_WINE_IMAGE_URL
+                  }
+                  alt={wineInfo.name}
                   className="w-full h-full object-contain p-4 drop-shadow-md"
                   onError={(e) => {
                     e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
@@ -398,16 +474,16 @@ export default function WineDetailPage({
                   <p className="text-[0.7rem] font-black tracking-[0.14em] text-[#C96D72] uppercase">
                     {wineInfo.category}
                   </p>
-                 <h1 className="text-text-main break-words text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em]">
-                  {wineInfo.name}
+                  <h1 className="text-text-main break-words text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em]">
+                    {wineInfo.name}
                   </h1>
                 </div>
                 <span className="text-text-main pt-2 text-[0.8rem] font-black tracking-[0.02em]">
                   {wineInfo.flagUrl ? (
-                    <img 
-                      src={wineInfo.flagUrl} 
-                      alt={wineInfo.country} 
-                      className="h-4 rounded-[2px] shadow-sm inline-block" 
+                    <img
+                      src={wineInfo.flagUrl}
+                      alt={wineInfo.country}
+                      className="h-4 rounded-[2px] shadow-sm inline-block"
                     />
                   ) : (
                     <span className="text-[1.1rem]">🍷</span>
@@ -446,9 +522,7 @@ export default function WineDetailPage({
                   onClick={() => setActiveTab('info')}
                   className={cn(
                     'rounded-[1rem] py-2.5 text-[0.88rem] font-black transition-all',
-                    activeTab === 'info'
-                      ? 'text-text-main bg-white shadow-sm'
-                      : 'text-text-main/42',
+                    activeTab === 'info' ? 'text-text-main bg-white shadow-sm' : 'text-text-main/42',
                   )}
                 >
                   상세 정보
@@ -478,11 +552,37 @@ export default function WineDetailPage({
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between relative">
                   <h3 className="text-text-main text-[1.05rem] font-black">맛 프로필</h3>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white">
+                  
+                  {/* ⭐️ '?' 버튼을 버튼 태그로 변경하고 토글 이벤트 추가 */}
+                  <button
+                    onClick={() => setShowTasteTooltip(!showTasteTooltip)}
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white hover:bg-[#b55b60] transition-colors focus:outline-none"
+                    aria-label="맛 프로필 설명 보기"
+                  >
                     ?
-                  </div>
+                  </button>
+
+                  {/* ⭐️ 클릭 시 나타나는 툴팁 창 */}
+                  {showTasteTooltip && (
+                    <div className="absolute right-0 top-7 z-50 w-[15rem] rounded-[1rem] border border-primary-100 bg-white p-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[0.8rem] font-black text-text-main">지표 설명</span>
+                        <button onClick={() => setShowTasteTooltip(false)} className="p-1 text-text-main/40 hover:text-text-main">
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="space-y-2 text-[0.75rem] font-medium text-text-main/80">
+                        <p><span className="font-bold text-[#C96D72]">BODY (바디):</span> 와인이 입안에서 느껴지는 무게감이나 점성입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">SWEET (당도):</span> 와인에 남아있는 잔당으로 인한 단맛의 정도입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">ACID (산미):</span> 입에 침이 고이게 만드는 신맛의 강도입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">TANNIN (탄닌):</span> 포도 껍질과 씨에서 나오는 떫은맛과 쌉쌀함입니다.</p>
+                      </div>
+                      {/* 말풍선 꼬리 */}
+                      <div className="absolute -top-2 right-2 h-4 w-4 rotate-45 border-l border-t border-primary-100 bg-white" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-primary-100 rounded-[1.5rem] border bg-white px-4 py-4 shadow-[0_8px_20px_rgba(51,34,17,0.035)]">
@@ -496,7 +596,9 @@ export default function WineDetailPage({
                       key={label as string}
                       className="flex items-center justify-between py-2 first:pt-0 last:pb-0"
                     >
-                      <span className="text-text-main/58 text-[0.82rem] font-black">{label as string}</span>
+                      <span className="text-text-main/58 text-[0.82rem] font-black">
+                        {label as string}
+                      </span>
                       <div className="flex gap-1.5">
                         {[1, 2, 3, 4, 5].map((step) => (
                           <div
@@ -511,19 +613,19 @@ export default function WineDetailPage({
                   ))}
                 </div>
 
-                {wineInfo.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {wineInfo.tags.map((tag, index) => (
+                {wineInfo.tasteGroups.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {wineInfo.tasteGroups.map((group, index) => (
                       <div
-                        key={tag}
+                        key={group}
                         className={cn(
                           'rounded-full px-4 py-2 text-[0.76rem] font-black',
-                          index === 0 || index === wineInfo.tags.length - 1
+                          index === 0 || index === wineInfo.tasteGroups.length - 1
                             ? 'bg-[#C96D72] text-white'
                             : 'text-text-main/62 bg-[#EFE8DD]',
                         )}
                       >
-                        {tag}
+                        {group}
                       </div>
                     ))}
                   </div>
@@ -533,7 +635,7 @@ export default function WineDetailPage({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-text-main text-[1.05rem] font-black">취향 그래프</h3>
-                  
+
                   {wineInfo.userPreference && (
                     <div className="flex items-center gap-2 pr-1">
                       <div className="flex items-center gap-1">
@@ -579,7 +681,7 @@ export default function WineDetailPage({
                           />
                         );
                       })}
-                      
+
                       {userPolygonPoints && (
                         <polygon
                           points={userPolygonPoints}
@@ -666,10 +768,14 @@ export default function WineDetailPage({
                       {wineInfo.rating}
                     </span>
                     <div className="mt-1 flex gap-0.5 text-[#FF9A3D]">
-                      {[1, 2, 3, 4].map((star) => (
-                        <Star key={star} size={14} fill="#FF9A3D" className="text-[#FF9A3D]" />
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          size={14}
+                          fill={i < summaryStarCount ? '#FF9A3D' : 'currentColor'}
+                          className={i < summaryStarCount ? 'text-[#FF9A3D]' : 'text-primary-100'}
+                        />
                       ))}
-                      <Star size={14} fill="currentColor" className="text-primary-100" />
                     </div>
                     <span className="text-text-main/34 mt-1 text-[0.72rem] font-semibold">
                       {wineInfo.reviewCount}개의 리뷰
@@ -677,7 +783,13 @@ export default function WineDetailPage({
                   </div>
 
                   <div className="flex-1 space-y-2">
-                    {[5, 4, 3, 2, 1].map((level) => (
+                    {[
+                      { level: 5, count: wineInfo.ratingDistribution.star5 },
+                      { level: 4, count: wineInfo.ratingDistribution.star4 },
+                      { level: 3, count: wineInfo.ratingDistribution.star3 },
+                      { level: 2, count: wineInfo.ratingDistribution.star2 },
+                      { level: 1, count: wineInfo.ratingDistribution.star1 },
+                    ].map(({ level, count }) => (
                       <div key={level} className="flex items-center gap-2.5">
                         <span className="text-text-main/34 w-2 text-[0.68rem] font-semibold">
                           {level}
@@ -685,7 +797,7 @@ export default function WineDetailPage({
                         <div className="bg-primary-100 h-1.5 flex-1 overflow-hidden rounded-full">
                           <div
                             className="h-full rounded-full bg-[#D9AD70]"
-                            style={{ width: level >= 4 ? '62%' : level === 3 ? '18%' : '0%' }}
+                            style={{ width: getRatingBarWidth(count) }}
                           />
                         </div>
                       </div>
@@ -765,8 +877,8 @@ export default function WineDetailPage({
                                 <Star
                                   key={star}
                                   size={12}
-                                  fill={star <= review.rating ? "#FF9A3D" : "none"}
-                                  className={star <= review.rating ? "text-[#FF9A3D]" : "text-primary-100"}
+                                  fill={star <= review.rating ? '#FF9A3D' : 'none'}
+                                  className={star <= review.rating ? 'text-[#FF9A3D]' : 'text-primary-100'}
                                 />
                               ))}
                             </div>
@@ -791,7 +903,7 @@ export default function WineDetailPage({
                                 수정
                               </button>
                               <div className="bg-primary-100/60 mx-1 h-px" />
-                              <button 
+                              <button
                                 onClick={() => handleReviewDelete(review.id)}
                                 className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50"
                               >
@@ -813,7 +925,7 @@ export default function WineDetailPage({
                   ))
                 ) : (
                   <div className="py-10 text-center text-text-main/40 font-bold text-sm">
-                    아직 작성된 리뷰가 없습니다.
+                    최근에 작성된 리뷰가 없습니다.
                   </div>
                 )}
               </div>
@@ -825,7 +937,10 @@ export default function WineDetailPage({
       <ReviewModal
         key={`${isReviewModalOpen}-${editingReview?.id ?? 'new'}`}
         isOpen={isReviewModalOpen}
-        onClose={() => setIsReviewModalOpen(false)}
+        onClose={() => {
+          setIsReviewModalOpen(false);
+          setEditingReview(null);
+        }}
         onSubmit={handleReviewSubmit}
         onDelete={() => handleReviewDelete()}
         initialData={

@@ -10,21 +10,53 @@ import com.a505.jupasu.domain.wine.dto.WineQuickRecommendResponse;
 import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
-import com.a505.jupasu.domain.wine.repository.WineRepository;
+import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
+import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Transactional
 public class WineRecommendationCalculator {
 
-    private final WineRepository wineRepository;
+    private final WineQueryService wineQueryService;
     private final PreferenceRepository preferenceRepository;
     private final ReviewRepository reviewRepository;
+    private final WineFoodPairingRepository wineFoodPairingRepository;
+
+    // ── Sigmoid 변환 ─────────────────────────────────────────────────────────────
+    /**
+     * 원점수(0~100)를 Sigmoid 변환으로 표시용 매칭률로 변환한다.
+     *
+     * <pre>
+     *   display = round(100 / (1 + exp(−k · (s − μ))))
+     *   s = rawScore / 100
+     *   μ = 0.35  (50% 중립점: 원점수 35 이하는 50% 미만으로 표시)
+     *   k = 6     (경사도: μ 기준 ±0.1마다 약 12%p 변화; 7에서 낮춰 분포를 약간 펼침)
+     * </pre>
+     *
+     * 추천 시스템에서 실제로 반환되는 top-5 와인의 원점수는 약 55~85 범위이며,
+     * 이 구간이 77~95%로 매핑되어 사용자에게 신뢰감 있는 점수를 제공한다.
+     * 상대적 순위(ranking)는 sigmoid의 단조증가 특성으로 원점수와 동일하게 보존된다.
+     *
+     * <ul>
+     *   <li>원점수 55 → 약 77%</li>
+     *   <li>원점수 65 → 약 86%</li>
+     *   <li>원점수 75 → 약 92%</li>
+     *   <li>원점수 85 → 약 95%</li>
+     * </ul>
+     */
+    private static int sigmoid(int rawScore) {
+        double s = rawScore / 100.0;
+        return (int) Math.round(100.0 / (1.0 + Math.exp(-6.0 * (s - 0.35))));
+    }
 
     // ── 스케일 정보 ──────────────────────────────────────────────────────────────
     // W_i (TasteProfile): 0.0 ~ 5.0 (Vivino 원본 스케일)
@@ -90,7 +122,7 @@ public class WineRecommendationCalculator {
         CalibratedProfile calibrated = calibrate(pref, reviews);
 
         PriorityQueue<WineScore> minHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
-        List<Wine> wineList = wineRepository.findAll();
+        List<Wine> wineList = wineQueryService.getAllWines();
 
         for (Wine wine : wineList) {
             int match = score(wine, situation, pref, calibrated);
@@ -108,7 +140,7 @@ public class WineRecommendationCalculator {
         Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
-        return score(wine, null, pref, calibrated);
+        return sigmoid(score(wine, null, pref, calibrated));
     }
 
     /**
@@ -125,7 +157,7 @@ public class WineRecommendationCalculator {
             situationHeaps.put(sit, new PriorityQueue<>(Comparator.comparingInt(WineScore::match)));
         }
 
-        List<Wine> wineList = wineRepository.findAll();
+        List<Wine> wineList = wineQueryService.getAllWines();
 
         for (Wine wine : wineList) {
             // 1. 상황 무관 점수 계산
@@ -162,9 +194,33 @@ public class WineRecommendationCalculator {
     }
 
     private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap, DrinkingSituation situation) {
-        return heap.stream()
+        List<WineScore> sortedScores = heap.stream()
                 .sorted(Comparator.comparingInt(WineScore::match).reversed())
-                .map(s -> WineRecommendationItem.of(s.wine(), s.match(), situation))
+                .toList();
+
+        if (sortedScores.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> wineIds = sortedScores.stream()
+                .map(s -> s.wine().getId())
+                .toList();
+
+        // IN 쿼리로 페어링 푸드 한 번에 조회
+        List<Object[]> foodResults = wineFoodPairingRepository.findFoodNamesByWineIds(wineIds);
+        Map<Long, List<String>> foodMap = foodResults.stream()
+                .collect(Collectors.groupingBy(
+                        r -> (Long) r[0],
+                        Collectors.mapping(r -> (String) r[1], Collectors.toList())
+                ));
+
+        return sortedScores.stream()
+                .map(s -> WineRecommendationItem.of(
+                        s.wine(),
+                        sigmoid(s.match()),
+                        situation,
+                        foodMap.getOrDefault(s.wine().getId(), List.of())
+                ))
                 .toList();
     }
 
@@ -175,7 +231,7 @@ public class WineRecommendationCalculator {
         Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
-        return score(wine, situation, pref, calibrated);
+        return sigmoid(score(wine, situation, pref, calibrated));
     }
 
     // ── calibrate: U_i^revealed · γ · Û_i · σ̂_i ────────────────────────────────
