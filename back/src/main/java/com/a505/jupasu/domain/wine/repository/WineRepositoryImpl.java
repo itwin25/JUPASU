@@ -46,10 +46,11 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
             }
         }
 
-        builder.and(typeEq(condition.type()));
+        builder.and(typeIn(condition.types()));
         builder.and(priceGoe(condition.minPrice()));
         builder.and(priceLoe(condition.maxPrice()));
         builder.and(ratingGoe(condition.minRate()));
+        builder.and(excludeZeroPriceWhenPriceAsc(pageable));
 
 
         OrderSpecifier<?>[] orderSpecifiers = getOrderSpecifier(pageable);
@@ -104,8 +105,8 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
     /**
      * 와인 종류가 일치하는지 검사
      */
-    private BooleanExpression typeEq(WineType type) {
-        return type != null ? wine.type.eq(type) : null;
+    private BooleanExpression typeIn(List<WineType> types) {
+        return types != null && !types.isEmpty() ? wine.type.in(types) : null;
     }
 
     /**
@@ -167,5 +168,25 @@ public class WineRepositoryImpl implements WineRepositoryCustom {
             }
         }
         return orderSpecifiers.toArray(new OrderSpecifier[0]);
+    }
+
+
+    /**
+     * 가격 오름차순 정렬시 0원 제외
+     * @param pageable
+     * @return
+     */
+    private BooleanExpression excludeZeroPriceWhenPriceAsc(Pageable pageable) {
+        if (pageable == null || pageable.getSort().isEmpty()) {
+            return null;
+        }
+
+        for (Sort.Order order : pageable.getSort()) {
+            if ("price".equals(order.getProperty()) && order.isAscending()) {
+                return wine.priceAndRating.price.gt(0);
+            }
+        }
+
+        return null;
     }
 }
