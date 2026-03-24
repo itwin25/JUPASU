@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star } from 'lucide-react';
+import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star, X } from 'lucide-react'; // ⭐️ X 아이콘 추가
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ReviewModal } from '@/features/review/components';
@@ -71,7 +71,7 @@ type WineInfo = {
   tasteProfile: TasteProfile;
   alcoholDegree: number;
   reason: string | null;
-  tags: string[];
+  tasteGroups: string[];
   foods: string[];
   similarWines: SimilarWine[];
   imageUrl: string;
@@ -150,6 +150,9 @@ export default function WineDetailPage({
   const [sortOrder, setSortOrder] = useState<'recent' | 'rating'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
+  // ⭐️ 툴팁 가시성 상태 관리 추가
+  const [showTasteTooltip, setShowTasteTooltip] = useState(false);
+
   const {
     data: wineDetail,
     isLoading: isWineLoading,
@@ -214,7 +217,7 @@ export default function WineDetailPage({
       },
       alcoholDegree: wineDetail.alcoholDegree || 0,
       reason: null,
-      tags: [wineDetail.region, wineDetail.winery].filter(Boolean) as string[],
+      tasteGroups: (wineDetail.tasteGroups || []) as string[],
       foods: (wineDetail.pairingFoods || []) as string[],
       similarWines: [],
       imageUrl: wineDetail.imageUrl,
@@ -448,7 +451,7 @@ export default function WineDetailPage({
               <div className="absolute inset-0 flex items-center justify-center text-[5.4rem]">
                 <img
                   src={
-                    wineInfo.imageUrl && wineInfo.imageUrl !== '/images/default_wine.png'
+                    wineInfo.imageUrl && wineInfo.imageUrl !== '/default_wine.png'
                       ? wineInfo.imageUrl
                       : DEFAULT_WINE_IMAGE_URL
                   }
@@ -549,11 +552,37 @@ export default function WineDetailPage({
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between relative">
                   <h3 className="text-text-main text-[1.05rem] font-black">맛 프로필</h3>
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white">
+                  
+                  {/* ⭐️ '?' 버튼을 버튼 태그로 변경하고 토글 이벤트 추가 */}
+                  <button
+                    onClick={() => setShowTasteTooltip(!showTasteTooltip)}
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white hover:bg-[#b55b60] transition-colors focus:outline-none"
+                    aria-label="맛 프로필 설명 보기"
+                  >
                     ?
-                  </div>
+                  </button>
+
+                  {/* ⭐️ 클릭 시 나타나는 툴팁 창 */}
+                  {showTasteTooltip && (
+                    <div className="absolute right-0 top-7 z-50 w-[15rem] rounded-[1rem] border border-primary-100 bg-white p-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[0.8rem] font-black text-text-main">지표 설명</span>
+                        <button onClick={() => setShowTasteTooltip(false)} className="p-1 text-text-main/40 hover:text-text-main">
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <div className="space-y-2 text-[0.75rem] font-medium text-text-main/80">
+                        <p><span className="font-bold text-[#C96D72]">BODY (바디):</span> 와인이 입안에서 느껴지는 무게감이나 점성입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">SWEET (당도):</span> 와인에 남아있는 잔당으로 인한 단맛의 정도입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">ACID (산미):</span> 입에 침이 고이게 만드는 신맛의 강도입니다.</p>
+                        <p><span className="font-bold text-[#C96D72]">TANNIN (탄닌):</span> 포도 껍질과 씨에서 나오는 떫은맛과 쌉쌀함입니다.</p>
+                      </div>
+                      {/* 말풍선 꼬리 */}
+                      <div className="absolute -top-2 right-2 h-4 w-4 rotate-45 border-l border-t border-primary-100 bg-white" />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-primary-100 rounded-[1.5rem] border bg-white px-4 py-4 shadow-[0_8px_20px_rgba(51,34,17,0.035)]">
@@ -584,19 +613,19 @@ export default function WineDetailPage({
                   ))}
                 </div>
 
-                {wineInfo.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {wineInfo.tags.map((tag, index) => (
+                {wineInfo.tasteGroups.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {wineInfo.tasteGroups.map((group, index) => (
                       <div
-                        key={tag}
+                        key={group}
                         className={cn(
                           'rounded-full px-4 py-2 text-[0.76rem] font-black',
-                          index === 0 || index === wineInfo.tags.length - 1
+                          index === 0 || index === wineInfo.tasteGroups.length - 1
                             ? 'bg-[#C96D72] text-white'
                             : 'text-text-main/62 bg-[#EFE8DD]',
                         )}
                       >
-                        {tag}
+                        {group}
                       </div>
                     ))}
                   </div>
@@ -896,7 +925,7 @@ export default function WineDetailPage({
                   ))
                 ) : (
                   <div className="py-10 text-center text-text-main/40 font-bold text-sm">
-                    아직 작성된 리뷰가 없습니다.
+                    최근에 작성된 리뷰가 없습니다.
                   </div>
                 )}
               </div>
