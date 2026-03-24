@@ -13,7 +13,7 @@ public class ReviewResponse {
     private Long reviewId;
     private Long userId;
     private String nickname;
-    private Float rating;
+    private Integer rating;
     private String content;
     private LocalDateTime createdAt;
 

@@ -2,6 +2,8 @@ package com.a505.jupasu.domain.wine.controller;
 
 import com.a505.jupasu.domain.preference.entity.DrinkingSituation;
 import com.a505.jupasu.domain.wine.dto.*;
+import com.a505.jupasu.domain.wine.dto.response.HybridSearchResponse;
+import com.a505.jupasu.domain.wine.service.WineSearchService;
 import com.a505.jupasu.domain.wine.service.WineService;
 import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
 import com.a505.jupasu.global.common.ApiResponse;
@@ -30,7 +32,9 @@ public class WineController {
             EnumSet.of(DrinkingSituation.ALONE, DrinkingSituation.DATE, DrinkingSituation.PARTY);
 
     private final WineService wineService;
+    private final WineSearchService wineSearchService;
     private final WineRecommendationCalculator wineRecommendationCalculator;
+    private final com.a505.jupasu.domain.wine.repository.WineRepository wineRepository;
 
     /**
      * 와인 통합 검색
@@ -47,8 +51,38 @@ public class WineController {
         return ApiResponse.success("와인 검색 완료", response);
     }
 
+    /**
+     * PostgreSQL pg_trgm 유사도 기반 와인 검색 및 유사한 맛 추천 (하이브리드 검색)
+     */
+    @GetMapping("/advanced-search")
+    public ApiResponse<HybridSearchResponse> searchWinesAdvanced(
+            @RequestParam(value = "q", defaultValue = "") String query
+    ) {
+        if (query.isBlank()) {
+            return ApiResponse.success("검색어가 비어 있습니다.", HybridSearchResponse.builder()
+                    .recommendations(java.util.Collections.emptyList())
+                    .build());
+        }
+        HybridSearchResponse response = wineSearchService.searchHybrid(query);
+        return ApiResponse.success("하이브리드 와인 검색 완료", response);
+    }
 
     /**
+     * 무작위 이미지 100개 테스트용 API
+     */
+    @GetMapping("/test-images")
+    public ApiResponse<List<String>> getRandomImages() {
+        // 성능 상관없이 ORDER BY RANDOM() 으로 100개 추출 (테스트 전용)
+        List<String> images = wineRepository.findAll().stream()
+                .map(com.a505.jupasu.domain.wine.entity.Wine::getImageUrl)
+                .collect(java.util.stream.Collectors.toList());
+        java.util.Collections.shuffle(images);
+        return ApiResponse.success("무작위 이미지 로드", images.stream().limit(100).toList());
+    }
+
+    /**
+     * DB 데이터를 엘라스틱서치 인덱스로 수동 동기화 (관리자용/초기화용)
+
      * 와인 상세 정보 검색
      *
      */
