@@ -79,9 +79,7 @@ export default function ReviewWritePage() {
         >
           리뷰 등록하기
         </Button>
-        <p className="text-text-main/30 text-center text-[10px] font-bold">
-          별점과 10자 이상의 리뷰를 작성해주세요
-        </p>
+       
       </div>
     </div>
   );

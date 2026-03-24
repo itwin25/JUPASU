@@ -13,8 +13,6 @@ public record WineDetailResponse(
         String nameEn,
         String imageUrl,
         String country,
-        String region,
-        String winery,
         String grapeVariety,
         Float alcoholDegree,
         Double averageRating,
@@ -32,12 +30,14 @@ public record WineDetailResponse(
         Float tannin,
         Integer matchRate,
         List<String> pairingFoods,
+        List<String> tasteGroups,
         UserPreferenceResponse userPreference
 ) {
     public static WineDetailResponse of(
             Wine wine,
             Integer matchRate,
             List<String> pairingFoods,
+            List<String> tasteGroups,
             Preference preference
     ) {
         Double averageRating = 0.0;
@@ -66,8 +66,6 @@ public record WineDetailResponse(
                 .nameEn(wine.getNameEn())
                 .imageUrl(wine.getImageUrl())
                 .country(wine.getOrigin() != null ? wine.getOrigin().getCountry() : null)
-                .region(wine.getOrigin() != null ? wine.getOrigin().getRegion() : null)
-                .winery(wine.getOrigin() != null ? wine.getOrigin().getWinery() : null)
                 .grapeVariety(wine.getGrapeVariety())
                 .alcoholDegree(wine.getAlcoholDegree())
                 .averageRating(averageRating)
@@ -85,6 +83,7 @@ public record WineDetailResponse(
                 .tannin(wine.getTasteProfile() != null ? wine.getTasteProfile().getTannin() : 0.0f)
                 .matchRate(matchRate)
                 .pairingFoods(pairingFoods)
+                .tasteGroups(tasteGroups)
                 .userPreference(preference != null ? UserPreferenceResponse.from(preference) : null)
                 .build();
     }
