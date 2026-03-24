@@ -134,13 +134,13 @@ public class WineRecommendationCalculator {
     }
 
     /**
-     * 상황 없이 취향 기반 추천도 계산
+     * 상황 없이 취향 기반 추천도 계산 (상세 페이지용 — 데이터 불완전 와인도 점수 산출)
      */
     public int getMatch(User user, Wine wine) {
         Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
-        return sigmoid(score(wine, null, pref, calibrated));
+        return sigmoid(scoreForDetail(wine, pref, calibrated));
     }
 
     /**
@@ -455,6 +455,62 @@ public class WineRecommendationCalculator {
         float bW = 0f;
 
         float total = wPref * sPref + wPriceW * sPrice + wSitW * sSit + bW;
+        return Math.round(total * 100);
+    }
+
+    /**
+     * 상세 페이지 전용 추천도 계산 — 데이터 불완전 와인 제외 없이 점수 산출.
+     *
+     * <p>추천 목록용 {@link #score}와 달리 핵심 데이터 부재 시에도 {@code Integer.MIN_VALUE}를
+     * 반환하지 않는다. 누락 차원은 Gaussian 합산에서 제외되고,
+     * {@code completenessFactor}(0.6 ~ 1.0)가 데이터 충실도 페널티를 적용한다.
+     * 가격 데이터가 없으면 {@code sPrice = 0.5}(중립값)으로 처리한다.
+     *
+     * <p>상황(situation)은 항상 {@code null}로 고정한다.
+     * 가중치: S_pref 0.70 / S_price 0.30
+     */
+    private int scoreForDetail(Wine wine, Preference pref, CalibratedProfile cal) {
+        TasteProfile tp = wine.getTasteProfile();
+
+        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness()) && tp.getSweetness() > 0;
+        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
+        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
+        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
+        boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree())
+                           && wine.getAlcoholDegree() != null && wine.getAlcoholDegree() > 0;
+        int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
+                   + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
+
+        float wSweet  = validSweet  ? tp.getSweetness() * 0.4f : 0f;
+        float wAcid   = validAcid   ? tp.getAcidity()   * 0.4f : 0f;
+        float wBody   = validBody   ? tp.getBody()       * 0.4f : 0f;
+        float wTannin = validTannin ? tp.getTannin()     * 0.4f : 0f;
+        float wAlc    = wine.getAlcoholDegree();
+
+        float uAlc = (pref != null && pref.getAbv() != null) ? pref.getAbv() : T_ALC_DEFAULT;
+
+        float sPref;
+        if (nValid == 0) {
+            sPref = 0f;
+        } else {
+            int nSum = 0;
+            float sum = 0f;
+            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  { sum += gaussian(cal.uHatSweet(),  wSweet,  cal.sigmaSweet());  nSum++; }
+            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   { sum += gaussian(cal.uHatAcid(),   wAcid,   cal.sigmaAcid());   nSum++; }
+            if (validBody   && !Float.isNaN(cal.uHatBody()))   { sum += gaussian(cal.uHatBody(),   wBody,   cal.sigmaBody());   nSum++; }
+            if (validTannin && !Float.isNaN(cal.uHatTannin())) { sum += gaussian(cal.uHatTannin(), wTannin, cal.sigmaTannin()); nSum++; }
+            if (validAlc)                                       { sum += gaussian(uAlc,             wAlc,    SIGMA_A);           nSum++; }
+
+            float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
+            sPref = nSum > 0 ? (sum / nSum) * completenessFactor : 0f;
+        }
+
+        boolean validPrice = wine.getPriceAndRating() != null
+                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice())
+                && wine.getPriceAndRating().getPrice() > 0;
+        float sPrice = calcSPrice(wine, pref, null, validPrice);
+
+        float total = 0.70f * sPref + 0.30f * sPrice;
         return Math.round(total * 100);
     }
 
