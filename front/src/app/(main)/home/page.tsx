@@ -160,8 +160,8 @@ export default function HomePage() {
                       </h3>
                       <p className="truncate text-[11px] font-bold text-[#FF8A00]">
                         {[
+                          ...(wine.pairingFoods || []).slice(0, 2).map((food) => `#${food}`),
                           formatPriceTag(wine.price) ? `#${formatPriceTag(wine.price)}` : null,
-                          ...(wine.pairingFoods || []).map((food) => `#${food}`),
                         ]
                           .filter(Boolean)
                           .join(' ') || '당신을 위한 추천 와인'}
