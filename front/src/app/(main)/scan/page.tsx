@@ -1,21 +1,47 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import NextImage from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Camera, ChevronLeft, Star, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
-import { useEffect } from 'react';
 import { OCRResult } from '@/features/scan/types';
+import { searchApi } from '@/features/scan/api/search.api';
+import { HybridSearchResponse } from '@/features/scan/types/search.types';
+
+function TasteGauge({ label, value }: { label: string; value: number | undefined | null }) {
+  const displayValue = value ? Math.ceil(value) : 0;
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-text-main/40 text-[10px] font-black tracking-tighter uppercase">
+        {label}
+      </span>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((level) => (
+          <div
+            key={level}
+            className={`h-1.5 w-1.5 rotate-45 ${
+              level <= displayValue ? 'bg-[#B36262]' : 'bg-primary-100'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type ScanStatus = 'idle' | 'scanning' | 'confirming' | 'result';
 
 export default function ScanPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number } | null>(null);
+  const [hybridResult, setHybridResult] = useState<HybridSearchResponse | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [scanData, setScanData] = useState({
     winery: '',
     wineName: '',
@@ -90,6 +116,32 @@ export default function ScanPage() {
 
   const triggerUpload = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleSearch = async () => {
+    if (isSearching) return;
+
+    const query = `${scanData.winery} ${scanData.wineName}`.trim();
+
+    if (!query) {
+      alert('와이너리나 와인 이름을 입력해 주세요.');
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const result = await searchApi.searchAdvanced(query);
+      console.log('✅ 검색 결과:', result);
+
+      setHybridResult(result);
+      setStatus('result');
+    } catch (err) {
+      console.error('Search Error:', err);
+      alert('와인 검색 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   if (modelError) {
@@ -329,7 +381,8 @@ export default function ScanPage() {
 
             <div className="mt-6">
               <Button
-                onClick={() => setStatus('result')}
+                onClick={handleSearch}
+                isLoading={isSearching}
                 size="full"
                 className="h-14 text-lg shadow-lg"
               >
@@ -342,55 +395,114 @@ export default function ScanPage() {
         {status === 'result' && (
           <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-8 py-6 duration-500">
             {/* Main Result Card */}
-            <div className="border-primary-100 flex items-center gap-5 rounded-[40px] border bg-white p-6 shadow-sm">
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl bg-gray-100">
-                {capturedImage && (
-                  <NextImage src={capturedImage} alt="Wine" fill className="object-cover" />
-                )}
-              </div>
-              <div className="relative flex-1 space-y-1">
-                <h3 className="text-xl leading-tight font-black">
-                  {scanData.wineName || '분석된 와인'}
-                </h3>
-                <h4 className="text-text-main/40 text-sm font-medium">{scanData.winery}</h4>
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="flex items-center gap-1 font-black text-[#FF8A00]">
-                    <Star size={16} fill="#FF8A00" /> 4.8
-                  </div>
-                  <span className="text-lg font-black text-[#B36262]">₩120,000</span>
+            {hybridResult?.bestMatch ? (
+              <div
+                onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
+                className="border-primary-100 flex cursor-pointer items-center gap-5 rounded-[40px] border bg-white p-6 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
+              >
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl bg-gray-100">
+                  {hybridResult.bestMatch.imageUrl ? (
+                    <NextImage
+                      src={hybridResult.bestMatch.imageUrl}
+                      alt={hybridResult.bestMatch.nameEn}
+                      fill
+                      className="object-contain p-2"
+                    />
+                  ) : capturedImage ? (
+                    <NextImage src={capturedImage} alt="Wine" fill className="object-cover" />
+                  ) : null}
                 </div>
-                <div className="bg-primary-100 absolute top-1/2 right-0 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black text-[#B36262]">
-                  95%
-                </div>
-              </div>
-            </div>
-
-            {/* Taste Profile (Mockup) */}
-            <div className="space-y-4">
-              <h4 className="text-text-main text-lg font-black italic">맛 프로필</h4>
-              <div className="border-primary-100 space-y-4 rounded-[40px] border bg-white p-8 shadow-sm">
-                {['BODY', 'SWEET', 'ACID', 'TANNIN'].map((label) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-text-main/60 text-xs font-black">{label}</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((d) => (
-                        <div
-                          key={d}
-                          className={`h-2.5 w-2.5 rotate-45 ${d <= 4 ? 'bg-[#B36262]' : 'bg-primary-100'}`}
-                        />
-                      ))}
+                <div className="relative flex-1 space-y-1">
+                  <h3 className="text-xl leading-tight font-black">
+                    {hybridResult.bestMatch.nameEn}
+                  </h3>
+                  <h4 className="text-text-main/40 text-sm font-medium">
+                    {hybridResult.bestMatch.winery}
+                  </h4>
+                  <div className="flex items-center gap-4 pt-2">
+                    <div className="flex items-center gap-1 font-black text-[#FF8A00]">
+                      <Star size={16} fill="#FF8A00" /> 4.8
                     </div>
+                    <span className="text-lg font-black text-[#B36262]">
+                      {hybridResult.bestMatch.type}
+                    </span>
                   </div>
-                ))}
+                  <div className="bg-primary-100 absolute top-1/2 right-0 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black text-[#B36262]">
+                    BEST
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="border-primary-100 flex flex-col items-center justify-center rounded-[40px] border bg-white p-10 text-center shadow-sm">
+                <p className="text-text-main/60 font-bold">일치하는 와인을 찾지 못했습니다.</p>
+                <p className="text-text-main/40 mt-2 text-sm">
+                  정보를 수정하여 다시 검색해 보세요.
+                </p>
+                <Button onClick={() => setStatus('confirming')} variant="ghost" className="mt-4">
+                  정보 수정하기
+                </Button>
+              </div>
+            )}
 
-            <div className="flex items-center gap-4 rounded-[32px] border border-[#B36262]/10 bg-[#FFE5E5] p-6">
-              <div className="h-12 w-12 shrink-0 rounded-full bg-[#B36262]/30" />
-              <p className="text-text-main text-sm leading-relaxed font-bold">
-                이런 와인을 찾으셨군요! 비슷한 와인도 함께 추천해드릴게요!
-              </p>
-            </div>
+            {/* Taste Profile */}
+            {hybridResult?.bestMatch && (
+              <div className="space-y-4">
+                <h4 className="text-text-main text-lg font-black italic">맛 프로필</h4>
+                <div className="border-primary-100 space-y-4 rounded-[40px] border bg-white p-8 shadow-sm">
+                  <TasteGauge label="BODY" value={hybridResult.bestMatch.body} />
+                  <TasteGauge label="SWEET" value={hybridResult.bestMatch.sweetness} />
+                  <TasteGauge label="ACID" value={hybridResult.bestMatch.acidity} />
+                  <TasteGauge label="TANNIN" value={hybridResult.bestMatch.tannin} />
+                </div>
+              </div>
+            )}
+
+            {hybridResult?.recommendations && hybridResult.recommendations.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 rounded-[32px] border border-[#B36262]/10 bg-[#FFE5E5] p-6">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#B36262]/30">
+                    <Star size={24} className="text-[#B36262]" fill="#B36262" />
+                  </div>
+                  <p className="text-text-main text-sm leading-relaxed font-bold">
+                    비슷한 맛의 다른 브랜드 와인들도 함께 찾아보았어요!
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-text-main text-lg font-black italic">추천 와인 리스트</h4>
+                  <div className="space-y-3">
+                    {hybridResult.recommendations.map((wine) => (
+                      <div
+                        key={wine.id}
+                        onClick={() => router.push(`/wines/${wine.id}`)}
+                        className="border-primary-100 flex cursor-pointer items-center gap-4 rounded-[30px] border bg-white p-4 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
+                      >
+                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gray-50">
+                          <NextImage
+                            src={wine.imageUrl || '/images/default_wine.png'}
+                            alt={wine.nameEn}
+                            fill
+                            className="object-contain p-1"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h5 className="truncate text-sm font-black">{wine.nameEn}</h5>
+                          <p className="text-text-main/40 truncate text-xs font-bold">
+                            {wine.winery}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="rounded-full bg-[#FFE5E5] px-2 py-0.5 text-[10px] font-black text-[#B36262]">
+                              {wine.type}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronLeft className="text-text-main/20 rotate-180" size={20} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
