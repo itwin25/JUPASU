@@ -216,7 +216,7 @@
 `.env` 예시:
 
 ```env
-GMS_KEY=your_gms_key
+GMS_API_KEY=your_gms_api_key
 ```
 
 임베딩 실행 예시:
