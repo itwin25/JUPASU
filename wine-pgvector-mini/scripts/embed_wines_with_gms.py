@@ -50,9 +50,9 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0, help="0 means all rows without embedding")
     args = parser.parse_args()
 
-    api_key = os.environ.get("GMS_KEY")
+    api_key = os.environ.get("GMS_API_KEY")
     if not api_key:
-        raise SystemExit("GMS_KEY environment variable is required.")
+        raise SystemExit("GMS_API_KEY environment variable is required.")
 
     query = """
         SELECT id, embedding_text_ko

@@ -132,9 +132,9 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Show raw similarity and score breakdown")
     args = parser.parse_args()
 
-    api_key = os.environ.get("GMS_KEY")
+    api_key = os.environ.get("GMS_API_KEY")
     if not api_key:
-        raise SystemExit("GMS_KEY environment variable is required.")
+        raise SystemExit("GMS_API_KEY environment variable is required.")
 
     profile = build_preference_profile(args)
     query_text = build_food_query_text(args.food_text)
