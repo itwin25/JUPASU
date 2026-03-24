@@ -49,5 +49,6 @@ export const API_PATH = {
   AI: {
     CHAT: '/ai/chat',
     REFINE: '/ai/refine',
+    ADVANCED_SEARCH: '/wines/advanced-search',
   },
 } as const;

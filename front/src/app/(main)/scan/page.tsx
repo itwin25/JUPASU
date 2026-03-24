@@ -397,15 +397,10 @@ export default function ScanPage() {
             {/* Integrated Result Card */}
             {hybridResult?.bestMatch ? (
               <div className="space-y-4">
-                <h4 className="text-text-main text-lg font-black italic">검색 결과</h4>
                 <article
                   onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
                   className="border-primary-100 relative cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]"
                 >
-                  <div className="absolute top-5 left-5 z-10 rounded-full bg-[#B36262] px-3.5 py-1.5 text-[11px] font-black text-white shadow-sm">
-                    BEST MATCH
-                  </div>
-
                   <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-8">
                     <div className="relative h-full w-full">
                       <NextImage

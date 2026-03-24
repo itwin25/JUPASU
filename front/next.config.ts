@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/images/:path*',
+        destination: 'http://backend:8080/images/:path*', // Docker 내부망의 백엔드 주소로 프록시
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

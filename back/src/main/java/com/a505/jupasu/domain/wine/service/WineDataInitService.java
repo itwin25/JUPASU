@@ -54,9 +54,13 @@ public class WineDataInitService {
     public void importWineDataFromJson() {
         log.info("🍷 [1/4] 데이터 초기화 시작 및 폴더 점검...");
         try {
-            Path uploadPath = Paths.get(targetImageDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+            try {
+                Path uploadPath = Paths.get(targetImageDir);
+                if (!Files.exists(uploadPath)) {
+                    Files.createDirectories(uploadPath);
+                }
+            } catch (Exception folderEx) {
+                log.warn("⚠️ 이미지 저장 디렉토리 생성 실패 (이미 있을 수 있음): {}", folderEx.getMessage());
             }
 
             File jsonFile = new File(dataFilePath);

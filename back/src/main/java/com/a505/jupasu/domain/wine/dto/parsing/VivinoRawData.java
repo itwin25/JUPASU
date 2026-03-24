@@ -22,5 +22,5 @@ public record VivinoRawData(
         @JsonProperty("taste_profile") Map<String, String> tasteProfile,
         Map<String, Object> ratings,
         @JsonProperty("local_image_paths") Map<String, String> localImagePaths
-) {
-}
+        ) {
+        }
