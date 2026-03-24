@@ -393,20 +393,20 @@ export default function ScanPage() {
         )}
 
         {status === 'result' && (
-          <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-8 py-6 duration-500">
+          <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-6 py-6 duration-500">
             {/* Integrated Result Card */}
             {hybridResult?.bestMatch ? (
               <div className="space-y-4">
                 <h4 className="text-text-main text-lg font-black italic">검색 결과</h4>
                 <article
                   onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
-                  className="border-primary-100 relative cursor-pointer overflow-hidden rounded-[40px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]"
+                  className="border-primary-100 relative cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]"
                 >
-                  <div className="absolute top-6 left-6 z-10 rounded-full bg-[#B36262] px-4 py-2 text-[12px] font-black text-white shadow-sm">
+                  <div className="absolute top-5 left-5 z-10 rounded-full bg-[#B36262] px-3.5 py-1.5 text-[11px] font-black text-white shadow-sm">
                     BEST MATCH
                   </div>
 
-                  <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-10">
+                  <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-8">
                     <div className="relative h-full w-full">
                       <NextImage
                         src={hybridResult.bestMatch.imageUrl || '/images/default_wine.png'}
@@ -417,20 +417,20 @@ export default function ScanPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-5 p-8">
-                    <div className="space-y-2">
-                      <p className="text-[12px] font-black tracking-[0.1em] text-[#B36262] uppercase">
+                  <div className="space-y-4 p-6">
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-black tracking-[0.1em] text-[#B36262] uppercase">
                         {hybridResult.bestMatch.type}
                       </p>
-                      <h3 className="text-text-main text-2xl leading-tight font-black">
+                      <h3 className="text-text-main text-xl leading-tight font-black">
                         {hybridResult.bestMatch.nameEn}
                       </h3>
-                      <p className="text-text-main/40 text-sm font-bold">
+                      <p className="text-text-main/40 text-xs font-bold">
                         {hybridResult.bestMatch.winery}
                       </p>
                     </div>
 
-                    <div className="border-primary-100/50 space-y-3 border-t pt-5">
+                    <div className="border-primary-100/50 space-y-2.5 border-t pt-4">
                       <TasteGauge label="BODY" value={hybridResult.bestMatch.body} />
                       <TasteGauge label="SWEET" value={hybridResult.bestMatch.sweetness} />
                       <TasteGauge label="ACID" value={hybridResult.bestMatch.acidity} />
@@ -440,7 +440,7 @@ export default function ScanPage() {
                 </article>
               </div>
             ) : (
-              <div className="border-primary-100 flex flex-col items-center justify-center rounded-[40px] border bg-white p-10 text-center shadow-sm">
+              <div className="border-primary-100 flex flex-col items-center justify-center rounded-[32px] border bg-white p-8 text-center shadow-sm">
                 <p className="text-text-main/60 font-bold">일치하는 와인을 찾지 못했습니다.</p>
                 <p className="text-text-main/40 mt-2 text-sm">
                   정보를 수정하여 다시 검색해 보세요.
@@ -453,11 +453,11 @@ export default function ScanPage() {
 
             {hybridResult?.recommendations && hybridResult.recommendations.length > 0 && (
               <div className="space-y-6">
-                <div className="flex items-center gap-4 rounded-[32px] border border-[#B36262]/10 bg-[#FFE5E5] p-6">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#B36262]/30">
-                    <Star size={24} className="text-[#B36262]" fill="#B36262" />
+                <div className="flex items-center gap-4 rounded-[28px] border border-[#B36262]/10 bg-[#FFE5E5] p-5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#B36262]/30">
+                    <Star size={22} className="text-[#B36262]" fill="#B36262" />
                   </div>
-                  <p className="text-text-main text-sm leading-relaxed font-bold">
+                  <p className="text-text-main text-xs leading-relaxed font-bold">
                     비슷한 맛의 다른 브랜드 와인들도 함께 찾아보았어요!
                   </p>
                 </div>
@@ -469,9 +469,9 @@ export default function ScanPage() {
                       <div
                         key={wine.id}
                         onClick={() => router.push(`/wines/${wine.id}`)}
-                        className="border-primary-100 flex cursor-pointer items-center gap-4 rounded-[30px] border bg-white p-4 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
+                        className="border-primary-100 flex cursor-pointer items-center gap-4 rounded-[24px] border bg-white p-3.5 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
                       >
-                        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gray-50">
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-50">
                           <NextImage
                             src={wine.imageUrl || '/images/default_wine.png'}
                             alt={wine.nameEn}
@@ -481,16 +481,16 @@ export default function ScanPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h5 className="truncate text-sm font-black">{wine.nameEn}</h5>
-                          <p className="text-text-main/40 truncate text-xs font-bold">
+                          <p className="text-text-main/40 truncate text-[11px] font-bold">
                             {wine.winery}
                           </p>
                           <div className="mt-1 flex items-center gap-2">
-                            <span className="rounded-full bg-[#FFE5E5] px-2 py-0.5 text-[10px] font-black text-[#B36262]">
+                            <span className="rounded-full bg-[#FFE5E5] px-2 py-0.5 text-[9px] font-black text-[#B36262]">
                               {wine.type}
                             </span>
                           </div>
                         </div>
-                        <ChevronLeft className="text-text-main/20 rotate-180" size={20} />
+                        <ChevronLeft className="text-text-main/20 rotate-180" size={18} />
                       </div>
                     ))}
                   </div>
