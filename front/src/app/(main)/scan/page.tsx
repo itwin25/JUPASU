@@ -394,43 +394,50 @@ export default function ScanPage() {
 
         {status === 'result' && (
           <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-8 py-6 duration-500">
-            {/* Main Result Card */}
+            {/* Integrated Result Card */}
             {hybridResult?.bestMatch ? (
-              <div
-                onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
-                className="border-primary-100 flex cursor-pointer items-center gap-5 rounded-[40px] border bg-white p-6 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
-              >
-                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl bg-gray-100">
-                  {hybridResult.bestMatch.imageUrl ? (
-                    <NextImage
-                      src={hybridResult.bestMatch.imageUrl}
-                      alt={hybridResult.bestMatch.nameEn}
-                      fill
-                      className="object-contain p-2"
-                    />
-                  ) : capturedImage ? (
-                    <NextImage src={capturedImage} alt="Wine" fill className="object-cover" />
-                  ) : null}
-                </div>
-                <div className="relative flex-1 space-y-1">
-                  <h3 className="text-xl leading-tight font-black">
-                    {hybridResult.bestMatch.nameEn}
-                  </h3>
-                  <h4 className="text-text-main/40 text-sm font-medium">
-                    {hybridResult.bestMatch.winery}
-                  </h4>
-                  <div className="flex items-center gap-4 pt-2">
-                    <div className="flex items-center gap-1 font-black text-[#FF8A00]">
-                      <Star size={16} fill="#FF8A00" /> 4.8
+              <div className="space-y-4">
+                <h4 className="text-text-main text-lg font-black italic">검색 결과</h4>
+                <article
+                  onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
+                  className="border-primary-100 relative cursor-pointer overflow-hidden rounded-[40px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]"
+                >
+                  <div className="absolute top-6 left-6 z-10 rounded-full bg-[#B36262] px-4 py-2 text-[12px] font-black text-white shadow-sm">
+                    BEST MATCH
+                  </div>
+
+                  <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-10">
+                    <div className="relative h-full w-full">
+                      <NextImage
+                        src={hybridResult.bestMatch.imageUrl || '/images/default_wine.png'}
+                        alt={hybridResult.bestMatch.nameEn}
+                        fill
+                        className="object-contain"
+                      />
                     </div>
-                    <span className="text-lg font-black text-[#B36262]">
-                      {hybridResult.bestMatch.type}
-                    </span>
                   </div>
-                  <div className="bg-primary-100 absolute top-1/2 right-0 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black text-[#B36262]">
-                    BEST
+
+                  <div className="space-y-5 p-8">
+                    <div className="space-y-2">
+                      <p className="text-[12px] font-black tracking-[0.1em] text-[#B36262] uppercase">
+                        {hybridResult.bestMatch.type}
+                      </p>
+                      <h3 className="text-text-main text-2xl leading-tight font-black">
+                        {hybridResult.bestMatch.nameEn}
+                      </h3>
+                      <p className="text-text-main/40 text-sm font-bold">
+                        {hybridResult.bestMatch.winery}
+                      </p>
+                    </div>
+
+                    <div className="border-primary-100/50 space-y-3 border-t pt-5">
+                      <TasteGauge label="BODY" value={hybridResult.bestMatch.body} />
+                      <TasteGauge label="SWEET" value={hybridResult.bestMatch.sweetness} />
+                      <TasteGauge label="ACID" value={hybridResult.bestMatch.acidity} />
+                      <TasteGauge label="TANNIN" value={hybridResult.bestMatch.tannin} />
+                    </div>
                   </div>
-                </div>
+                </article>
               </div>
             ) : (
               <div className="border-primary-100 flex flex-col items-center justify-center rounded-[40px] border bg-white p-10 text-center shadow-sm">
@@ -441,19 +448,6 @@ export default function ScanPage() {
                 <Button onClick={() => setStatus('confirming')} variant="ghost" className="mt-4">
                   정보 수정하기
                 </Button>
-              </div>
-            )}
-
-            {/* Taste Profile */}
-            {hybridResult?.bestMatch && (
-              <div className="space-y-4">
-                <h4 className="text-text-main text-lg font-black italic">맛 프로필</h4>
-                <div className="border-primary-100 space-y-4 rounded-[40px] border bg-white p-8 shadow-sm">
-                  <TasteGauge label="BODY" value={hybridResult.bestMatch.body} />
-                  <TasteGauge label="SWEET" value={hybridResult.bestMatch.sweetness} />
-                  <TasteGauge label="ACID" value={hybridResult.bestMatch.acidity} />
-                  <TasteGauge label="TANNIN" value={hybridResult.bestMatch.tannin} />
-                </div>
               </div>
             )}
 
