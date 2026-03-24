@@ -41,6 +41,21 @@ function TasteGauge({ label, value }: { label: string; value: number | undefined
   );
 }
 
+const formatPriceTag = (price: number | undefined | null): string | null => {
+  if (price === null || price === undefined || price === 0) return null;
+  if (price <= 50000) return '5만원 이하';
+  if (price <= 100000) return '10만원 이하';
+  if (price <= 200000) return '20만원 이하';
+  if (price <= 300000) return '30만원 이하';
+  if (price <= 400000) return '40만원 이하';
+  if (price <= 500000) return '50만원 이하';
+  if (price >= 2000000) return '200만원 이상';
+
+  // 50만원 단위 (100만원 이하, 150만원 이하, 200만원 이하)
+  const units = Math.ceil(price / 500000) * 50;
+  return `${units}만원 이하`;
+};
+
 function WineImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
   const [imgSrc, setImgSrc] = useState(src || DEFAULT_WINE_IMAGE_URL);
 
@@ -110,14 +125,16 @@ export default function HomePage() {
 
                   <div className="min-w-0 space-y-3 p-5">
                     <div className="min-w-0 space-y-1.5">
-                      <p className="h-[15px] truncate text-[10px] font-black tracking-[0.1em] text-[#B36262] uppercase">
-                        {wine.style || ''}
-                      </p>
                       <h3 className="text-text-main truncate text-[1rem] leading-tight font-black">
                         {wine.nameKr}
                       </h3>
                       <p className="truncate text-[11px] font-bold text-[#FF8A00]">
-                        {wine.recommendationReason || '당신을 위한 추천 와인'}
+                        {[
+                          formatPriceTag(wine.price) ? `#${formatPriceTag(wine.price)}` : null,
+                          ...(wine.pairingFoods || []).map((food) => `#${food}`),
+                        ]
+                          .filter(Boolean)
+                          .join(' ') || '당신을 위한 추천 와인'}
                       </p>
                     </div>
 
