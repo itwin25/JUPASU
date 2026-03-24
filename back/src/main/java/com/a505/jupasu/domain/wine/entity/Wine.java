@@ -5,9 +5,19 @@ import com.a505.jupasu.domain.wine.entity.vo.RatingSummary;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.entity.vo.WinePriceAndRating;
 import com.a505.jupasu.global.common.entity.BaseEntity;
-import jakarta.persistence.*;
-import lombok.*;
-
+import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Getter
@@ -20,7 +30,6 @@ public class Wine extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 이름은 메인 정보이므로 엔티티에 유지
     private String nameKr;
     @Builder.Default private Boolean isRealNameKr = false;
 
@@ -31,7 +40,6 @@ public class Wine extends BaseEntity {
     @Column(nullable = false)
     private WineType type;
 
-    // ⭐️ VO들을 Embedded로 선언
     @Embedded
     private Origin origin;
 
@@ -58,6 +66,9 @@ public class Wine extends BaseEntity {
     private String style;
 
     private String imageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String embeddingTextKo;
 
     public void initializeExternalRatings(
             double externalAverageRating,
