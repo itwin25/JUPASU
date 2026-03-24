@@ -59,7 +59,7 @@ services:
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
     volumes:
-     - /home/ubuntu/data:/app/data:ro
+     - ./data:/app/data
      - ./uploads:/app/uploads
     ports:
       - "8080:8080"
