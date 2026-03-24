@@ -26,17 +26,17 @@ services:
     ports:
       - "6379:6379"
 
-  # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
-  ai:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    container_name: ai-fastapi
-    restart: always
-    depends_on:
-      - db
-    ports:
-      - 18000:18000
+  # # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
+  # ai:
+  #   build:
+  #     context: ./ai
+  #     dockerfile: Dockerfile
+  #   container_name: ai-fastapi
+  #   restart: always
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - 18000:18000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
@@ -68,8 +68,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      ai:
-        condition: service_started
+      # ai:
+      #   condition: service_started
 
   # Frontend: Next.js (React 19)
   frontend:
