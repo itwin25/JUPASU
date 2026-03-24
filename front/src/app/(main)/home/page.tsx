@@ -56,6 +56,11 @@ const formatPriceTag = (price: number | undefined | null): string | null => {
   return `${units}만원 이하`;
 };
 
+const formatPrice = (price: number | undefined | null): string => {
+  if (price === null || price === undefined || price === 0) return '가격 정보 없음';
+  return `₩${price.toLocaleString()}`;
+};
+
 function WineImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
   const [imgSrc, setImgSrc] = useState(src || DEFAULT_WINE_IMAGE_URL);
 
@@ -181,8 +186,8 @@ export default function HomePage() {
           {situationWines.length > 0 ? (
             situationWines.map((wine) => (
               <Link key={wine.wineId} href={`/wines/${wine.wineId}`} className="block">
-                <article className="border-primary-100 flex min-h-[6.5rem] items-center gap-3 rounded-[22px] border bg-white px-3.5 py-2.5 shadow-[0_10px_24px_rgba(51,34,17,0.05)] transition-all active:scale-[0.985]">
-                  <div className="flex h-[4.8rem] w-[4.8rem] shrink-0 items-center justify-center rounded-[1.1rem] bg-[#FCE7E7] p-2">
+                <article className="border-[#F1E9E0] flex min-h-[6.5rem] items-center gap-3 rounded-[22px] border bg-white px-3.5 py-2.5 shadow-[0_10px_24px_rgba(51,34,17,0.05)] transition-all active:scale-[0.985]">
+                  <div className="flex h-[4.8rem] w-[4.8rem] shrink-0 items-center justify-center rounded-[1.1rem] bg-[#F5F3F1] p-2">
                     <WineImage
                       src={wine.imageUrl}
                       alt={wine.nameKr}
@@ -191,20 +196,37 @@ export default function HomePage() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-text-main truncate text-[0.9rem] leading-tight font-black">
-                      {wine.nameKr}
-                    </h3>
-                    <p className="text-text-main/42 mt-1 truncate text-[0.75rem] leading-tight font-medium">
-                      {wine.recommendationReason || `${activeSituation} 상황에 추천하는 와인`}
+                    <div className="flex items-start justify-between">
+                      <h3 className="text-text-main truncate text-[0.9rem] leading-tight font-black">
+                        {wine.nameKr}
+                      </h3>
+                      <span className="shrink-0 text-[0.75rem] font-black text-[#E5484D]">
+                        {wine.matchRate}%
+                      </span>
+                    </div>
+                    
+                    <p className="mt-1 truncate text-[0.75rem] font-bold text-[#FF8A00]">
+                      {(wine.pairingFoods || []).map((food) => `#${food}`).join(' ') ||
+                        `${activeSituation} 상황에 추천`}
                     </p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[0.8rem] font-black text-[#B36262]">
-                        {wine.matchRate}% MATCH
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex items-center gap-0.5">
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M5 0L6.12257 3.45492H9.75528L6.81636 5.59017L7.93893 9.04508L5 6.90983L2.06107 9.04508L3.18364 5.59017L0.244718 3.45492H3.87743L5 0Z" fill="#F59E0B"/>
+                        </svg>
+                        <span className="text-[0.75rem] font-black text-[#3C2E2E]">
+                          {wine.rating?.toFixed(1) || '0.0'}
+                        </span>
+                      </div>
+                      <span className="text-text-main/20 text-[0.7rem]">|</span>
+                      <span className="text-[#DF5A61] text-[0.75rem] font-black">
+                        {formatPrice(wine.price)}
                       </span>
                     </div>
                   </div>
 
-                  <ChevronRight className="text-primary-100 shrink-0" size={18} />
+                  <ChevronRight className="text-[#3C2E2E]/20 shrink-0" size={18} />
                 </article>
               </Link>
             ))
