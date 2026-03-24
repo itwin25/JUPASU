@@ -49,3 +49,5 @@ front/public/workbox-*.js
 
 # Local settings backup
 settings.local/
+.worktrees/
+jupasu-local-config/

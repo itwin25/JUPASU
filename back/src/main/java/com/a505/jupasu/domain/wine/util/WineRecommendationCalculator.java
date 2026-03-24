@@ -10,6 +10,7 @@ import com.a505.jupasu.domain.wine.dto.WineQuickRecommendResponse;
 import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
+import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
 import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +29,7 @@ public class WineRecommendationCalculator {
     private final WineQueryService wineQueryService;
     private final PreferenceRepository preferenceRepository;
     private final ReviewRepository reviewRepository;
+    private final WineFoodPairingRepository wineFoodPairingRepository;
 
     // ── 스케일 정보 ──────────────────────────────────────────────────────────────
     // W_i (TasteProfile): 0.0 ~ 5.0 (Vivino 원본 스케일)
@@ -164,9 +167,33 @@ public class WineRecommendationCalculator {
     }
 
     private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap, DrinkingSituation situation) {
-        return heap.stream()
+        List<WineScore> sortedScores = heap.stream()
                 .sorted(Comparator.comparingInt(WineScore::match).reversed())
-                .map(s -> WineRecommendationItem.of(s.wine(), s.match(), situation))
+                .toList();
+
+        if (sortedScores.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> wineIds = sortedScores.stream()
+                .map(s -> s.wine().getId())
+                .toList();
+
+        // IN 쿼리로 페어링 푸드 한 번에 조회
+        List<Object[]> foodResults = wineFoodPairingRepository.findFoodNamesByWineIds(wineIds);
+        Map<Long, List<String>> foodMap = foodResults.stream()
+                .collect(Collectors.groupingBy(
+                        r -> (Long) r[0],
+                        Collectors.mapping(r -> (String) r[1], Collectors.toList())
+                ));
+
+        return sortedScores.stream()
+                .map(s -> WineRecommendationItem.of(
+                        s.wine(),
+                        s.match(),
+                        situation,
+                        foodMap.getOrDefault(s.wine().getId(), List.of())
+                ))
                 .toList();
     }
 
