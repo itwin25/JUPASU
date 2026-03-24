@@ -71,8 +71,27 @@ class CustomChatRequest(BaseModel):
     stream: bool = False
     mentioned_friends: List[dict] = Field(default=[])
 
+class ChatCardData(BaseModel):
+    wine_id: Optional[int] = None
+    name_kr: Optional[str] = None
+    name_en: Optional[str] = None
+    subtitle: Optional[str] = None
+    price: Optional[int] = None
+    match_percent: Optional[int] = None
+    image_url: Optional[str] = None
+    detail_url: Optional[str] = None
+
+
+class ChatActionData(BaseModel):
+    type: str
+    label: str
+    wine_id: Optional[int] = None
+
+
 class CustomChatResponse(BaseModel):
     answer: str
     status: str = "success"
     raw_ocr: Optional[str] = None
     provider: Optional[str] = None
+    card: Optional[ChatCardData] = None
+    actions: List[ChatActionData] = Field(default=[])
