@@ -15,6 +15,8 @@ public record VivinoRawData(
         @JsonProperty("wine_type") String wineType,
         String price,
         String description,
+        @JsonProperty("top_3_taste_groups_kr")
+        List<String> top3TasteGroupsKr,
 
         @JsonProperty("food_pairings") List<String> foodPairings,
 
@@ -22,5 +24,5 @@ public record VivinoRawData(
         @JsonProperty("taste_profile") Map<String, String> tasteProfile,
         Map<String, Object> ratings,
         @JsonProperty("local_image_paths") Map<String, String> localImagePaths
-) {
-}
+        ) {
+        }

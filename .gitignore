@@ -40,6 +40,12 @@ ai/crawled-results/
 
 # AI Local Test Scripts
 ai/test_gms_*.py
+ai/chat-request.json
+
+# Generated recommendation SQL
+back/src/main/resources/sql/recommendation/02_backfill_embedding_text_ko.sql
+back/src/main/resources/sql/recommendation/04_backfill_embedding_vectors.sql
+back/src/main/resources/sql/recommendation/05_test_food_search.sql
 
 # File System
 data/
@@ -49,3 +55,5 @@ front/public/workbox-*.js
 
 # Local settings backup
 settings.local/
+.worktrees/
+jupasu-local-config/

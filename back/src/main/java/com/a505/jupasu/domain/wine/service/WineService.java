@@ -11,6 +11,8 @@ import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
 import com.a505.jupasu.domain.wine.repository.WineRepository;
+import com.a505.jupasu.domain.wine.repository.WineTasteGroupRepository;
+import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,8 @@ public class WineService {
     private final UserRepository userRepository;
     private final PreferenceRepository preferenceRepository;
     private final WineFoodPairingRepository wineFoodPairingRepository;
+    private final WineTasteGroupRepository wineTasteGroupRepository;
+    private final WineRecommendationCalculator wineRecommendationCalculator;
 
     public Page<WineSearchResponse> searchWines(WineSearchCondition condition, Pageable pageable) {
         List<Long> matchingIds = null;
@@ -63,11 +67,11 @@ public class WineService {
         // 3. 페어링 푸드 목록 조회
         List<String> pairingFoods = wineFoodPairingRepository.findFoodNamesByWineId(wineId);
 
+        List<String> tasteGroup = wineTasteGroupRepository.findTasteNamesByWineId(wineId);
         // 4. 취향 적중률 계산 현재는 95 고정
-        //TODO: 취향 적중률 로직 추후 추가 예정
-        int matchRate = 95;
+        int matchRate = wineRecommendationCalculator.getMatch(user, wine);
 
 
-        return WineDetailResponse.of(wine, matchRate, pairingFoods, preference);
+        return WineDetailResponse.of(wine, matchRate, pairingFoods, tasteGroup, preference);
     }
 }

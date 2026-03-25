@@ -37,7 +37,7 @@ public class ReviewController {
 
     @GetMapping("/{wine_id}")
     public ApiResponse<Page<ReviewResponse>> getWineReviews(
-            //TODO: 로그인한 사용자 확인 (Authentication 추가)
+            @AuthenticationPrincipal LoginUserCustom loginUser,
             @PathVariable("wine_id") Long wineId,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {

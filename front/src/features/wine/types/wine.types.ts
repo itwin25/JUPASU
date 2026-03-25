@@ -75,6 +75,9 @@ export interface WineRecommendationItem {
   body?: number;
   tannin?: number;
   style?: string;
+  price?: number;
+  rating?: number;
+  pairingFoods: string[];
 }
 
 export interface SituationResult {

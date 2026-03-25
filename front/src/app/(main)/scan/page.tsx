@@ -1,21 +1,47 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import NextImage from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Camera, ChevronLeft, Star, X } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
-import { useEffect } from 'react';
 import { OCRResult } from '@/features/scan/types';
+import { searchApi } from '@/features/scan/api/search.api';
+import { HybridSearchResponse } from '@/features/scan/types/search.types';
+
+function TasteGauge({ label, value }: { label: string; value: number | undefined | null }) {
+  const displayValue = value ? Math.ceil(value) : 0;
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-text-main/40 text-[10px] font-black tracking-tighter uppercase">
+        {label}
+      </span>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((level) => (
+          <div
+            key={level}
+            className={`h-1.5 w-1.5 rotate-45 ${
+              level <= displayValue ? 'bg-[#B36262]' : 'bg-primary-100'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 type ScanStatus = 'idle' | 'scanning' | 'confirming' | 'result';
 
 export default function ScanPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number } | null>(null);
+  const [hybridResult, setHybridResult] = useState<HybridSearchResponse | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [scanData, setScanData] = useState({
     winery: '',
     wineName: '',
@@ -92,6 +118,32 @@ export default function ScanPage() {
     fileInputRef.current?.click();
   };
 
+  const handleSearch = async () => {
+    if (isSearching) return;
+
+    const query = `${scanData.winery} ${scanData.wineName}`.trim();
+
+    if (!query) {
+      alert('와이너리나 와인 이름을 입력해 주세요.');
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const result = await searchApi.searchAdvanced(query);
+      console.log('✅ 검색 결과:', result);
+
+      setHybridResult(result);
+      setStatus('result');
+    } catch (err) {
+      console.error('Search Error:', err);
+      alert('와인 검색 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   if (modelError) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
@@ -129,25 +181,35 @@ export default function ScanPage() {
 
       <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6">
         {status === 'idle' && (
-          <div className="flex flex-col py-2">
-            <header className="mb-2">
+          <div className="flex flex-col pt-16 pb-4">
+            <header className="mb-4">
               <h1 className="text-text-main mb-1 text-2xl font-black">WINE SCAN</h1>
               <p className="text-text-main/40 text-sm font-medium">
                 와인 라벨을 스캔하면 정보를 알려드려요
               </p>
             </header>
 
-            <div className="relative mx-auto mt-4 mb-4 aspect-square w-full overflow-hidden rounded-[40px]">
+            <div className="mx-auto w-full overflow-hidden rounded-[40px]">
               <NextImage
                 src="/Scanning.jpg"
                 alt="Scanning Guide"
-                fill
+                width={500}
+                height={500}
                 priority
-                className="object-contain"
+                className="h-auto w-full"
               />
             </div>
 
-            <div className="space-y-6">
+            <div className="mt-6 space-y-6">
+              <Button
+                onClick={triggerUpload}
+                size="full"
+                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
+              >
+                <Camera size={24} />
+                와인 라벨 스캔하기
+              </Button>
+
               <div>
                 <div className="text-text-main mb-3 flex items-center gap-2 text-base font-black italic">
                   <span className="text-lg text-[#FF8A00]">⚡</span> 이렇게 스캔해 보세요
@@ -160,25 +222,18 @@ export default function ScanPage() {
                   ].map((tip) => (
                     <div
                       key={tip.n}
-                      className="border-primary-100 flex items-center gap-4 rounded-full border bg-white px-5 py-2 shadow-sm"
+                      className="border-primary-100 flex min-h-[60px] items-center gap-4 rounded-[20px] border bg-white px-5 py-3 shadow-sm"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFE5E5] text-sm font-black text-[#B36262]">
                         {tip.n}
                       </span>
-                      <span className="text-text-main/60 text-sm font-bold">{tip.t}</span>
+                      <span className="text-text-main/60 break-keep-all text-[13px] font-bold leading-tight">
+                        {tip.t}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
-
-              <Button
-                onClick={triggerUpload}
-                size="full"
-                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
-              >
-                <Camera size={24} />
-                와인 라벨 스캔하기
-              </Button>
             </div>
           </div>
         )}
@@ -329,7 +384,8 @@ export default function ScanPage() {
 
             <div className="mt-6">
               <Button
-                onClick={() => setStatus('result')}
+                onClick={handleSearch}
+                isLoading={isSearching}
                 size="full"
                 className="h-14 text-lg shadow-lg"
               >
@@ -340,57 +396,105 @@ export default function ScanPage() {
         )}
 
         {status === 'result' && (
-          <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-8 py-6 duration-500">
-            {/* Main Result Card */}
-            <div className="border-primary-100 flex items-center gap-5 rounded-[40px] border bg-white p-6 shadow-sm">
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-3xl bg-gray-100">
-                {capturedImage && (
-                  <NextImage src={capturedImage} alt="Wine" fill className="object-cover" />
-                )}
-              </div>
-              <div className="relative flex-1 space-y-1">
-                <h3 className="text-xl leading-tight font-black">
-                  {scanData.wineName || '분석된 와인'}
-                </h3>
-                <h4 className="text-text-main/40 text-sm font-medium">{scanData.winery}</h4>
-                <div className="flex items-center gap-4 pt-2">
-                  <div className="flex items-center gap-1 font-black text-[#FF8A00]">
-                    <Star size={16} fill="#FF8A00" /> 4.8
-                  </div>
-                  <span className="text-lg font-black text-[#B36262]">₩120,000</span>
-                </div>
-                <div className="bg-primary-100 absolute top-1/2 right-0 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-[10px] font-black text-[#B36262]">
-                  95%
-                </div>
-              </div>
-            </div>
-
-            {/* Taste Profile (Mockup) */}
-            <div className="space-y-4">
-              <h4 className="text-text-main text-lg font-black italic">맛 프로필</h4>
-              <div className="border-primary-100 space-y-4 rounded-[40px] border bg-white p-8 shadow-sm">
-                {['BODY', 'SWEET', 'ACID', 'TANNIN'].map((label) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-text-main/60 text-xs font-black">{label}</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3, 4, 5].map((d) => (
-                        <div
-                          key={d}
-                          className={`h-2.5 w-2.5 rotate-45 ${d <= 4 ? 'bg-[#B36262]' : 'bg-primary-100'}`}
-                        />
-                      ))}
+          <div className="animate-in slide-in-from-bottom-4 flex flex-col space-y-6 py-6 duration-500">
+            {/* Integrated Result Card */}
+            {hybridResult?.bestMatch ? (
+              <div className="space-y-4">
+                <article
+                  onClick={() => router.push(`/wines/${hybridResult.bestMatch?.id}`)}
+                  className="border-primary-100 relative cursor-pointer overflow-hidden rounded-[32px] border bg-white shadow-[0_12px_26px_rgba(51,34,17,0.06)] transition-all active:scale-[0.985]"
+                >
+                  <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-8">
+                    <div className="relative h-full w-full">
+                      <NextImage
+                        src={hybridResult.bestMatch.imageUrl || '/images/default_wine.png'}
+                        alt={hybridResult.bestMatch.nameEn}
+                        fill
+                        className="object-contain"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="flex items-center gap-4 rounded-[32px] border border-[#B36262]/10 bg-[#FFE5E5] p-6">
-              <div className="h-12 w-12 shrink-0 rounded-full bg-[#B36262]/30" />
-              <p className="text-text-main text-sm leading-relaxed font-bold">
-                이런 와인을 찾으셨군요! 비슷한 와인도 함께 추천해드릴게요!
-              </p>
-            </div>
+                  <div className="space-y-4 p-6">
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-black tracking-[0.1em] text-[#B36262] uppercase">
+                        {hybridResult.bestMatch.type}
+                      </p>
+                      <h3 className="text-text-main text-xl leading-tight font-black">
+                        {hybridResult.bestMatch.nameEn}
+                      </h3>
+                      <p className="text-text-main/40 text-xs font-bold">
+                        {hybridResult.bestMatch.winery}
+                      </p>
+                    </div>
+
+                    <div className="border-primary-100/50 space-y-2.5 border-t pt-4">
+                      <TasteGauge label="BODY" value={hybridResult.bestMatch.body} />
+                      <TasteGauge label="SWEET" value={hybridResult.bestMatch.sweetness} />
+                      <TasteGauge label="ACID" value={hybridResult.bestMatch.acidity} />
+                      <TasteGauge label="TANNIN" value={hybridResult.bestMatch.tannin} />
+                    </div>
+                  </div>
+                </article>
+              </div>
+            ) : (
+              <div className="border-primary-100 flex flex-col items-center justify-center rounded-[32px] border bg-white p-8 text-center shadow-sm">
+                <p className="text-text-main/60 font-bold">일치하는 와인을 찾지 못했습니다.</p>
+                <p className="text-text-main/40 mt-2 text-sm">
+                  정보를 수정하여 다시 검색해 보세요.
+                </p>
+                <Button onClick={() => setStatus('confirming')} variant="ghost" className="mt-4">
+                  정보 수정하기
+                </Button>
+              </div>
+            )}
+
+            {hybridResult?.recommendations && hybridResult.recommendations.length > 0 && (
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 rounded-[28px] border border-[#B36262]/10 bg-[#FFE5E5] p-5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#B36262]/30">
+                    <Star size={22} className="text-[#B36262]" fill="#B36262" />
+                  </div>
+                  <p className="text-text-main text-xs leading-relaxed font-bold">
+                    비슷한 맛의 다른 브랜드 와인들도 함께 찾아보았어요!
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-text-main text-lg font-black italic">추천 와인 리스트</h4>
+                  <div className="space-y-3">
+                    {hybridResult.recommendations.map((wine) => (
+                      <div
+                        key={wine.id}
+                        onClick={() => router.push(`/wines/${wine.id}`)}
+                        className="border-primary-100 flex cursor-pointer items-center gap-4 rounded-[24px] border bg-white p-3.5 shadow-sm transition-all hover:border-[#B36262]/30 active:scale-[0.98]"
+                      >
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-50">
+                          <NextImage
+                            src={wine.imageUrl || '/images/default_wine.png'}
+                            alt={wine.nameEn}
+                            fill
+                            className="object-contain p-1"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h5 className="truncate text-sm font-black">{wine.nameEn}</h5>
+                          <p className="text-text-main/40 truncate text-[11px] font-bold">
+                            {wine.winery}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className="rounded-full bg-[#FFE5E5] px-2 py-0.5 text-[9px] font-black text-[#B36262]">
+                              {wine.type}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronLeft className="text-text-main/20 rotate-180" size={18} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

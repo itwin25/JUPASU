@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+import re
+import unicodedata
 
 
 TYPE_MAP = {
@@ -75,6 +77,10 @@ COUNTRY_MAP_KO = {
     "portugal": "포르투갈",
     "germany": "독일",
     "austria": "오스트리아",
+    "canada": "캐나다",
+    "switzerland": "스위스",
+    "moldova": "몰도바",
+    "canada": "캐나다",
 }
 
 REGION_MAP_KO = {
@@ -91,6 +97,47 @@ REGION_MAP_KO = {
     "mendoza": "멘도사",
     "champagne": "샹파뉴",
     "mosel": "모젤",
+    "central otago": "센트럴 오타고",
+    "alsace": "알자스",
+    "südtirol - alto adige": "쥐트티롤-알토 아디제",
+    "sudtirol - alto adige": "쥐트티롤-알토 아디제",
+    "montagny premier cru": "몽타니 프르미에 크뤼",
+    "chianti classico": "키안티 클라시코",
+    "piave": "피아베",
+    "south eastern australia": "사우스 이스턴 오스트레일리아",
+    "kumeu": "쿠메우",
+    "willamette valley": "윌라멧 밸리",
+    "bio-bio valley": "비오비오 밸리",
+    "valais": "발레",
+    "barossa": "바로사",
+    "saint-julien": "생쥘리앙",
+    "st-julien": "생쥘리앙",
+    "pauillac": "포이약",
+    "margaux": "마고",
+    "saint-estèphe": "생테스테프",
+    "saint-estephe": "생테스테프",
+    "saint-émilion": "생테밀리옹",
+    "saint-emilion": "생테밀리옹",
+    "pomerol": "포므롤",
+    "medoc": "메독",
+    "médoc": "메독",
+    "haut-médoc": "오메독",
+    "haut-medoc": "오메독",
+    "bianco di custoza": "비앙코 디 쿠스토자",
+    "barbera d'asti": "바르베라 다스티",
+    "barbera d asti": "바르베라 다스티",
+    "pauillac": "포이약",
+    "waiheke island": "와이헤케 아일랜드",
+    "wachau": "바하우",
+    "columbia valley": "컬럼비아 밸리",
+    "colchagua valley": "콜차과 밸리",
+    "nagambie lakes": "나감비 레이크스",
+    "wine of canada": "캐나다",
+    "mâcon-villages": "마콩 빌라주",
+    "macon-villages": "마콩 빌라주",
+    "rosso di montalcino": "로쏘 디 몬탈치노",
+    "romanée-saint-vivant grand cru": "로마네 생 비방 그랑 크뤼",
+    "romanee-saint-vivant grand cru": "로마네 생 비방 그랑 크뤼",
 }
 
 GRAPE_MAP_KO = {
@@ -101,6 +148,37 @@ GRAPE_MAP_KO = {
     "Chardonnay": "샤르도네",
     "Sauvignon Blanc": "소비뇽 블랑",
     "Riesling": "리슬링",
+    "Carignan": "카리냥",
+    "Vermentino": "베르멘티노",
+    "Pinot Gris": "피노 그리",
+    "Pinot Grigio": "피노 그리지오",
+    "Grenache": "그르나슈",
+    "Syrah": "시라즈",
+    "Tempranillo": "템프라니요",
+    "Malbec": "말벡",
+    "Sangiovese": "산지오베제",
+    "Nebbiolo": "네비올로",
+    "Zinfandel": "진판델",
+    "Moscato": "모스카토",
+    "Gewurztraminer": "게뷔르츠트라미너",
+    "Viognier": "비오니에",
+    "Chenin Blanc": "슈냉 블랑",
+    "Muscat Blanc": "뮈스카 블랑",
+    "Pinot Blanc": "피노 블랑",
+    "Raboso Piave": "라보소 피아베",
+    "Cariñena": "카리녜나",
+    "Carinena": "카리녜나",
+    "Cabernet Franc": "카베르네 프랑",
+    "Petit Verdot": "쁘띠 베르도",
+    "Pinot Bianco": "피노 비안코",
+    "Grauburgunder": "그라우부르군더",
+    "Barbera": "바르베라",
+    "Tocai Friulano": "토카이 프리울라노",
+    "Corvina": "코르비나",
+    "Rondinella": "론디넬라",
+    "Molinara": "몰리나라",
+    "Trebbiano": "트레비아노",
+    "Garganega": "가르가네가",
 }
 
 RAW_FOOD_TO_CANONICAL = {
@@ -148,12 +226,95 @@ NOTE_TRANSLATIONS = {
     "mushroom": "버섯",
     "toast": "토스트",
     "mandarin orange": "만다린 오렌지",
+    "strawberry": "딸기",
+    "cranberry": "크랜베리",
+    "raspberry": "라즈베리",
+    "red currant": "레드커런트",
+    "currant": "커런트",
+    "apple": "사과",
+    "green apple": "청사과",
+    "pear": "배",
+    "peach": "복숭아",
+    "apricot": "살구",
+    "yellow peach": "황도 복숭아",
+    "citrus": "시트러스",
+    "grapefruit": "자몽",
+    "orange": "오렌지",
+    "orange peel": "오렌지 껍질",
+    "orange zest": "오렌지 제스트",
+    "lime": "라임",
+    "lemon": "레몬",
+    "minerals": "미네랄",
+    "mineral": "미네랄",
+    "stone": "돌 향",
+    "smoke": "훈연 향",
+    "honey": "꿀",
+    "beeswax": "밀랍",
+    "rose": "장미",
+    "violet": "제비꽃",
+    "clove": "정향",
+    "red cherry": "붉은 체리",
+    "butter": "버터",
+    "cocoa": "코코아",
+    "leather": "가죽",
+    "cedar": "삼나무",
+    "mint": "민트",
+    "oil": "오일리한 느낌",
+    "anise": "아니스",
+    "graphite": "흑연",
+    "butterscotch": "버터스카치",
+    "black currant": "블랙커런트",
+    "blackcurrant": "블랙커런트",
+    "tropical": "열대 과일",
+    "pineapple": "파인애플",
+    "mango": "망고",
+    "bing cherry": "빙 체리",
+    "ginger": "생강",
+    "cream": "크리미한 풍미",
+    "cheese": "치즈 풍미",
+    "nectarine": "넥타린",
+    "dried rose": "말린 장미",
+    "jasmine": "자스민",
+    "boysenberry": "보이즌베리",
+    "smoked meats": "훈연 고기 향",
 }
 
 STYLE_TRANSLATIONS = {
     "South Australia Shiraz": "사우스 오스트레일리아 시라즈 스타일",
     "South Australia Cabernet Sauvignon": "사우스 오스트레일리아 카베르네 소비뇽 스타일",
     "Bourgogne Chardonnay": "부르고뉴 샤르도네 스타일",
+    "French Rosé": "프렌치 로제 스타일",
+    "French Rose": "프렌치 로제 스타일",
+    "Alsace Pinot Gris": "알자스 피노 그리 스타일",
+    "Central Otago Pinot Noir": "센트럴 오타고 피노 누아 스타일",
+    "Bourgogne Pinot Noir": "부르고뉴 피노 누아 스타일",
+    "Burgundy White": "부르고뉴 화이트 스타일",
+    "New Zealand Bordeaux Blend": "뉴질랜드 보르도 블렌드 스타일",
+    "Spanish Montsant Red": "스페인 몬산트 레드 스타일",
+    "New Zealand Chardonnay": "뉴질랜드 샤르도네 스타일",
+    "Northern Italy Pinot Blanc": "북이탈리아 피노 블랑 스타일",
+    "Burgundy Côte Chalonnaise White": "부르고뉴 코트 샬로네즈 화이트 스타일",
+    "Italian Chianti Classico Red": "이탈리아 키안티 클라시코 레드 스타일",
+    "Northern Italy Red": "북이탈리아 레드 스타일",
+    "Australian Rosé": "호주 로제 스타일",
+    "Australian Rose": "호주 로제 스타일",
+    "Australian Riesling": "호주 리슬링 스타일",
+    "Washington State Merlot": "워싱턴주 메를로 스타일",
+    "Tuscan Red": "토스카나 레드 스타일",
+    "Burgundy Mâconnais White": "부르고뉴 마코네 화이트 스타일",
+    "Burgundy Maconnais White": "부르고뉴 마코네 화이트 스타일",
+    "Argentinian Bordeaux Blend": "아르헨티나 보르도 블렌드 스타일",
+    "Chilean White Blend": "칠레 화이트 블렌드 스타일",
+    "Austrian Pinot Gris": "오스트리아 피노 그리 스타일",
+    "Burgundy Côte de Nuits Red": "부르고뉴 코트 드 뉘 레드 스타일",
+    "Burgundy Cote de Nuits Red": "부르고뉴 코트 드 뉘 레드 스타일",
+    "Australian Cabernet Sauvignon": "호주 카베르네 소비뇽 스타일",
+    "Austrian Riesling": "오스트리아 리슬링 스타일",
+    "Austrian Pinot Gris": "오스트리아 피노 그리 스타일",
+    "French White": "프렌치 화이트 스타일",
+    "Northern Italy White": "북부 이탈리아 화이트 스타일",
+    "Argentinian Merlot": "아르헨티나 메를로 스타일",
+    "New Zealand Sauvignon Blanc": "뉴질랜드 소비뇽 블랑 스타일",
 }
 
 NOTE_GROUP_TRANSLATIONS = {
@@ -218,7 +379,7 @@ def _parse_percent(value: Any) -> int | None:
 
 def _band(metric: str, value: int | None) -> str:
     if value is None:
-        return "unknown"
+        return ""
 
     if metric == "boldness":
         if value >= 85:
@@ -256,7 +417,7 @@ def _band(metric: str, value: int | None) -> str:
             return "soft tannin"
         return "low tannin"
 
-    return "unknown"
+    return ""
 
 
 def _normalize_grapes(raw: str) -> list[str]:
@@ -291,34 +452,160 @@ def _normalize_foods(items: list[str]) -> list[str]:
 def _translate_country(country: str) -> str:
     if not country:
         return ""
-    return COUNTRY_MAP_KO.get(country.lower(), country)
+    return COUNTRY_MAP_KO.get(country.lower(), _translate_free_text(country))
 
 
 def _translate_region(region: str) -> str:
     if not region:
         return ""
-    return REGION_MAP_KO.get(region.lower(), region)
+    return REGION_MAP_KO.get(region.lower(), _translate_free_text(region))
 
 
 def _translate_grape(grape: str) -> str:
     if not grape:
         return ""
-    return GRAPE_MAP_KO.get(grape, grape)
+    cleaned = grape.strip()
+    cleaned = re.sub(r"^\d+%\s*", "", cleaned)
+    cleaned = cleaned.replace("100% ", "").strip()
+    direct = GRAPE_MAP_KO.get(cleaned)
+    if direct:
+        return direct
+
+    translated = _translate_free_text(cleaned)
+    return translated or cleaned
+
+
+def _normalize_lookup_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    return ascii_value.lower().strip()
+
+
+def _lookup_normalized(mapping: dict[str, str], value: str) -> str | None:
+    if not value:
+        return None
+
+    normalized_value = _normalize_lookup_key(value)
+    for key, mapped in mapping.items():
+        if _normalize_lookup_key(key) == normalized_value:
+            return mapped
+    return None
+
+
+def _translate_free_text(text: str) -> str:
+    if not text:
+        return ""
+
+    translated = text
+
+    def replace_term(source: str, term: str, replacement: str) -> str:
+        pattern = re.escape(term)
+        if re.match(r"^[A-Za-zÀ-ÿ0-9 .,'’&-]+$", term):
+            pattern = rf"(?<![A-Za-zÀ-ÿ]){pattern}(?![A-Za-zÀ-ÿ])"
+        return re.sub(pattern, replacement, source, flags=re.IGNORECASE)
+
+    replacement_maps = (
+        NOTE_TRANSLATIONS,
+        GRAPE_MAP_KO,
+        REGION_MAP_KO,
+        COUNTRY_MAP_KO,
+    )
+
+    for mapping in replacement_maps:
+        for english, korean in sorted(mapping.items(), key=lambda item: len(item[0]), reverse=True):
+            translated = replace_term(translated, english, korean)
+
+    general_replacements = {
+        "Rosé": "로제",
+        "Rose": "로제",
+        "White": "화이트",
+        "Red": "레드",
+        "Blend": "블렌드",
+        "French": "프렌치",
+        "Italian": "이탈리아",
+        "Spanish": "스페인",
+        "Australian": "호주",
+        "Austrian": "오스트리아",
+        "Argentinian": "아르헨티나",
+        "Chilean": "칠레",
+        "Hungary": "헝가리",
+        "Northern": "북부",
+        "South": "사우스",
+        "Cote": "코트",
+        "Côte": "코트",
+        "Premier Cru": "프르미에 크뤼",
+    }
+
+    for english, korean in general_replacements.items():
+        translated = replace_term(translated, english, korean)
+
+    translated = re.sub(r"\s+", " ", translated).strip()
+    return translated
+
+
+def _join_foods_ko(foods: list[str]) -> str:
+    if not foods:
+        return "다양한 음식"
+    if len(foods) == 1:
+        return foods[0]
+    if len(foods) == 2:
+        return f"{foods[0]}와 {foods[1]}"
+    return ", ".join(foods[:-1]) + f", {foods[-1]}"
+
+
+def _build_origin_text(country: str, region: str) -> str:
+    country = country.strip()
+    region = region.strip()
+
+    if country and region:
+        normalized_country = re.sub(r"\s+", "", country)
+        normalized_region = re.sub(r"\s+", "", region)
+        if normalized_country == normalized_region:
+            return country
+        if country in region or region in country:
+            shorter = country if len(country) <= len(region) else region
+            return shorter
+        return f"{country} {region}"
+
+    return country or region
+
+
+def _clean_description_text(text: str) -> str:
+    cleaned = _text(text)
+    if not cleaned:
+        return ""
+    cleaned = cleaned.replace("향의 향과 풍미", "향과 풍미")
+    cleaned = cleaned.replace("풍미의 향과 풍미", "풍미가 두드러집니다")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _simplify_note_phrase(note_phrase: str) -> str:
+    translated = _translate_note_phrase(note_phrase)
+    if not translated:
+        return ""
+    if ": " not in translated:
+        return translated
+
+    group, keywords = translated.split(": ", 1)
+    first_keywords = [item.strip() for item in keywords.split(",") if item.strip()][:3]
+    if not first_keywords:
+        return group
+    return f"{group} 계열의 {', '.join(first_keywords)}"
 
 
 def _translate_style(style: str) -> str:
     if not style:
         return ""
-    if style in STYLE_TRANSLATIONS:
-        return STYLE_TRANSLATIONS[style]
+    direct = STYLE_TRANSLATIONS.get(style) or _lookup_normalized(STYLE_TRANSLATIONS, style)
+    if direct:
+        return direct
 
-    translated = style
-    for english, korean in COUNTRY_MAP_KO.items():
-        translated = translated.replace(english.title(), korean)
-    for english, korean in REGION_MAP_KO.items():
-        translated = translated.replace(english.title(), korean)
-    for english, korean in GRAPE_MAP_KO.items():
-        translated = translated.replace(english, korean)
+    translated = _translate_free_text(style)
+    translated = translated.replace("n 로제", " 로제")
+    translated = translated.replace("  ", " ").strip()
+    if re.search(r"[A-Za-z]{3,}", translated):
+        return ""
     return translated
 
 
@@ -350,7 +637,7 @@ def _translate_note_phrase(note_phrase: str) -> str:
         return ""
 
     if ": " not in note_phrase:
-        return NOTE_TRANSLATIONS.get(note_phrase.lower(), note_phrase)
+        return NOTE_TRANSLATIONS.get(note_phrase.lower(), _translate_free_text(note_phrase))
 
     group, keywords = note_phrase.split(": ", 1)
     translated_group = NOTE_GROUP_TRANSLATIONS.get(group, group)
@@ -359,8 +646,37 @@ def _translate_note_phrase(note_phrase: str) -> str:
         token = keyword.strip()
         if not token:
             continue
-        translated_keywords.append(NOTE_TRANSLATIONS.get(token.lower(), token))
+        translated = NOTE_TRANSLATIONS.get(token.lower(), _translate_free_text(token))
+        if re.search(r"[A-Za-z]{2,}", translated):
+            continue
+        translated_keywords.append(translated)
+
+    if not translated_keywords:
+        return translated_group
     return f"{translated_group}: {', '.join(translated_keywords)}"
+
+
+def _build_taste_sentence(
+    body: str,
+    acidity: str,
+    tannin: str,
+    sweetness: str,
+    foods: str,
+) -> str:
+    taste_parts: list[str] = []
+    if body:
+        taste_parts.append(f"{body} 바디감")
+    if acidity:
+        taste_parts.append(f"{acidity} 산미")
+    if tannin:
+        taste_parts.append(f"{tannin} 탄닌")
+    if sweetness:
+        taste_parts.append(f"{sweetness} 당도")
+
+    if not taste_parts:
+        return f"{foods} 같은 음식과 잘 어울립니다."
+
+    return f"{', '.join(taste_parts)}의 특징을 가지며, {foods} 같은 음식과 잘 어울립니다."
 
 
 def normalize_wine(wine: dict[str, Any]) -> dict[str, Any]:
@@ -466,16 +782,16 @@ def build_wine_narrative_ko(wine: dict[str, Any]) -> str:
 def build_embedding_text_ko(wine: dict[str, Any]) -> str:
     normalized = normalize_wine(wine)
     grapes = ", ".join(normalized["grapes_ko"]) if normalized["grapes_ko"] else "품종 정보가 확인되지 않은"
-    foods = ", ".join(normalized["food_pairings_ko"][:4]) if normalized["food_pairings_ko"] else "다양한 음식"
+    foods = _join_foods_ko(normalized["food_pairings_ko"][:4])
 
     translated_notes = []
     for note in normalized["top_notes"]:
-        translated = _translate_note_phrase(note)
+        translated = _simplify_note_phrase(note)
         if translated:
             translated_notes.append(translated)
 
     if translated_notes:
-        note_text = ", ".join(translated_notes)
+        note_text = ", ".join(translated_notes[:3])
     else:
         note_text = "과실과 향신료 계열의 풍미"
 
@@ -485,22 +801,19 @@ def build_embedding_text_ko(wine: dict[str, Any]) -> str:
     sweetness = TASTE_MAP_KO.get(normalized["taste"]["sweetness"], normalized["taste"]["sweetness"])
 
     sentence1 = (
-        f"{normalized['display_name']}는 {normalized['country_ko']} {normalized['region_ko']}에서 생산된 "
+        f"{normalized['display_name']}는 {_build_origin_text(normalized['country_ko'], normalized['region_ko'])}에서 생산된 "
         f"{normalized['wine_type_ko']}입니다."
     )
     sentence2 = (
         f"{grapes} 품종 기반으로, {note_text}의 향과 풍미가 두드러집니다."
     )
-    sentence3 = (
-        f"{body} 바디감, {acidity} 산미, {tannin} 탄닌, {sweetness} 당도의 특징을 가지며, "
-        f"{foods}와 잘 어울립니다."
-    )
+    sentence3 = _build_taste_sentence(body, acidity, tannin, sweetness, foods)
 
     style_sentence = ""
     if normalized["wine_style_ko"]:
-        style_sentence = f"와인 스타일은 {normalized['wine_style_ko']}로 분류됩니다."
+        style_sentence = f"{normalized['wine_style_ko']}로 즐기기 좋은 와인입니다."
     elif normalized["description"]:
-        style_sentence = normalized["description"]
+        style_sentence = _clean_description_text(normalized["description"])
 
     parts = [sentence1, sentence2, sentence3]
     if style_sentence:

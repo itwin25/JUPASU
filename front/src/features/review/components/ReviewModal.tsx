@@ -46,7 +46,7 @@ export default function ReviewModal({
 
   if (!isOpen) return null;
 
-  const isValid = rating > 0 && content.trim().length >= 10;
+  const isValid = rating > 0;
 
   return (
     <div className="animate-in fade-in fixed inset-0 z-[120] flex items-center justify-center bg-black/45 px-4 duration-200">
@@ -164,7 +164,7 @@ export default function ReviewModal({
 
           {!isValid ? (
             <p className="text-text-main/28 text-center text-[10px] font-medium">
-              별점과 10자 이상의 리뷰를 작성해주세요
+              별점을 선택해주세요
             </p>
           ) : null}
         </div>

@@ -2,8 +2,12 @@
 FROM ghcr.io/astral-sh/uv:latest AS uv_bin
 FROM nvidia/cuda:12.8.0-base-ubuntu24.04 AS builder
 
-# Ubuntu 24.04 환경 설정 및 Python 설치
-RUN apt-get update && apt-get install -y python3 python3-pip && \
+# Ubuntu 24.04 환경 설정 및 Python 설치 (APT 캐시 활용)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
@@ -13,20 +17,27 @@ COPY --from=uv_bin /uv /uvx /bin/
 
 # 환경 변수 설정
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_PYTHON_INSTALL_DIR=/app/.python
 
-# 의존성 파일 복사
+# 의존성 파일 복사 (레이어 캐싱을 위해 소스 코드보다 먼저 복사)
 COPY pyproject.toml uv.lock ./
 
-# 가상환경 생성 및 의존성 설치
-RUN uv sync --frozen --no-install-project --no-dev
+# 가상환경 생성 및 의존성 설치 (UV 캐시 활용)
+# --mount=type=cache를 통해 패키지 재다운로드 방지
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
 
 # 2. 실행 스테이지 (Runtime)
 FROM nvidia/cuda:12.8.0-base-ubuntu24.04
 
-# 필수 라이브러리 설치 (Ubuntu 24.04 최적화)
-# libgl1-mesa-glx 대신 libgl1 사용 (24.04 대응)
-RUN apt-get update && apt-get install -y python3 libgl1 libglib2.0-0 && \
+# 필수 라이브러리 설치 (APT 캐시 활용)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    libgl1 \
+    libglib2.0-0 && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # 보안: 비특권 사용자 생성
@@ -38,7 +49,7 @@ RUN mkdir -p /app/logs && chown appuser:appuser /app/logs
 # 빌드 스테이지에서 생성된 가상환경(.venv) 복사
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
-# 소스 코드 복사
+# 소스 코드 복사 (변경이 잦으므로 마지막에 배치)
 COPY --chown=appuser:appuser app/ ./app/
 
 # 실행 환경 설정
