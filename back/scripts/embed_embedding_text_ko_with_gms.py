@@ -7,12 +7,23 @@ from pathlib import Path
 
 import httpx
 import psycopg
-from dotenv import load_dotenv
 
 
 DEFAULT_MODEL = "text-embedding-3-small"
 DEFAULT_BASE_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/embeddings"
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_dotenv_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip("'").strip('"'))
 
 
 def fetch_embedding(client: httpx.Client, api_key: str, model: str, text: str) -> list[float]:
@@ -38,11 +49,13 @@ def vector_literal(values: list[float]) -> str:
 
 
 def main() -> None:
-    load_dotenv(ROOT_DIR / ".env")
+    load_dotenv_file(ROOT / ".env")
 
-    parser = argparse.ArgumentParser(description="Embed wine.embedding_text_ko with GMS and store vectors in PostgreSQL.")
+    parser = argparse.ArgumentParser(
+        description="Embed wine.embedding_text_ko with GMS and store vectors in PostgreSQL."
+    )
     parser.add_argument("--db-host", default="127.0.0.1")
-    parser.add_argument("--db-port", type=int, default=5432)
+    parser.add_argument("--db-port", type=int, default=15432)
     parser.add_argument("--db-name", default="jupasu")
     parser.add_argument("--db-user", default="jupasu_user")
     parser.add_argument("--db-password", default="jupasu_pass")
@@ -96,12 +109,7 @@ def main() -> None:
                             embedding_generated_at = %s
                         WHERE id = %s
                         """,
-                        (
-                            vector,
-                            args.model,
-                            datetime.now(timezone.utc),
-                            wine_id,
-                        ),
+                        (vector, args.model, datetime.now(timezone.utc), wine_id),
                     )
                 conn.commit()
                 print(f"[{index}/{len(rows)}] updated wine id={wine_id}")
