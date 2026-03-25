@@ -1,11 +1,13 @@
 import logging
 import re
-from typing import List, TypedDict, Optional, Any
-from langgraph.graph import StateGraph, END
+from typing import List, Optional, TypedDict
+
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
-from langchain_core.prompts import ChatPromptTemplate
-
+from app.api.v1.schemas import ChatMessage
 from app.services.chat.food_wine_recommendation_client import (
     build_food_recommendation_summary,
     request_food_wine_recommendation,
@@ -13,7 +15,6 @@ from app.services.chat.food_wine_recommendation_client import (
 )
 from app.services.chat.input_context_builder import build_chat_input_context
 from app.services.llm.factory import get_llm
-from app.services.rag.chat_retrieval_service import perform_hybrid_recommendation
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class WineRecommendation(BaseModel):
     image_url: str
     match_score: int
     reason: str
+
 
 
 class FinalSommelierResponse(BaseModel):
@@ -38,6 +40,8 @@ class AgentState(TypedDict):
     mentioned_friends: Optional[List[dict]]
     selected_wine: Optional[dict]
     selected_menu: Optional[dict]
+    history: Optional[List[ChatMessage]] # 추가: 외부에서 전달받은 히스토리
+    messages: List[BaseMessage]          # 추가: 그래프 내부용 메시지 리스트
     input_context: Optional[dict]
     food_wine_recommendation: Optional[dict]
     final_output: Optional[FinalSommelierResponse]
@@ -126,13 +130,43 @@ def build_recommendation_first_message(recommendation: dict) -> str:
     return "\n".join([lead, reason])
 
 
+def convert_history_to_base_messages(history: List[ChatMessage] | List[dict] | None) -> List[BaseMessage]:
+    """Spring에서 전달받은 history 배열을 LangChain 메시지 객체 리스트로 변환 (객체/딕셔너리 모두 대응)"""
+    messages: List[BaseMessage] = []
+    if not history:
+        return messages
+
+    for entry in history:
+        # Pydantic 객체인 경우와 dict인 경우를 모두 처리
+        role = getattr(entry, 'role', None) or (entry.get('role') if isinstance(entry, dict) else None)
+        content = getattr(entry, 'content', None) or (entry.get('content') if isinstance(entry, dict) else None)
+        
+        if role == "user":
+            messages.append(HumanMessage(content=content))
+        elif role == "assistant" or role == "bot":
+            messages.append(AIMessage(content=content))
+            
+    return messages
+
+
 async def prepare_input_context_node(state: AgentState):
+    raw_history = state.get("history")
+    
     input_context = build_chat_input_context(
         raw_input=state.get("raw_input", ""),
         selected_menu=state.get("selected_menu"),
         selected_wine=state.get("selected_wine"),
         mentioned_friends=state.get("mentioned_friends"),
     )
+
+    # 히스토리를 텍스트 블록으로 변환 (클라이언트 호환성을 위해 직접 주입)
+    history_text = "없음"
+    if raw_history:
+        history_lines = []
+        for entry in raw_history:
+            role_label = "사용자" if entry.role == "user" else "소믈리에"
+            history_lines.append(f"[{role_label}]: {entry.content}")
+        history_text = "\n".join(history_lines)
 
     recommendation = None
     if should_request_food_recommendation(state.get("raw_input", ""), input_context):
@@ -147,7 +181,9 @@ async def prepare_input_context_node(state: AgentState):
 
     summary = input_context.get("summary", "")
     recommendation_summary = build_food_recommendation_summary(recommendation)
-    input_context["summary"] = f"{summary}\n{recommendation_summary}".strip()
+    
+    # 요약 정보에 대화 이력 명시적으로 추가
+    input_context["summary"] = f"### 이전 대화 이력\n{history_text}\n\n### 현재 상황 정보\n{summary}\n{recommendation_summary}".strip()
 
     return {
         "input_context": input_context,
@@ -269,5 +305,6 @@ def build_chat_graph():
     workflow.add_edge("prepare_input_context", "chat")
     workflow.add_edge("chat", END)
     return workflow.compile()
+
 
 sommelier_agent = build_chat_graph()

@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * ChatMessage 테이블이 자동으로 생성됩니다.
  */
 @Entity
-@Table(name = "chat_messages")
+@Table(name = "chat_messages", indexes = @Index(name = "idx_chat_session", columnList = "session_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ChatMessage {
@@ -25,9 +25,12 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 세션별 대화 묶음을 위한 ID
+    @Column(name = "session_id", nullable = false)
+    private String sessionId;
+
     /**
      * @ManyToOne: 여러 개의 채팅 메시지가 하나의 유저에게 속함을 나타냅니다.
-     * @JoinColumn: DB 외래키(FK) 이름을 user_id로 설정합니다.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -52,7 +55,8 @@ public class ChatMessage {
     }
 
     @Builder
-    public ChatMessage(User user, String role, String content) {
+    public ChatMessage(String sessionId, User user, String role, String content) {
+        this.sessionId = sessionId;
         this.user = user;
         this.role = role;
         this.content = content;

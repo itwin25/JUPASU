@@ -91,20 +91,30 @@ async def chat(request: CustomChatRequest):
         "selected_menu": request.selected_menu,
         "user_id": request.user_id,
         "mentioned_friends": request.mentioned_friends,
+        "history": request.history, # 추가: 과거 대화 이력 전달
     }
 
     settings = get_settings()
 
     if request.stream:
         async def stream_generator():
+            # [ULTIMATE HOTFIX] GMS 프록시의 버퍼링 및 초기 바이트 유실 문제를 해결하기 위해
+            # 약 2KB 크기의 벌크 더미 데이터를 먼저 전송하여 프록시 버퍼를 강제로 밀어냅니다.
+            dummy_padding = " " * 2048
+            yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
+            
             has_sent_content = False
 
-            async for event in sommelier_agent.astream_events(initial_state, version="v2"):
+            # v2 대신 v1을 사용하여 더 원시적인 이벤트를 캡처합니다. (짤림 방지)
+            async for event in sommelier_agent.astream_events(initial_state, version="v1"):
                 kind = event.get("event")
 
+                # v1에서는 on_chat_model_stream의 데이터 구조가 약간 다를 수 있으나 
+                # LangChain 추상화 레이어에서 대부분 호환됩니다.
                 if kind == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
-                    if content:
+                    chunk = event["data"]["chunk"]
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if content is not None:
                         has_sent_content = True
                         yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
 

@@ -10,6 +10,7 @@ import com.a505.jupasu.domain.wine.dto.WineQuickRecommendResponse;
 import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
+import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
 import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +29,34 @@ public class WineRecommendationCalculator {
     private final WineQueryService wineQueryService;
     private final PreferenceRepository preferenceRepository;
     private final ReviewRepository reviewRepository;
+    private final WineFoodPairingRepository wineFoodPairingRepository;
+
+    // ── Sigmoid 변환 ─────────────────────────────────────────────────────────────
+    /**
+     * 원점수(0~100)를 Sigmoid 변환으로 표시용 매칭률로 변환한다.
+     *
+     * <pre>
+     *   display = round(100 / (1 + exp(−k · (s − μ))))
+     *   s = rawScore / 100
+     *   μ = 0.35  (50% 중립점: 원점수 35 이하는 50% 미만으로 표시)
+     *   k = 6     (경사도: μ 기준 ±0.1마다 약 12%p 변화; 7에서 낮춰 분포를 약간 펼침)
+     * </pre>
+     *
+     * 추천 시스템에서 실제로 반환되는 top-5 와인의 원점수는 약 55~85 범위이며,
+     * 이 구간이 77~95%로 매핑되어 사용자에게 신뢰감 있는 점수를 제공한다.
+     * 상대적 순위(ranking)는 sigmoid의 단조증가 특성으로 원점수와 동일하게 보존된다.
+     *
+     * <ul>
+     *   <li>원점수 55 → 약 77%</li>
+     *   <li>원점수 65 → 약 86%</li>
+     *   <li>원점수 75 → 약 92%</li>
+     *   <li>원점수 85 → 약 95%</li>
+     * </ul>
+     */
+    private static int sigmoid(int rawScore) {
+        double s = rawScore / 100.0;
+        return (int) Math.round(100.0 / (1.0 + Math.exp(-6.0 * (s - 0.35))));
+    }
 
     // ── 스케일 정보 ──────────────────────────────────────────────────────────────
     // W_i (TasteProfile): 0.0 ~ 5.0 (Vivino 원본 스케일)
@@ -104,13 +134,13 @@ public class WineRecommendationCalculator {
     }
 
     /**
-     * 상황 없이 취향 기반 추천도 계산
+     * 상황 없이 취향 기반 추천도 계산 (상세 페이지용 — 데이터 불완전 와인도 점수 산출)
      */
     public int getMatch(User user, Wine wine) {
         Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
-        return score(wine, null, pref, calibrated);
+        return sigmoid(scoreForDetail(wine, pref, calibrated));
     }
 
     /**
@@ -164,9 +194,33 @@ public class WineRecommendationCalculator {
     }
 
     private List<WineRecommendationItem> heapToList(PriorityQueue<WineScore> heap, DrinkingSituation situation) {
-        return heap.stream()
+        List<WineScore> sortedScores = heap.stream()
                 .sorted(Comparator.comparingInt(WineScore::match).reversed())
-                .map(s -> WineRecommendationItem.of(s.wine(), s.match(), situation))
+                .toList();
+
+        if (sortedScores.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> wineIds = sortedScores.stream()
+                .map(s -> s.wine().getId())
+                .toList();
+
+        // IN 쿼리로 페어링 푸드 한 번에 조회
+        List<Object[]> foodResults = wineFoodPairingRepository.findFoodNamesByWineIds(wineIds);
+        Map<Long, List<String>> foodMap = foodResults.stream()
+                .collect(Collectors.groupingBy(
+                        r -> (Long) r[0],
+                        Collectors.mapping(r -> (String) r[1], Collectors.toList())
+                ));
+
+        return sortedScores.stream()
+                .map(s -> WineRecommendationItem.of(
+                        s.wine(),
+                        sigmoid(s.match()),
+                        situation,
+                        foodMap.getOrDefault(s.wine().getId(), List.of())
+                ))
                 .toList();
     }
 
@@ -177,7 +231,7 @@ public class WineRecommendationCalculator {
         Preference pref = preferenceRepository.findByUserId(user.getId()).orElse(null);
         List<Review> reviews = reviewRepository.findAllByUserWithWine(user);
         CalibratedProfile calibrated = calibrate(pref, reviews);
-        return score(wine, situation, pref, calibrated);
+        return sigmoid(score(wine, situation, pref, calibrated));
     }
 
     // ── calibrate: U_i^revealed · γ · Û_i · σ̂_i ────────────────────────────────
@@ -401,6 +455,62 @@ public class WineRecommendationCalculator {
         float bW = 0f;
 
         float total = wPref * sPref + wPriceW * sPrice + wSitW * sSit + bW;
+        return Math.round(total * 100);
+    }
+
+    /**
+     * 상세 페이지 전용 추천도 계산 — 데이터 불완전 와인 제외 없이 점수 산출.
+     *
+     * <p>추천 목록용 {@link #score}와 달리 핵심 데이터 부재 시에도 {@code Integer.MIN_VALUE}를
+     * 반환하지 않는다. 누락 차원은 Gaussian 합산에서 제외되고,
+     * {@code completenessFactor}(0.6 ~ 1.0)가 데이터 충실도 페널티를 적용한다.
+     * 가격 데이터가 없으면 {@code sPrice = 0.5}(중립값)으로 처리한다.
+     *
+     * <p>상황(situation)은 항상 {@code null}로 고정한다.
+     * 가중치: S_pref 0.70 / S_price 0.30
+     */
+    private int scoreForDetail(Wine wine, Preference pref, CalibratedProfile cal) {
+        TasteProfile tp = wine.getTasteProfile();
+
+        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness()) && tp.getSweetness() > 0;
+        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
+        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
+        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
+        boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree())
+                           && wine.getAlcoholDegree() != null && wine.getAlcoholDegree() > 0;
+        int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
+                   + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
+
+        float wSweet  = validSweet  ? tp.getSweetness() * 0.4f : 0f;
+        float wAcid   = validAcid   ? tp.getAcidity()   * 0.4f : 0f;
+        float wBody   = validBody   ? tp.getBody()       * 0.4f : 0f;
+        float wTannin = validTannin ? tp.getTannin()     * 0.4f : 0f;
+        float wAlc    = wine.getAlcoholDegree();
+
+        float uAlc = (pref != null && pref.getAbv() != null) ? pref.getAbv() : T_ALC_DEFAULT;
+
+        float sPref;
+        if (nValid == 0) {
+            sPref = 0f;
+        } else {
+            int nSum = 0;
+            float sum = 0f;
+            if (validSweet  && !Float.isNaN(cal.uHatSweet()))  { sum += gaussian(cal.uHatSweet(),  wSweet,  cal.sigmaSweet());  nSum++; }
+            if (validAcid   && !Float.isNaN(cal.uHatAcid()))   { sum += gaussian(cal.uHatAcid(),   wAcid,   cal.sigmaAcid());   nSum++; }
+            if (validBody   && !Float.isNaN(cal.uHatBody()))   { sum += gaussian(cal.uHatBody(),   wBody,   cal.sigmaBody());   nSum++; }
+            if (validTannin && !Float.isNaN(cal.uHatTannin())) { sum += gaussian(cal.uHatTannin(), wTannin, cal.sigmaTannin()); nSum++; }
+            if (validAlc)                                       { sum += gaussian(uAlc,             wAlc,    SIGMA_A);           nSum++; }
+
+            float completenessFactor = 0.6f + 0.4f * (nValid / 5.0f);
+            sPref = nSum > 0 ? (sum / nSum) * completenessFactor : 0f;
+        }
+
+        boolean validPrice = wine.getPriceAndRating() != null
+                && Boolean.TRUE.equals(wine.getPriceAndRating().getIsRealPrice())
+                && wine.getPriceAndRating().getPrice() > 0;
+        float sPrice = calcSPrice(wine, pref, null, validPrice);
+
+        float total = 0.70f * sPref + 0.30f * sPrice;
         return Math.round(total * 100);
     }
 

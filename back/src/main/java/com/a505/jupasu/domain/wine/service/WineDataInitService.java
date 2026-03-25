@@ -1,16 +1,12 @@
 package com.a505.jupasu.domain.wine.service;
 
 import com.a505.jupasu.domain.wine.dto.parsing.VivinoRawData;
-import com.a505.jupasu.domain.wine.entity.Food;
-import com.a505.jupasu.domain.wine.entity.Wine;
-import com.a505.jupasu.domain.wine.entity.WineFoodPairing;
+import com.a505.jupasu.domain.wine.entity.*;
 import com.a505.jupasu.domain.wine.entity.vo.Origin;
 import com.a505.jupasu.domain.wine.entity.vo.RatingSummary;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.entity.vo.WinePriceAndRating;
-import com.a505.jupasu.domain.wine.repository.FoodRepository;
-import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
-import com.a505.jupasu.domain.wine.repository.WineRepository;
+import com.a505.jupasu.domain.wine.repository.*;
 import com.a505.jupasu.domain.wine.util.WineDataParser;
 import org.springframework.cache.annotation.CacheEvict;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -37,6 +33,8 @@ public class WineDataInitService {
     private final WineRepository wineRepository;
     private final FoodRepository foodRepository;
     private final WineFoodPairingRepository wineFoodPairingRepository;
+    private final TasteGroupRepository tasteGroupRepository;
+    private final WineTasteGroupRepository wineTasteGroupRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -54,9 +52,13 @@ public class WineDataInitService {
     public void importWineDataFromJson() {
         log.info("🍷 [1/4] 데이터 초기화 시작 및 폴더 점검...");
         try {
-            Path uploadPath = Paths.get(targetImageDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+            try {
+                Path uploadPath = Paths.get(targetImageDir);
+                if (!Files.exists(uploadPath)) {
+                    Files.createDirectories(uploadPath);
+                }
+            } catch (Exception folderEx) {
+                log.warn("⚠️ 이미지 저장 디렉토리 생성 실패 (이미 있을 수 있음): {}", folderEx.getMessage());
             }
 
             File jsonFile = new File(dataFilePath);
@@ -69,6 +71,7 @@ public class WineDataInitService {
             log.info("🍷 [2/4] 외부 JSON 파일에서 {} 건의 데이터를 읽었습니다.", rawDataList.size());
 
             Map<String, Food> foodCache = new HashMap<>();
+            Map<String, TasteGroup> tasteGroupCache = new HashMap<>();
             int batchSize = 1000;
             List<Wine> wineBatch = new ArrayList<>();
             List<VivinoRawData> rawBatch = new ArrayList<>();
@@ -170,6 +173,8 @@ public class WineDataInitService {
 
                     List<WineFoodPairing> pairingBatch = new ArrayList<>();
 
+                    List<WineTasteGroup> tasteGroupBatch = new ArrayList<>();
+
                     // ⭐️ [핵심 2] 연관관계 매핑 (ID가 있는 savedWines 사용)
                     for (int j = 0; j < savedWines.size(); j++) {
                         Wine savedWine = savedWines.get(j);
@@ -192,10 +197,28 @@ public class WineDataInitService {
                                         .build());
                             }
                         }
+
+                        if (correspondingRaw.top3TasteGroupsKr() != null && !correspondingRaw.top3TasteGroupsKr().isEmpty()) {
+                            for (String tasteName : correspondingRaw.top3TasteGroupsKr()) {
+                                if (!StringUtils.hasText(tasteName)) continue;
+
+                                // 향 찾기 or 새로 만들기
+                                TasteGroup tasteGroup = tasteGroupCache.computeIfAbsent(tasteName, key ->
+                                        tasteGroupRepository.findByName(key).orElseGet(() -> tasteGroupRepository.save(TasteGroup.builder().name(key).build()))
+                                );
+
+                                // 페어링 엔티티 조립
+                                tasteGroupBatch.add(WineTasteGroup.builder()
+                                        .wine(savedWine)
+                                        .tasteGroup(tasteGroup)
+                                        .build());
+                            }
+                        }
                     }
 
                     // ⭐️ [핵심 3] 조립된 페어링 정보들을 최종적으로 DB에 저장합니다.
                     wineFoodPairingRepository.saveAll(pairingBatch);
+                    wineTasteGroupRepository.saveAll(tasteGroupBatch);
 
                     log.info("👉 {}/{} 건 와인 및 음식 페어링 저장 완료...", i + 1, rawDataList.size());
                     wineBatch.clear();
@@ -211,7 +234,7 @@ public class WineDataInitService {
     }
 
     private String processImageFile(Map<String, String> localImagePaths) {
-        String defaultImageUrl = "/images/default_wine.png";
+        String defaultImageUrl = "/default_wine.png";
         if (localImagePaths == null || !localImagePaths.containsKey("bottle")) {
             return defaultImageUrl;
         }

@@ -20,6 +20,7 @@ public class MyPageReviewResponse {
     private String nickname;
     private Long wineId;
     private String wineName;
+    private String wineImageUrl;
     private Integer rating;
     private String content;
     private LocalDateTime createdAt;
@@ -35,6 +36,7 @@ public class MyPageReviewResponse {
                 .nickname(review.getUser().getNickname())
                 .wineId(review.getWine().getId())
                 .wineName(review.getWine().getNameKr())
+                .wineImageUrl(review.getWine().getImageUrl())
                 .rating(review.getRating())
                 .content(review.getContent())
                 .createdAt(review.getCreatedAt())

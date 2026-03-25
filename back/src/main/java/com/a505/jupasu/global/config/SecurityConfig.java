@@ -1,24 +1,23 @@
 package com.a505.jupasu.global.config;
 
+import com.a505.jupasu.global.security.jwt.JwtAuthenticationFilter;
+import java.util.Arrays;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.beans.factory.annotation.Value;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import com.a505.jupasu.global.security.jwt.JwtAuthenticationFilter;
-import lombok.RequiredArgsConstructor;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -41,40 +40,36 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // CSRF/세션 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 기본 폼 로그인 / HTTP Basic 비활성화
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/users/**",
-                                "/api/friends/**",
-
-                                // prometheus 모니터링 엔드포인트
+                                // "/api/admin/wines/**",
+                                "/api/wines/recommendations/food/internal",
                                 "/actuator/prometheus",
-                                "/actuator/health"
-
-                                //swagger 추가
-                                , "/swagger-ui/**", "/v3/api-docs/**"
-
-                                //테스트용 api 추가
-                                , "/api/dummy/**"
-                                //데이터 삽입용 api 추가
-                                ,"/api/admin/wines/**"
-                                // 이미지 서빙용
-                                , "/images/**"
-                                // 에러 페이지 허용
-                                , "/error"
+                                "/actuator/health",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/images/**",
+                                "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write(
+                                    "{\"status\": 401, \"message\": \"인증이 필요합니다.\", \"data\": null}"
+                            );
+                        })
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

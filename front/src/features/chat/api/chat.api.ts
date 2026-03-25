@@ -16,13 +16,12 @@ export const chatApi = {
   /**
    * 실시간 소믈리에 채팅 전송 (Streaming)
    */
-  sendChatStream: async (message: string, onMessage: (text: string) => void) => {
+  sendChatStream: async (message: string, sessionId: string, onMessage: (text: string) => void) => {
     const token = authToken.getAccess();
     const url = `/api${API_PATH.AI.CHAT}`;
 
-    // 디버깅을 위한 강력한 알림
-    console.log('📢 API 요청 시도:', url);
-    // window.alert('채팅 요청을 보냅니다: ' + url);
+    // 디버깅을 위한 로그
+    console.log('📢 API 요청 시도:', url, 'Session ID:', sessionId);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -30,7 +29,10 @@ export const chatApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ 
+        message,
+        session_id: sessionId // 세션 ID 추가
+      }),
     });
 
     if (!response.ok) throw new Error('Failed to send message');
