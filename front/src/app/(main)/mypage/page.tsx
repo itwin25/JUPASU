@@ -58,6 +58,7 @@ type WishlistItem = {
   price: string;
   countryFlag: string;
   match: string;
+  imageUrl?: string;
 };
 
 type FriendItem = {
@@ -69,49 +70,8 @@ type FriendItem = {
   avatar: string;
 };
 
-const INITIAL_REVIEWS: ReviewItem[] = [
-  {
-    id: 1,
-    wineName: 'Cloudy Bay',
-    rating: 4,
-    content: '여름에 시원하게 마시면 최고! 상큼하고 깔끔해요.',
-    date: '2026.01.05',
-  },
-  {
-    id: 2,
-    wineName: 'Chateau Margaux 2018',
-    rating: 5,
-    content: '특별한 날에 열면 분위기가 확 살아나는 레드였어요.',
-    date: '2025.12.28',
-  },
-];
-
-const WISHLIST_ITEMS: WishlistItem[] = [
-  {
-    id: 1,
-    name: 'Chateau Margaux 2018',
-    subtitle: 'Bordeaux Red',
-    rating: 4.8,
-    price: '₩120,000',
-    countryFlag: '🇫🇷',
-    match: '95%',
-  },
-  {
-    id: 2,
-    name: 'Cloudy Bay',
-    subtitle: 'Sauvignon Blanc',
-    rating: 4.7,
-    price: '₩58,000',
-    countryFlag: '🇳🇿',
-    match: '92%',
-  },
-];
-
-const FRIENDS: FriendItem[] = [];
-
-const FRIEND_REQUESTS: FriendItem[] = [];
-
-const PAGINATION = [1, 2, 3, 4, 5];
+const PAGE_SIZE = 3;
+const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
@@ -119,7 +79,6 @@ const modalClassName =
 function resolveCharacterImage(character?: string, level: number = 1) {
   if (!character) return '/tiger1.png';
   if (character.startsWith('/') || character.includes('.')) {
-    // 이미 경로이거나 확장자가 포함된 경우 (예: cat1.svg) 그대로 반환하되, 슬래시가 없으면 추가
     return character.startsWith('/') ? character : `/${character}`;
   }
   return `/${character}${level}.png`;
@@ -149,33 +108,53 @@ function getCountryCode(country?: string) {
   }
 }
 
-function Pagination() {
+function Pagination({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  const pages = Array.from({ length: totalPages }, (_, index) => index);
+
   return (
     <div className="text-text-main/45 flex items-center justify-center gap-3 pt-5 text-xs">
-      <button className="text-text-main/20">
+      <button
+        className={cn(currentPage === 0 ? 'text-text-main/20' : 'text-text-main')}
+        onClick={() => currentPage > 0 && onPageChange(currentPage - 1)}
+        disabled={currentPage === 0}
+      >
         <ChevronLeft size={20} />
       </button>
-      {PAGINATION.map((page) => (
+
+      {pages.map((page) => (
         <button
           key={page}
+          onClick={() => onPageChange(page)}
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium',
-            page === 1 ? 'bg-[#B17672] text-white' : 'text-text-main/45',
+            page === currentPage ? 'bg-[#B17672] text-white' : 'text-text-main/45',
           )}
         >
-          {page}
+          {page + 1}
         </button>
       ))}
-      <button className="text-text-main">
+
+      <button
+        className={cn(currentPage === totalPages - 1 ? 'text-text-main/20' : 'text-text-main')}
+        onClick={() => currentPage < totalPages - 1 && onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages - 1}
+      >
         <ChevronRight size={20} />
       </button>
     </div>
   );
 }
 
-// 레이더 차트 (오각형) 좌표 계산을 위한 헬퍼 함수
-// value: 0 ~ maxVal 기준
-// maxXY: 배경 다각형의 각 꼭짓점 좌표 (x, y)
 function calculateRadarPoint(
   value: number,
   maxVal: number,
@@ -194,11 +173,19 @@ function calculateRadarPoint(
 
 export default function MyPage() {
   const { data: profile, isLoading } = useUserMyPage();
-  const { data: myReviews = [] } = useMyReviewsQuery();
-  const { data: scrapListData } = useWineScrapListQuery();
   const { data: friendListData } = useFriendListQuery();
   const { data: pendingFriendListData } = usePendingFriendListQuery();
   const { data: tasteReport, isLoading: isReportLoading } = useTasteReportQuery();
+
+  const [wishlistPage, setWishlistPage] = useState(0);
+  const [reviewPage, setReviewPage] = useState(0);
+
+  const { data: myReviewsPageData } = useMyReviewsQuery(reviewPage);
+  const { data: scrapListPageData } = useWineScrapListQuery(wishlistPage);
+
+  const myReviews = myReviewsPageData?.content ?? [];
+  const scrapList = scrapListPageData?.content ?? [];
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBestOpen, setIsBestOpen] = useState(true);
   const [isWorstOpen, setIsWorstOpen] = useState(true);
@@ -206,19 +193,22 @@ export default function MyPage() {
     'wishlist' | 'reviews' | 'friends' | 'terms' | null
   >(null);
   const [friendTab, setFriendTab] = useState<'list' | 'search' | 'requests'>('list');
-  const [reviews, setReviews] = useState(INITIAL_REVIEWS);
   const [activeReviewMenuId, setActiveReviewMenuId] = useState<number | null>(null);
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
   const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
-  const [editedContent, setEditedContent] = useState('');
-  const [editedRating, setEditedRating] = useState(0);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
+
   const { data: searchResults = [], isFetching: isSearching } =
     useSearchUsersQuery(friendSearchQuery);
-  const [reviewOverrides, _setReviewOverrides] = useState<
+
+  const [reviewOverrides, setReviewOverrides] = useState<
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
   >({});
-  const [deletedReviewIds, _setDeletedReviewIds] = useState<number[]>([]);
+  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
+  const [removedWishlistWineIds, setRemovedWishlistWineIds] = useState<number[]>([]);
+  const [removedFriendIds, setRemovedFriendIds] = useState<number[]>([]);
+  const [removedPendingRequestIds, setRemovedPendingRequestIds] = useState<number[]>([]);
+  const [optimisticAcceptedFriends, setOptimisticAcceptedFriends] = useState<FriendItem[]>([]);
   const [sentInviteIds, setSentInviteIds] = useState<number[]>([]);
 
   const { handleSignout } = useSignout();
@@ -228,23 +218,32 @@ export default function MyPage() {
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
   const wineScrapMutation = useWineScrapMutation();
+
   const wishlistItems = useMemo<WishlistItem[]>(
     () =>
-      scrapListData
-        ? scrapListData.map((item) => ({
-            id: item.scrapId,
-            wineId: item.wineId,
-            scrapId: item.scrapId,
-            name: item.wineName,
-            subtitle: item.wineType,
-            rating: item.averageRating,
-            price: `₩${item.price.toLocaleString('ko-KR')}`,
-            countryFlag: getCountryCode(item.country),
-            match: `${item.matchRate}%`,
-          }))
-        : WISHLIST_ITEMS,
-    [scrapListData],
+      scrapList.map((item) => ({
+        id: item.scrapId,
+        wineId: item.wineId,
+        scrapId: item.scrapId,
+        name: item.wineName,
+        subtitle: item.wineType,
+        rating: Number(item.averageRating ?? 0),
+        price: `₩${item.price.toLocaleString('ko-KR')}`,
+        countryFlag: getCountryCode(item.country),
+        match: `${item.matchRate}%`,
+        imageUrl: item.imageUrl || DEFAULT_WINE_IMAGE_URL,
+      })),
+    [scrapList],
   );
+
+  const visibleWishlistItems = useMemo(
+    () =>
+      wishlistItems.filter(
+        (item) => item.wineId == null || !removedWishlistWineIds.includes(item.wineId),
+      ),
+    [wishlistItems, removedWishlistWineIds],
+  );
+
   const mappedReviews = useMemo<ReviewItem[]>(
     () =>
       myReviews.map((review) => {
@@ -264,38 +263,76 @@ export default function MyPage() {
       }),
     [myReviews, reviewOverrides],
   );
-  const visibleReviews = (myReviews.length > 0 ? mappedReviews : reviews).filter(
-    (review) => !deletedReviewIds.includes(review.id),
+
+  const visibleReviews = useMemo(
+    () => mappedReviews.filter((review) => !deletedReviewIds.includes(review.id)),
+    [mappedReviews, deletedReviewIds],
   );
+
   const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
-  const visibleFriends = useMemo<FriendItem[]>(
+
+  const baseFriends = useMemo<FriendItem[]>(
     () =>
-      friendListData
-        ? friendListData.map((friend) => ({
-            id: friend.friendId,
-            requestId: friend.requestId,
-            friendId: friend.friendId,
-            name: friend.nickname,
-            winesTasted: friend.reviewCount,
-            avatar: resolveCharacterImage(friend.character),
-          }))
-        : FRIENDS,
+      (friendListData ?? []).map((friend) => ({
+        id: friend.friendId,
+        requestId: friend.requestId,
+        friendId: friend.friendId,
+        name: friend.nickname,
+        winesTasted: friend.reviewCount,
+        avatar: resolveCharacterImage(friend.character),
+      })),
     [friendListData],
   );
-  const visiblePendingFriends = useMemo<FriendItem[]>(
+
+  const visibleFriends = useMemo<FriendItem[]>(() => {
+    const merged = [...optimisticAcceptedFriends, ...baseFriends];
+    const seen = new Set<number>();
+
+    return merged.filter((friend) => {
+      const key = friend.friendId ?? friend.id;
+      if (removedFriendIds.includes(key)) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [baseFriends, optimisticAcceptedFriends, removedFriendIds]);
+
+  const basePendingFriends = useMemo<FriendItem[]>(
     () =>
-      pendingFriendListData
-        ? pendingFriendListData.map((friend) => ({
-            id: friend.requesterId,
-            requestId: friend.requestId,
-            friendId: friend.requesterId,
-            name: friend.nickname,
-            winesTasted: friend.reviewCount,
-            avatar: resolveCharacterImage(friend.character),
-          }))
-        : FRIEND_REQUESTS,
+      (pendingFriendListData ?? []).map((friend) => ({
+        id: friend.requesterId,
+        requestId: friend.requestId,
+        friendId: friend.requesterId,
+        name: friend.nickname,
+        winesTasted: friend.reviewCount,
+        avatar: resolveCharacterImage(friend.character),
+      })),
     [pendingFriendListData],
   );
+
+  const visiblePendingFriends = useMemo<FriendItem[]>(
+    () =>
+      basePendingFriends.filter(
+        (friend) =>
+          friend.requestId == null || !removedPendingRequestIds.includes(friend.requestId),
+      ),
+    [basePendingFriends, removedPendingRequestIds],
+  );
+
+  const serverWishlistTotalCount = scrapListPageData?.totalElements ?? profile?.wishlistCount ?? 0;
+  const serverReviewTotalCount = myReviewsPageData?.totalElements ?? profile?.reviewCount ?? 0;
+
+  const currentWishlistCount = Math.max(0, serverWishlistTotalCount - removedWishlistWineIds.length);
+  const currentReviewCount = Math.max(0, serverReviewTotalCount - deletedReviewIds.length);
+  const currentFriendCount =
+    friendListData !== undefined ? visibleFriends.length : (profile?.friendCount ?? 0);
+
+  const wishlistTotalPages = Math.max(1, Math.ceil(currentWishlistCount / PAGE_SIZE));
+  const reviewTotalPages = Math.max(1, Math.ceil(currentReviewCount / PAGE_SIZE));
+
+  const currentLevel = Math.min(Math.floor(currentReviewCount / 5) + 1, 5);
+  const progressInLevel = currentLevel === 5 ? 5 : currentReviewCount % 5;
+  const progressPercentage = (progressInLevel / 5) * 100;
 
   const handleLogout = () => {
     handleSignout();
@@ -304,52 +341,40 @@ export default function MyPage() {
   const openReviewEditModal = (review: ReviewItem) => {
     setActiveReviewMenuId(null);
     setEditingReviewId(review.id);
-    setEditedContent(review.content);
-    setEditedRating(review.rating);
   };
 
   const closeReviewEditModal = () => {
     setEditingReviewId(null);
-    setEditedContent('');
-    setEditedRating(0);
-  };
-
-  const saveReview = async () => {
-    if (!editingReview) return;
-    const trimmedContent = editedContent.trim();
-    if (!trimmedContent || editedRating === 0) return;
-
-    if (myReviews.length > 0 && editingReview.wineId) {
-      await updateReviewMutation.mutateAsync({
-        wineId: editingReview.wineId,
-        reviewId: editingReview.id,
-        rating: editedRating,
-        content: trimmedContent,
-      });
-    } else {
-      setReviews((prev) =>
-        prev.map((review) =>
-          review.id === editingReview.id
-            ? { ...review, content: trimmedContent, rating: editedRating }
-            : review,
-        ),
-      );
-    }
-    closeReviewEditModal();
   };
 
   const deleteReview = async () => {
     if (deletingReviewId === null) return;
-    const deletingReview = visibleReviews.find((review) => review.id === deletingReviewId) ?? null;
 
-    if (myReviews.length > 0 && deletingReview?.wineId) {
-      await deleteReviewMutation.mutateAsync({
-        wineId: deletingReview.wineId,
-        reviewId: deletingReview.id,
-      });
-    } else {
-      setReviews((prev) => prev.filter((review) => review.id !== deletingReviewId));
+    const deletingReview = visibleReviews.find((review) => review.id === deletingReviewId) ?? null;
+    if (!deletingReview?.wineId) return;
+
+    await deleteReviewMutation.mutateAsync({
+      wineId: deletingReview.wineId,
+      reviewId: deletingReview.id,
+    });
+
+    setDeletedReviewIds((prev) =>
+      prev.includes(deletingReview.id) ? prev : [...prev, deletingReview.id],
+    );
+
+    setReviewOverrides((prev) => {
+      const next = { ...prev };
+      delete next[deletingReview.id];
+      return next;
+    });
+
+    const nextTotalCount = Math.max(0, currentReviewCount - 1);
+    const nextTotalPages = Math.max(1, Math.ceil(nextTotalCount / PAGE_SIZE));
+
+    if (reviewPage >= nextTotalPages && reviewPage > 0) {
+      setReviewPage(reviewPage - 1);
     }
+
     setDeletingReviewId(null);
   };
 
@@ -358,7 +383,8 @@ export default function MyPage() {
       receiverId: userId,
       receiverNickname: nickname,
     });
-    setSentInviteIds((prev) => [...prev, userId]);
+
+    setSentInviteIds((prev) => (prev.includes(userId) ? prev : [...prev, userId]));
   };
 
   const handleFriendRequestResponse = async (
@@ -367,46 +393,74 @@ export default function MyPage() {
   ) => {
     if (!requestId) return;
 
+    const target = visiblePendingFriends.find((friend) => friend.requestId === requestId);
+
     await respondFriendRequestMutation.mutateAsync({
       requestId,
       status,
     });
+
+    setRemovedPendingRequestIds((prev) =>
+      prev.includes(requestId) ? prev : [...prev, requestId],
+    );
+
+    if (status === 'ACCEPTED' && target) {
+      setOptimisticAcceptedFriends((prev) => [
+        {
+          ...target,
+          id: target.friendId ?? target.id,
+        },
+        ...prev,
+      ]);
+    }
   };
 
   const handleDeleteFriend = async (requestId: number | undefined) => {
     if (!requestId) return;
 
+    const target = visibleFriends.find((friend) => friend.requestId === requestId);
+
     await deleteFriendMutation.mutateAsync(requestId);
+
+    if (target) {
+      const friendKey = target.friendId ?? target.id;
+
+      setRemovedFriendIds((prev) => (prev.includes(friendKey) ? prev : [...prev, friendKey]));
+      setOptimisticAcceptedFriends((prev) =>
+        prev.filter((friend) => (friend.friendId ?? friend.id) !== friendKey),
+      );
+    }
   };
 
   const handleToggleWishlist = async (wineId: number | undefined) => {
     if (!wineId) return;
 
     await wineScrapMutation.mutateAsync(wineId);
+
+    setRemovedWishlistWineIds((prev) => (prev.includes(wineId) ? prev : [...prev, wineId]));
+
+    const nextTotalCount = Math.max(0, currentWishlistCount - 1);
+    const nextTotalPages = Math.max(1, Math.ceil(nextTotalCount / PAGE_SIZE));
+
+    if (wishlistPage >= nextTotalPages && wishlistPage > 0) {
+      setWishlistPage(wishlistPage - 1);
+    }
   };
 
-  // 차트 좌표 생성 중심점 120, 베이스 기준 반경 75
   const radarChartPoints = useMemo(() => {
     if (!tasteReport?.radarChart) {
-      // 데이터가 없을 때의 기본 빈 오각형
       return '120,45 191,97 164,181 76,181 49,97';
     }
 
     const radar = tasteReport.radarChart;
-    const p1 = calculateRadarPoint(radar.tannin, 5, [120, 30]); // 상단: 탄닌
-    const p2 = calculateRadarPoint(radar.acidity, 5, [195, 84]); // 우상단: 산미
-    const p3 = calculateRadarPoint(radar.body, 5, [166, 173]); // 우하단: 바디
-    const p4 = calculateRadarPoint(radar.sweetness, 5, [74, 173]); // 좌하단: 당도
-    const p5 = calculateRadarPoint(radar.alcohol, 20, [45, 84]); // 좌상단: 도수
+    const p1 = calculateRadarPoint(radar.tannin, 5, [120, 30]);
+    const p2 = calculateRadarPoint(radar.acidity, 5, [195, 84]);
+    const p3 = calculateRadarPoint(radar.body, 5, [166, 173]);
+    const p4 = calculateRadarPoint(radar.sweetness, 5, [74, 173]);
+    const p5 = calculateRadarPoint(radar.alcohol, 20, [45, 84]);
 
     return `${p1} ${p2} ${p3} ${p4} ${p5}`;
   }, [tasteReport]);
-
-  // 레벨 계산: 리뷰 5개당 1레벨, 최대 5레벨
-  const currentReviewCount = profile?.reviewCount || 0;
-  const currentLevel = Math.min(Math.floor(currentReviewCount / 5) + 1, 5);
-  const progressInLevel = currentLevel === 5 ? 5 : currentReviewCount % 5;
-  const progressPercentage = (progressInLevel / 5) * 100;
 
   return (
     <div className="bg-background min-h-screen pb-24">
@@ -484,14 +538,28 @@ export default function MyPage() {
           </div>
 
           <div className="divide-primary-100 mt-4 grid grid-cols-3 divide-x">
-            <button onClick={() => setActiveModal('wishlist')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{profile?.wishlistCount ?? 0}</p>
+            <button
+              onClick={() => {
+                setWishlistPage(0);
+                setActiveModal('wishlist');
+              }}
+              className="py-2 text-center"
+            >
+              <p className="text-lg font-black text-[#B36262]">{currentWishlistCount}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">위시리스트</p>
             </button>
-            <button onClick={() => setActiveModal('reviews')} className="py-2 text-center">
-              <p className="text-lg font-black text-[#B36262]">{profile?.reviewCount ?? 0}</p>
+
+            <button
+              onClick={() => {
+                setReviewPage(0);
+                setActiveModal('reviews');
+              }}
+              className="py-2 text-center"
+            >
+              <p className="text-lg font-black text-[#B36262]">{currentReviewCount}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">리뷰</p>
             </button>
+
             <button
               onClick={() => {
                 setFriendTab('list');
@@ -499,7 +567,7 @@ export default function MyPage() {
               }}
               className="py-2 text-center"
             >
-              <p className="text-lg font-black text-[#B36262]">{profile?.friendCount ?? 0}</p>
+              <p className="text-lg font-black text-[#B36262]">{currentFriendCount}</p>
               <p className="text-text-main/45 mt-1 text-[11px] font-bold">친구</p>
             </button>
           </div>
@@ -531,7 +599,6 @@ export default function MyPage() {
                     <line x1="120" y1="120" x2="74" y2="173" />
                     <line x1="120" y1="120" x2="45" y2="84" />
                   </g>
-                  {/* 동적으로 계산된 좌표로 다각형 생성 */}
                   <polygon
                     points={radarChartPoints}
                     fill="rgba(196, 91, 91, 0.16)"
@@ -666,11 +733,10 @@ export default function MyPage() {
         </section>
       </main>
 
-      {/* 용어 설명 모달 */}
       <Modal
         isOpen={activeModal === 'terms'}
         onClose={() => setActiveModal(null)}
-        title="와인 용어 설명"
+        title={<div className="w-full text-center">와인 용어 설명</div>}
         hideDefaultFooter
         className={modalClassName}
       >
@@ -714,51 +780,131 @@ export default function MyPage() {
         isOpen={activeModal === 'wishlist'}
         onClose={() => setActiveModal(null)}
         title="위시리스트"
+        centerTitle
         hideDefaultFooter
         className={modalClassName}
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
-        <div className="space-y-3">
-          {wishlistItems.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
-            >
-              <div className="flex gap-2.5">
-                <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h4 className="text-text-main truncate text-sm font-black">{item.name}</h4>
-                      <p className="text-text-main/45 mt-0.5 text-[11px] font-medium">
-                        {item.subtitle}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 pt-0.5">
-                      <span className="text-text-main/55 text-[10px] font-black">
-                        {item.countryFlag}
-                      </span>
-                      <span className="text-[10px] font-black text-[#C87E7A]">{item.match}</span>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-black text-[#D89A4F]">★ {item.rating}</span>
-                      <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
-                    </div>
+
+        {visibleWishlistItems.length > 0 ? (
+          <>
+            <div className="space-y-3">
+              {visibleWishlistItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {item.wineId ? (
+                      <Link
+                        href={`/wines/${item.wineId}`}
+                        onClick={() => setActiveModal(null)}
+                        className="flex min-w-0 flex-1 items-center gap-2.5"
+                      >
+                        <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-[0.8rem] bg-[#E6E3DE]">
+                          <img
+                            src={item.imageUrl || DEFAULT_WINE_IMAGE_URL}
+                            alt={item.name}
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
+                            }}
+                          />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="text-text-main truncate text-sm font-black hover:underline">
+                                {item.name}
+                              </h4>
+                              <p className="text-text-main/45 mt-0.5 text-[11px] font-medium">
+                                {item.subtitle}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span className="text-text-main/55 text-[10px] font-black">
+                                {item.countryFlag}
+                              </span>
+                              <span className="text-[10px] font-black text-[#C87E7A]">
+                                {item.match}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex items-center gap-3">
+                            <span className="text-[11px] font-black text-[#D89A4F]">
+                              ★ {item.rating.toFixed(1)}
+                            </span>
+                            <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                        <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-[0.8rem] bg-[#E6E3DE]">
+                          <img
+                            src={item.imageUrl || DEFAULT_WINE_IMAGE_URL}
+                            alt={item.name}
+                            className="h-full w-full object-contain"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
+                            }}
+                          />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h4 className="text-text-main truncate text-sm font-black">
+                                {item.name}
+                              </h4>
+                              <p className="text-text-main/45 mt-0.5 text-[11px] font-medium">
+                                {item.subtitle}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span className="text-text-main/55 text-[10px] font-black">
+                                {item.countryFlag}
+                              </span>
+                              <span className="text-[10px] font-black text-[#C87E7A]">
+                                {item.match}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex items-center gap-3">
+                            <span className="text-[11px] font-black text-[#D89A4F]">
+                              ★ {item.rating.toFixed(1)}
+                            </span>
+                            <span className="text-xs font-black text-[#CC5C57]">{item.price}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => handleToggleWishlist(item.wineId)}
-                      className="text-[#CC5C57]"
+                      className="shrink-0 text-[#CC5C57]"
                     >
                       <Heart size={16} fill="currentColor" />
                     </button>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <Pagination />
+
+            <Pagination
+              currentPage={wishlistPage}
+              totalPages={wishlistTotalPages}
+              onPageChange={setWishlistPage}
+            />
+          </>
+        ) : (
+          <div className="text-text-main/50 py-10 text-center text-[13px] font-medium">
+            위시리스트가 비어 있습니다.
+          </div>
+        )}
       </Modal>
 
       <Modal
@@ -768,115 +914,131 @@ export default function MyPage() {
           setActiveReviewMenuId(null);
         }}
         title="내가 작성한 리뷰"
+        centerTitle
         hideDefaultFooter
         className={modalClassName}
       >
         <div className="bg-primary-100/80 mb-4 h-px" />
-        <div className="space-y-3">
-          {visibleReviews.map((review) => (
-            <div
-              key={review.id}
-              className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
-            >
-              <div className="flex gap-2.5">
-                {/* 와인 이미지 플레이스홀더 */}
-                <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="min-w-0">
-                      {/* 와인 이름 - 클릭 시 상세 페이지 이동 */}
-                      <Link
-                        href={`/wines/${review.wineId}`}
-                        onClick={() => setActiveModal(null)}
-                        className="text-text-main block truncate text-[13px] font-black hover:underline"
-                      >
-                        {review.wineName}
-                      </Link>
-                      <div className="mt-0.5 flex gap-0.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <Star
-                            key={star}
-                            size={12}
-                            fill={star <= review.rating ? '#D89A4F' : '#E0DDD7'}
-                            className={star <= review.rating ? 'text-[#D89A4F]' : 'text-[#E0DDD7]'}
-                          />
-                        ))}
+        {visibleReviews.length > 0 ? (
+          <>
+            <div className="space-y-3">
+              {visibleReviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
+                >
+                  <div className="flex gap-2.5">
+                    <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-1">
+                        <div className="min-w-0">
+                          <Link
+                            href={`/wines/${review.wineId}`}
+                            onClick={() => setActiveModal(null)}
+                            className="text-text-main block truncate text-[13px] font-black hover:underline"
+                          >
+                            {review.wineName}
+                          </Link>
+                          <div className="mt-0.5 flex gap-0.5">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={12}
+                                fill={star <= review.rating ? '#D89A4F' : '#E0DDD7'}
+                                className={
+                                  star <= review.rating ? 'text-[#D89A4F]' : 'text-[#E0DDD7]'
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="relative shrink-0">
+                          <button
+                            onClick={() =>
+                              setActiveReviewMenuId((prev) =>
+                                prev === review.id ? null : review.id,
+                              )
+                            }
+                            className="text-text-main rounded-full p-1"
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+
+                          {activeReviewMenuId === review.id && (
+                            <div className="border-primary-100 absolute top-7 right-0 z-10 w-24 rounded-[0.9rem] border bg-white p-1 shadow-xl">
+                              <button
+                                onClick={() => openReviewEditModal(review)}
+                                className="text-text-main hover:bg-primary-100/40 w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold transition-colors"
+                              >
+                                수정하기
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setActiveReviewMenuId(null);
+                                  setDeletingReviewId(review.id);
+                                }}
+                                className="w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold text-[#D65F69] transition-colors hover:bg-red-50"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <p className="text-text-main mt-1.5 text-[12px] leading-relaxed font-medium">
+                        {review.content || '작성한 리뷰 내용이 없습니다.'}
+                      </p>
+                      <div className="mt-1 flex justify-end">
+                        <span className="text-[11px] font-medium text-[#B97B79]">
+                          {review.date}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="relative shrink-0">
-                      <button
-                        onClick={() =>
-                          setActiveReviewMenuId((prev) => (prev === review.id ? null : review.id))
-                        }
-                        className="text-text-main rounded-full p-1"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-
-                      {activeReviewMenuId === review.id && (
-                        <div className="border-primary-100 absolute top-7 right-0 z-10 w-24 rounded-[0.9rem] border bg-white p-1 shadow-xl">
-                          <button
-                            onClick={() => openReviewEditModal(review)}
-                            className="text-text-main hover:bg-primary-100/40 w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold transition-colors"
-                          >
-                            수정하기
-                          </button>
-                          <button
-                            onClick={() => {
-                              setActiveReviewMenuId(null);
-                              setDeletingReviewId(review.id);
-                            }}
-                            className="w-full rounded-xl px-2 py-1.5 text-center text-[10px] font-bold text-[#D65F69] transition-colors hover:bg-red-50"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-text-main mt-1.5 text-[12px] leading-relaxed font-medium">
-                    {review.content}
-                  </p>
-                  <div className="mt-1 flex justify-end">
-                    <span className="text-[11px] font-medium text-[#B97B79]">{review.date}</span>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <Pagination />
+
+            <Pagination
+              currentPage={reviewPage}
+              totalPages={reviewTotalPages}
+              onPageChange={setReviewPage}
+            />
+          </>
+        ) : (
+          <div className="text-text-main/50 py-10 text-center text-[13px] font-medium">
+            작성한 리뷰가 없습니다.
+          </div>
+        )}
       </Modal>
 
       <ReviewModal
-        key={`${editingReview?.id ?? 'closed'}-${editingReview?.rating ?? 0}`}
+        key={`${editingReview?.id ?? 'closed'}-${editingReview?.rating ?? 0}-${editingReview?.content ?? ''}`}
         isOpen={editingReview !== null}
         onClose={closeReviewEditModal}
         onSubmit={async ({ rating, content }) => {
-          if (!editingReview) return;
+          if (!editingReview || rating === 0 || !editingReview.wineId) return;
 
-          const trimmedContent = content.trim();
-          if (!trimmedContent || rating === 0) return;
+          const normalizedContent = content.trim();
 
-          if (myReviews.length > 0 && editingReview.wineId) {
-            await updateReviewMutation.mutateAsync({
-              wineId: editingReview.wineId,
-              reviewId: editingReview.id,
+          await updateReviewMutation.mutateAsync({
+            wineId: editingReview.wineId,
+            reviewId: editingReview.id,
+            rating,
+            content: normalizedContent,
+          });
+
+          setReviewOverrides((prev) => ({
+            ...prev,
+            [editingReview.id]: {
               rating,
-              content: trimmedContent,
-            });
-          } else {
-            setReviews((prev) =>
-              prev.map((review) =>
-                review.id === editingReview.id
-                  ? { ...review, content: trimmedContent, rating }
-                  : review,
-              ),
-            );
-          }
+              content: normalizedContent,
+            },
+          }));
 
           closeReviewEditModal();
         }}
@@ -896,80 +1058,9 @@ export default function MyPage() {
       />
 
       <Modal
-        isOpen={false && editingReview !== null}
-        onClose={closeReviewEditModal}
-        title="리뷰 수정"
-        hideDefaultFooter
-        className="w-[calc(100vw-0.75rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4"
-      >
-        {editingReview ? (
-          <div className="space-y-4">
-            <div className="border-primary-100 rounded-[1.2rem] border bg-white p-2.5 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="h-14 w-10 shrink-0 rounded-[0.75rem] bg-[#DDD2C1]" />
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-text-main truncate text-sm font-black">
-                    {editingReview.wineName}
-                  </h4>
-                  <p className="text-text-main/35 mt-0.5 text-xs font-medium">{''}</p>
-                </div>
-                <span className="text-text-main/35 rounded-full bg-[#F3EFE8] px-2 py-1 text-[10px] font-black">
-                  수정 중
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <h5 className="text-text-main text-[15px] font-black">별점</h5>
-              <div className="mt-2.5 flex justify-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setEditedRating(star)}
-                    className="p-0.5"
-                  >
-                    <Star
-                      size={30}
-                      fill={star <= editedRating ? '#D89A4F' : '#E9E2D8'}
-                      className={star <= editedRating ? 'text-[#D89A4F]' : 'text-[#E9E2D8]'}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h5 className="text-text-main text-[15px] font-black">리뷰 내용</h5>
-              <div className="relative mt-2.5">
-                <textarea
-                  value={editedContent}
-                  onChange={(event) => setEditedContent(event.target.value.slice(0, 500))}
-                  className="border-primary-100 text-text-main focus:border-primary-500 h-28 w-full resize-none rounded-[1.2rem] border bg-white p-3.5 text-[13px] leading-relaxed font-medium transition-colors outline-none"
-                  placeholder="리뷰 내용을 입력해 주세요."
-                />
-                <span className="text-text-main/30 absolute right-4 bottom-4 text-[10px] font-bold">
-                  {editedContent.length}/500
-                </span>
-              </div>
-            </div>
-
-            <Button
-              size="full"
-              onClick={saveReview}
-              disabled={editedContent.trim().length < 5 || editedRating === 0}
-              className="h-11 rounded-[1rem] bg-[#B37474] text-sm font-black hover:bg-[#9E6666]"
-            >
-              리뷰 수정하기
-            </Button>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
         isOpen={deletingReviewId !== null}
         onClose={() => setDeletingReviewId(null)}
-        title="리뷰 삭제"
+        title={<div className="w-full text-center">리뷰 삭제</div>}
         className="w-[calc(100vw-2rem)] max-w-[18.5rem] rounded-[1.55rem] bg-[#F7F5F1] px-3.5 py-4"
         footer={
           <div className="flex gap-2">
@@ -1002,9 +1093,8 @@ export default function MyPage() {
       <Modal
         isOpen={activeModal === 'friends'}
         onClose={() => setActiveModal(null)}
-        title={
-          friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'
-        }
+        title={friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'}
+        centerTitle
         hideDefaultFooter
         className={modalClassName}
       >
@@ -1042,40 +1132,43 @@ export default function MyPage() {
                 친구 {visibleFriends.length}명
               </p>
               <div className="max-h-[18rem] space-y-2.5 overflow-y-auto pr-1">
-                {visibleFriends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-2.5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
-                        <Image
-                          src={friend.avatar}
-                          alt={friend.name}
-                          fill
-                          className="object-cover"
-                        />
+                {visibleFriends.length > 0 ? (
+                  visibleFriends.map((friend) => (
+                    <div
+                      key={friend.id}
+                      className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-2.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
+                          <Image
+                            src={friend.avatar}
+                            alt={friend.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-text-main text-[13px] font-black">{friend.name}</p>
+                          <p className="text-text-main/45 text-[11px] font-medium">
+                            {friend.winesTasted ?? 0}종 시음
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-text-main text-[13px] font-black">{friend.name}</p>
-                        <p className="text-text-main/45 text-[11px] font-medium">
-                          {friend.winesTasted ?? 0}종 시음
-                        </p>
+                      <div className="space-y-1.5">
+                        <button
+                          onClick={() => handleDeleteFriend(friend.requestId)}
+                          className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                        >
+                          삭제
+                        </button>
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <button className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]">
-                        프로필
-                      </button>
-                      <button
-                        onClick={() => handleDeleteFriend(friend.requestId)}
-                        className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
-                      >
-                        삭제
-                      </button>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-text-main/50 py-8 text-center text-[13px] font-medium">
+                    친구 목록이 비어 있습니다.
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -1083,33 +1176,39 @@ export default function MyPage() {
 
         {friendTab === 'requests' && (
           <div className="space-y-2.5">
-            {visiblePendingFriends.map((friend) => (
-              <div
-                key={friend.id}
-                className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
-                    <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
+            {visiblePendingFriends.length > 0 ? (
+              visiblePendingFriends.map((friend) => (
+                <div
+                  key={friend.id}
+                  className="flex items-center justify-between rounded-[1.2rem] border border-[#DDD4C8] bg-[#FBFAF7] px-3.5 py-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
+                      <Image src={friend.avatar} alt={friend.name} fill className="object-cover" />
+                    </div>
+                    <p className="text-text-main text-[13px] font-black">{friend.name}</p>
                   </div>
-                  <p className="text-text-main text-[13px] font-black">{friend.name}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleFriendRequestResponse(friend.requestId, 'ACCEPTED')}
+                      className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]"
+                    >
+                      수락
+                    </button>
+                    <button
+                      onClick={() => handleFriendRequestResponse(friend.requestId, 'REJECTED')}
+                      className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
+                    >
+                      거절
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleFriendRequestResponse(friend.requestId, 'ACCEPTED')}
-                    className="rounded-full bg-[#F6EAEA] px-3 py-1 text-[10px] font-black text-[#B17672]"
-                  >
-                    수락
-                  </button>
-                  <button
-                    onClick={() => handleFriendRequestResponse(friend.requestId, 'REJECTED')}
-                    className="text-text-main/55 rounded-full bg-[#E8E5E0] px-3 py-1 text-[10px] font-black"
-                  >
-                    거절
-                  </button>
-                </div>
+              ))
+            ) : (
+              <div className="text-text-main/50 py-8 text-center text-[13px] font-medium">
+                받은 친구 요청이 없습니다.
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -1156,7 +1255,9 @@ export default function MyPage() {
                       </div>
                       <button
                         onClick={() => {
-                          if (displayStatus === 'NONE') handleInviteFriend(f.userId, f.nickname);
+                          if (displayStatus === 'NONE') {
+                            handleInviteFriend(f.userId, f.nickname);
+                          }
                         }}
                         className={cn(
                           'rounded-full px-3.5 py-1.5 text-[10px] font-black transition-colors',

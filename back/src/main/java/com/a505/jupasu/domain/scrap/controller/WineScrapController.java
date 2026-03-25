@@ -6,6 +6,9 @@ import com.a505.jupasu.domain.scrap.service.WineScrapService;
 import com.a505.jupasu.global.common.ApiResponse;
 import com.a505.jupasu.global.security.auth.LoginUserCustom;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,10 +43,12 @@ public class WineScrapController {
      * @return 스크랩한 와인의 상세 정보(평점, 가격, 매칭률 등) 리스트
      */
     @GetMapping("/scraps")
-    public ApiResponse<List<ScrapListResponse>> getMyScrapList(
-            @AuthenticationPrincipal LoginUserCustom loginUser) {
+    public ApiResponse<Page<ScrapListResponse>> getMyScrapList(
+            @AuthenticationPrincipal LoginUserCustom loginUser,
+            @RequestParam(defaultValue = "0") int page) {
 
-        List<ScrapListResponse> response = wineScrapService.getMyScrapList(loginUser.getUser());
+        Pageable pageable = PageRequest.of(page, 3);
+        Page<ScrapListResponse> response = wineScrapService.getMyScrapList(loginUser.getUser(), pageable);
 
         return ApiResponse.success(response);
     }
