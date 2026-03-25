@@ -64,7 +64,7 @@ public class FoodContextAnalyzer {
         Set<String> attributes = new LinkedHashSet<>();
         Set<String> pairingHints = new LinkedHashSet<>();
 
-        addIfContains(lowered, attributes, List.of("스테이크", "소고기", "우삼겹", "소갈비", "티본", "등심", "안심", "채끝", "beef"), "beef");
+        addIfContains(lowered, attributes, List.of("소고기", "우삼겹", "소갈비", "티본", "등심", "안심", "채끝", "beef"), "beef");
         addIfContains(lowered, attributes, List.of("양갈비", "양고기", "lamb"), "lamb");
         addIfContains(lowered, attributes, List.of("닭", "닭고기", "치킨", "닭갈비", "chicken"), "chicken");
         addIfContains(lowered, attributes, List.of("돼지", "돼지고기", "보쌈", "삼겹살", "목살", "족발", "pork"), "pork");
@@ -81,6 +81,10 @@ public class FoodContextAnalyzer {
         addIfContains(lowered, attributes, List.of("김치", "피클", "절임", "발효"), "fermented");
         addIfContains(lowered, attributes, List.of("김치", "샐러드", "날치알", "회", "상큼"), "refreshing");
         addIfContains(lowered, attributes, List.of("된장", "덮밥", "볶음", "구이", "육즙"), "savory");
+
+        if (lowered.contains("스테이크") && !attributes.contains("seafood")) {
+            attributes.add("beef");
+        }
 
         if (attributes.contains("beef") || attributes.contains("lamb")) {
             pairingHints.add("소고기");

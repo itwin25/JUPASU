@@ -41,7 +41,7 @@ public class FoodWineReasonGenerator {
         FoodItem food = foodContext.foods().isEmpty() ? null : foodContext.foods().get(0);
         String label = food != null ? food.label() : foodContext.label();
 
-        if (food != null && food.hasAnyAttribute("beef", "lamb", "grilled")) {
+        if (food != null && food.hasAnyAttribute("beef", "lamb", "pork")) {
             if (candidate.body() != null && candidate.body() >= 3.2) {
                 reasons.add("와인의 무게감이 " + label + "에 밀리지 않아서 함께 먹기 좋아요.");
             }
@@ -166,30 +166,38 @@ public class FoodWineReasonGenerator {
             return null;
         }
 
-        if (score.bodyScore() != null && score.bodyScore() >= 0.75) {
-            return "평소 좋아하시는 무게감과 비슷해서 만족스럽게 느껴질 가능성이 높아요.";
-        }
-
-        if (score.acidityScore() != null && score.acidityScore() >= 0.75) {
-            return "평소 선호하시는 산뜻한 느낌과도 잘 맞아서 부담 없이 즐기기 좋아요.";
-        }
-
-        if (score.tanninScore() != null && score.tanninScore() >= 0.75) {
-            return "평소 좋아하시는 탄탄한 느낌과도 잘 맞는 편이에요.";
-        }
+        String bestReason = null;
+        double bestScore = 0.0;
 
         if (score.typeScore() != null && score.typeScore() >= 1.0) {
-            return "평소 좋아하시는 " + wineTypeLabel + " 계열이라 더 편하게 즐기실 수 있어요.";
+            bestReason = "평소 좋아하시는 " + wineTypeLabel + " 계열이라 더 편하게 즐기실 수 있어요.";
+            bestScore = 1.0;
         }
 
-        if (score.flavorScore() != null && score.flavorScore() >= 0.6) {
-            return "평소 선호하시는 향과 결이 비슷해서 취향에도 잘 맞을 가능성이 높아요.";
+        if (score.flavorScore() != null && score.flavorScore() >= 0.6 && score.flavorScore() > bestScore) {
+            bestReason = "평소 선호하시는 향과 결이 비슷해서 취향에도 잘 맞을 가능성이 높아요.";
+            bestScore = score.flavorScore();
         }
 
-        if (score.priceScore() != null && score.priceScore() >= 0.9) {
-            return "보통 즐기시는 가격대와도 잘 맞는 편이라 부담이 적어요.";
+        if (score.acidityScore() != null && score.acidityScore() >= 0.75 && score.acidityScore() > bestScore) {
+            bestReason = "평소 선호하시는 산뜻한 느낌과도 잘 맞아서 부담 없이 즐기기 좋아요.";
+            bestScore = score.acidityScore();
         }
 
-        return null;
+        if (score.tanninScore() != null && score.tanninScore() >= 0.75 && score.tanninScore() > bestScore) {
+            bestReason = "평소 좋아하시는 탄탄한 느낌과도 잘 맞는 편이에요.";
+            bestScore = score.tanninScore();
+        }
+
+        if (score.bodyScore() != null && score.bodyScore() >= 0.75 && score.bodyScore() > bestScore) {
+            bestReason = "평소 좋아하시는 무게감과 비슷해서 만족스럽게 느껴질 가능성이 높아요.";
+            bestScore = score.bodyScore();
+        }
+
+        if (score.priceScore() != null && score.priceScore() >= 0.9 && score.priceScore() > bestScore) {
+            bestReason = "보통 즐기시는 가격대와도 잘 맞는 편이라 부담이 적어요.";
+        }
+
+        return bestReason;
     }
 }
