@@ -39,26 +39,48 @@ public class AiService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
-     * [채팅] 실시간 소믈리에 대화 (완전한 실시간 스트리밍 보장)
+     * [채팅] 실시간 소믈리에 대화 (멀티턴 지원 및 스트리밍 보장)
      */
     public Flux<String> chat(ChatRequest request, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        if (request.getMessage() != null && !request.getMessage().trim().isEmpty()) {
-            chatMessageRepository.save(new ChatMessage(user, "user", request.getMessage()));
+        String sessionId = request.getSessionId();
+        if (sessionId == null || sessionId.trim().isEmpty()) {
+            sessionId = "session-" + user.getId(); // 기본 세션 ID 생성
         }
-        // AI 서버 규격에 맞게 페이로드 구성
+
+        // 1. 현재 사용자 메시지를 먼저 DB에 저장 (맥락에 포함시키기 위함)
+        if (request.getMessage() != null && !request.getMessage().trim().isEmpty()) {
+            chatMessageRepository.save(new ChatMessage(sessionId, user, "user", request.getMessage()));
+        }
+
+        // 2. 현재 메시지를 포함하여 DB에서 최근 대화 내역 조회
+        List<ChatMessage> historyEntities = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        
+        // 3. AI 서버 규격에 맞게 히스토리 변환
+        List<Map<String, String>> history = historyEntities.stream()
+                .map(msg -> {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("role", msg.getRole());
+                    map.put("content", msg.getContent());
+                    return map;
+                })
+                .collect(Collectors.toList());
+
+        // 4. AI 서버 호출 페이로드 구성
         Map<String, Object> payload = new HashMap<>();
         payload.put("message", request.getMessage());
+        payload.put("history", history); // 이제 현재 메시지가 포함된 이력이 전달됨
+        payload.put("session_id", sessionId); // 세션 ID 추가
         payload.put("selected_wine", request.getSelectedWine() != null ? request.getSelectedWine() : null);
         payload.put("selected_menu", request.getSelectedMenu() != null ? request.getSelectedMenu() : null);
-        payload.put("user_id", user.getId()); // getId()로 수정
+        payload.put("user_id", user.getId());
         payload.put("stream", true);
         payload.put("mentioned_friends", List.of());
 
-
         StringBuilder fullTextForStorage = new StringBuilder();
+        final String finalSessionId = sessionId; // 람다용 상수
 
         return webClient.post()
                 .uri("/v1/chat")
@@ -68,26 +90,32 @@ public class AiService {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .flatMap(rawChunk -> {
-                    log.info("📡 [AI Raw Chunk]: {}", rawChunk);
-                    // [DONE] 신호나 빈 값 처리
                     if (rawChunk == null || rawChunk.trim().isEmpty() || rawChunk.contains("[DONE]")) {
                         return Flux.empty();
                     }
                     
                     try {
-                        // AI 서버가 가끔 여러 줄을 한 번에 보낼 수 있으므로 줄바꿈 처리
                         return Flux.fromArray(rawChunk.split("\n"))
-                                .filter(line -> !line.trim().isEmpty())
+                                .map(String::trim)
+                                .filter(line -> !line.isEmpty() && !line.startsWith("event:"))
                                 .map(line -> {
-                                    log.info("🔍 [Processing Line]: {}", line);
                                     try {
-                                        JsonNode root = objectMapper.readTree(line);
+                                        String jsonData = line;
+                                        if (line.startsWith("data:")) {
+                                            jsonData = line.substring(5).trim();
+                                        }
+                                        
+                                        if (jsonData.equals("[DONE]")) return line;
+
+                                        JsonNode root = objectMapper.readTree(jsonData);
                                         String content = root.path("content").asText("");
-                                        fullTextForStorage.append(content);
+                                        if (!content.isEmpty()) {
+                                            fullTextForStorage.append(content);
+                                        }
                                     } catch (Exception e) {
-                                        log.warn("📦 [Parsing Error]: {}", e.getMessage());
+                                        log.warn("📦 [Parsing Error] Line: {}, Error: {}", line, e.getMessage());
                                     }
-                                    return line; // 원본 JSON(또는 라인)을 컨트롤러로 전달
+                                    return line;
                                 });
                     } catch (Exception e) {
                         return Flux.empty();
@@ -95,7 +123,8 @@ public class AiService {
                 })
                 .doOnComplete(() -> {
                     if (fullTextForStorage.length() > 0) {
-                        chatMessageRepository.save(new ChatMessage(user, "assistant", fullTextForStorage.toString()));
+                        // 5. AI 응답 저장 시 sessionId 포함
+                        chatMessageRepository.save(new ChatMessage(finalSessionId, user, "assistant", fullTextForStorage.toString()));
                     }
                 });
     }

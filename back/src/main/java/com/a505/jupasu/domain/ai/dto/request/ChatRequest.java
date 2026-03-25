@@ -10,6 +10,9 @@ import java.util.Map;
 @AllArgsConstructor
 public class ChatRequest {
     private String message;
+
+    @JsonProperty("session_id")
+    private String sessionId;
     
     @JsonProperty("selected_wine")
     private Map<String, Object> selectedWine;

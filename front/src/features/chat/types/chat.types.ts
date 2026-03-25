@@ -7,6 +7,7 @@ export interface ChatMessageResponse {
 
 export interface SendChatRequest {
   message: string;
+  session_id: string; // 세션 ID 추가
   selectedWine?: Record<string, any>;
   selectedMenu?: Record<string, any>;
 }
