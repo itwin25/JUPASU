@@ -13,7 +13,31 @@ import WithdrawModal from '@/features/user/components/WithdrawModal';
 import { cn } from '@/lib/utils';
 import { UserInfo } from '@/types/user.types';
 
-const AVATARS = ['cat1.svg', 'dog1.svg', 'giraffe1.svg', 'mouse1.svg', 'tiger1.svg', 'whale1.svg'];
+const AVATARS = [
+  'cat1.svg',
+  'dog1.svg',
+  'giraffe1.svg',
+  'mouse1.svg',
+  'tiger1.svg',
+  'whale1.svg',
+];
+
+function normalizeAvatarForPicker(character?: string | null) {
+  if (!character) return 'dog1.svg';
+
+  const normalized = character
+    .replace(/^\//, '')
+    .replace(/\.svg$/i, '')
+    .replace(/[1-3]$/, '');
+
+  const avatar = `${normalized}1.svg`;
+  return AVATARS.includes(avatar) ? avatar : 'dog1.svg';
+}
+
+function resolveAvatarSrc(character?: string | null) {
+  if (!character) return '/dog1.svg';
+  return character.startsWith('/') ? character : `/${character}`;
+}
 
 export default function ProfileEditPage() {
   const router = useRouter();
@@ -33,11 +57,13 @@ export default function ProfileEditPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const profileNickname = profile ? profile.nickname : '';
-  const profileCharacter =
-    profile && AVATARS.includes(profile.character) ? profile.character : 'dog1.svg';
+  const profileCharacter = normalizeAvatarForPicker(profile?.character);
 
   const resolvedNickname = nickname ?? profileNickname;
   const resolvedAvatar = currentAvatar ?? profileCharacter;
+
+  // 화면에 보여주는 실제 프로필 이미지는 서버 값 우선
+  const previewAvatar = currentAvatar ?? profile?.character ?? 'dog1.svg';
 
   const handleUpdateProfile = async () => {
     const shouldChangePassword =
@@ -99,7 +125,7 @@ export default function ProfileEditPage() {
       <main className="flex-1 space-y-8 px-4 pb-32">
         <div className="relative flex justify-center pt-2">
           <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
-            <Image src={`/${resolvedAvatar}`} alt="Avatar" fill className="object-cover" />
+            <Image src={resolveAvatarSrc(previewAvatar)} alt="Avatar" fill className="object-cover" />
           </div>
           <button
             onClick={() => setIsAvatarPickerOpen(true)}

@@ -14,6 +14,7 @@ export interface MyPageReview {
   nickname: string;
   wineId: number;
   wineName: string;
+  wineImageUrl?: string;
   rating: number;
   content: string;
   createdAt: string;
