@@ -19,6 +19,27 @@ from app.services.ocr.refiner import ocr_refiner
 
 router = APIRouter(dependencies=[Depends(verify_internal_api_key)])
 
+COUNTRY_LABELS = {
+    "France": "\ud504\ub791\uc2a4",
+    "Italy": "\uc774\ud0c8\ub9ac\uc544",
+    "Spain": "\uc2a4\ud398\uc778",
+    "United States": "\ubbf8\uad6d",
+    "USA": "\ubbf8\uad6d",
+    "Australia": "\ud638\uc8fc",
+    "New Zealand": "\ub274\uc9c8\ub79c\ub4dc",
+    "Germany": "\ub3c5\uc77c",
+    "Romania": "\ub8e8\ub9c8\ub2c8\uc544",
+    "Argentina": "\uc544\ub974\ud5e8\ud2f0\ub098",
+    "Chile": "\uce60\ub808",
+    "Portugal": "\ud3ec\ub974\ud22c\uac08",
+}
+
+
+def localize_country(country: str | None) -> str | None:
+    if not country:
+        return None
+    return COUNTRY_LABELS.get(country, country)
+
 
 def build_recommendation_card(recommendation: dict | None) -> ChatCardData | None:
     if not recommendation:
@@ -28,7 +49,7 @@ def build_recommendation_card(recommendation: dict | None) -> ChatCardData | Non
     if not recommended_wine:
         return None
 
-    country = recommended_wine.get("country")
+    country = localize_country(recommended_wine.get("country"))
     wine_type_label = recommended_wine.get("wineTypeLabel") or recommended_wine.get("wineType")
     subtitle_parts = [part for part in (country, wine_type_label) if part]
 
@@ -56,7 +77,7 @@ def build_recommendation_actions(recommendation: dict | None) -> list[ChatAction
     return [
         ChatActionData(
             type="wishlist",
-            label="위시리스트에 추가하기",
+            label="\uc704\uc2dc\ub9ac\uc2a4\ud2b8\uc5d0 \ucd94\uac00\ud558\uae30",
             wine_id=wine_id,
         )
     ]
@@ -64,7 +85,6 @@ def build_recommendation_actions(recommendation: dict | None) -> list[ChatAction
 
 @router.post("/chat", response_model=CustomChatResponse)
 async def chat(request: CustomChatRequest):
-    """실시간 소믈리에 상담."""
     initial_state = {
         "raw_input": request.message,
         "selected_wine": request.selected_wine,
@@ -105,7 +125,7 @@ async def chat(request: CustomChatRequest):
         result = await sommelier_agent.ainvoke(initial_state)
         final_output = result.get("final_output")
         recommendation = result.get("food_wine_recommendation")
-        answer = final_output.main_message if final_output else "답변 생성 실패"
+        answer = final_output.main_message if final_output else "\ub2f5\ubcc0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694."
 
         return {
             "answer": answer,
@@ -120,7 +140,6 @@ async def chat(request: CustomChatRequest):
 
 @router.post("/refine", response_model=RefineResponse)
 async def refine(request: RefineRequest):
-    """OCR 정제 요청."""
     try:
         is_menu = request.task == SommelierTask.MENU_SCAN
         result_data = await ocr_refiner.refine_wine_info(request.text_content, is_menu=is_menu)

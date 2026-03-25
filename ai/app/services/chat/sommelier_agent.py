@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import List, Optional, TypedDict
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -39,52 +40,87 @@ class AgentState(TypedDict):
     final_output: Optional[FinalSommelierResponse]
 
 
+FOOD_REQUEST_SUFFIXES = (
+    "\uc640 \uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c\ud574\uc918",
+    "\ub791 \uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c\ud574\uc918",
+    "\uc640 \uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c",
+    "\ub791 \uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c",
+    "\uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c\ud574\uc918",
+    "\uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778 \ucd94\ucc9c",
+    "\uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778",
+    "\ucd94\ucc9c\ud574\uc918",
+    "\ucd94\ucc9c",
+)
+
+
 def normalize_food_label(food_text: str | None) -> str:
     if not food_text:
-        return "이 음식"
+        return "\uc774 \uc74c\uc2dd"
 
-    normalized = food_text.strip()
-    suffixes = (
-        "과 어울리는 와인 추천해줘",
-        "와 어울리는 와인 추천해줘",
-        "랑 어울리는 와인 추천해줘",
-        "과 어울리는 와인 추천",
-        "와 어울리는 와인 추천",
-        "랑 어울리는 와인 추천",
-        "추천해줘",
-        "추천해 줘",
-    )
+    normalized = re.sub(r"\s+", " ", food_text).strip()
 
-    for suffix in suffixes:
+    for suffix in FOOD_REQUEST_SUFFIXES:
         if normalized.endswith(suffix):
             normalized = normalized[: -len(suffix)].strip()
             break
 
-    if normalized.endswith("이랑"):
-        normalized = normalized[:-2].strip()
-    elif normalized.endswith("랑"):
-        normalized = normalized[:-1].strip()
+    for particle in ("\uc774\ub791", "\ub791", "\uacfc", "\uc640"):
+        if normalized.endswith(particle):
+            normalized = normalized[: -len(particle)].strip()
+            break
 
-    return normalized or "이 음식"
+    normalized = re.sub(r"[?.!,]+$", "", normalized).strip()
+    return normalized or "\uc774 \uc74c\uc2dd"
+
+
+def polish_recommendation_reason(reason: str, food_label: str, raw_food_text: str | None) -> str:
+    polished = (reason or "").strip()
+
+    if raw_food_text:
+        polished = polished.replace(raw_food_text, food_label)
+        polished = polished.replace(f"{raw_food_text}\uc640", f"{food_label}\uc640")
+        polished = polished.replace(f"{raw_food_text}\ub791", f"{food_label}\uc640")
+
+    polished = re.sub(r"\s+", " ", polished).strip()
+    if not polished:
+        return f"{food_label}\uc640 \uc798 \uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778\uc774\uc5d0\uc694."
+
+    if not polished.endswith((".", "!", "?")):
+        polished += "."
+
+    return polished
+
+
+def choose_with_particle(text: str) -> str:
+    if not text:
+        return "와"
+
+    last_char = text[-1]
+    code = ord(last_char)
+    if 0xAC00 <= code <= 0xD7A3:
+        has_batchim = (code - 0xAC00) % 28 != 0
+        return "과" if has_batchim else "와"
+    return "와"
 
 
 def build_recommendation_first_message(recommendation: dict) -> str:
     recommended_wine = recommendation.get("recommendedWine") or {}
-    wine_name = recommended_wine.get("nameKr") or recommended_wine.get("nameEn") or "추천 와인"
-    reason = recommendation.get("reason") or "음식과 잘 어울리는 와인이에요."
+    wine_name = (
+        recommended_wine.get("nameKr")
+        or recommended_wine.get("nameEn")
+        or "\ucd94\ucc9c \uc640\uc778"
+    )
     raw_food_text = recommendation.get("foodText")
     food_label = normalize_food_label(raw_food_text)
+    reason = polish_recommendation_reason(
+        recommendation.get("reason") or "",
+        food_label,
+        raw_food_text,
+    )
 
-    if raw_food_text:
-        reason = reason.replace(f"{raw_food_text}와", f"{food_label}와")
-        reason = reason.replace(str(raw_food_text), food_label)
-
-    message_lines = [
-        f"오늘은 {wine_name}를 추천드릴게요.",
-        reason,
-    ]
-
-    return "\n".join(message_lines)
+    particle = choose_with_particle(food_label)
+    lead = f"{food_label}{particle} \ud568\uaed8\ub77c\uba74 {wine_name}\ub97c \ucd94\ucc9c\ub4dc\ub9b4\uac8c\uc694."
+    return "\n".join([lead, reason])
 
 
 async def prepare_input_context_node(state: AgentState):
@@ -128,20 +164,13 @@ async def chat_node(state: AgentState):
     llm = get_llm()
 
     input_context = state.get("input_context") or {}
-    input_context_summary = input_context.get("summary", "없음")
+    input_context_summary = input_context.get("summary", "\uc815\ubcf4 \uc5c6\uc74c")
 
     system_instruction = """
-당신은 사용자의 취향과 상황에 맞는 와인을 제안하는 소믈리에 챗봇입니다.
-
-가능하면 먼저 사용자가 이미 제공한 정보만으로 답변하세요.
-추가 질문이 꼭 필요할 때만 짧게 물어보고, 이미 추천 결과나 메뉴 정보가 있으면 그것을 우선 활용하세요.
-
-답변 원칙:
-1. 사용자가 바로 이해할 수 있도록 자연스럽고 친절한 한국어로 답변합니다.
-2. 추천 결과가 있는 경우, 그 내용을 중심으로 이유를 설명합니다.
-3. 와인명, 추천 이유, 매칭 포인트가 있으면 우선적으로 반영합니다.
-4. 불필요하게 질문을 되돌리지 말고, 이미 있는 정보로 최대한 도움을 줍니다.
-5. 초보자도 이해할 수 있도록 쉬운 표현을 사용합니다.
+You are a warm sommelier assistant.
+Reply in natural Korean.
+Keep answers concise and practical.
+When recommending wine, prioritize a short lead sentence and one clear reason.
 """
 
     prompt = ChatPromptTemplate.from_messages(
@@ -149,8 +178,8 @@ async def chat_node(state: AgentState):
             ("system", system_instruction),
             (
                 "user",
-                "[정리된 입력 정보]\n{context}\n\n"
-                "[사용자 메시지]\n{input}",
+                "[\uc785\ub825 \ucee8\ud14d\uc2a4\ud2b8]\n{context}\n\n"
+                "[\uc0ac\uc6a9\uc790 \uba54\uc2dc\uc9c0]\n{input}",
             ),
         ]
     )
