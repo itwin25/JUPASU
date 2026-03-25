@@ -19,6 +19,27 @@ from app.services.ocr.refiner import ocr_refiner
 
 router = APIRouter(dependencies=[Depends(verify_internal_api_key)])
 
+COUNTRY_LABELS = {
+    "France": "\ud504\ub791\uc2a4",
+    "Italy": "\uc774\ud0c8\ub9ac\uc544",
+    "Spain": "\uc2a4\ud398\uc778",
+    "United States": "\ubbf8\uad6d",
+    "USA": "\ubbf8\uad6d",
+    "Australia": "\ud638\uc8fc",
+    "New Zealand": "\ub274\uc9c8\ub79c\ub4dc",
+    "Germany": "\ub3c5\uc77c",
+    "Romania": "\ub8e8\ub9c8\ub2c8\uc544",
+    "Argentina": "\uc544\ub974\ud5e8\ud2f0\ub098",
+    "Chile": "\uce60\ub808",
+    "Portugal": "\ud3ec\ub974\ud22c\uac08",
+}
+
+
+def localize_country(country: str | None) -> str | None:
+    if not country:
+        return None
+    return COUNTRY_LABELS.get(country, country)
+
 
 def build_recommendation_card(recommendation: dict | None) -> ChatCardData | None:
     if not recommendation:
@@ -28,7 +49,7 @@ def build_recommendation_card(recommendation: dict | None) -> ChatCardData | Non
     if not recommended_wine:
         return None
 
-    country = recommended_wine.get("country")
+    country = localize_country(recommended_wine.get("country"))
     wine_type_label = recommended_wine.get("wineTypeLabel") or recommended_wine.get("wineType")
     subtitle_parts = [part for part in (country, wine_type_label) if part]
 
@@ -56,7 +77,7 @@ def build_recommendation_actions(recommendation: dict | None) -> list[ChatAction
     return [
         ChatActionData(
             type="wishlist",
-            label="위시리스트에 추가하기",
+            label="\uc704\uc2dc\ub9ac\uc2a4\ud2b8\uc5d0 \ucd94\uac00\ud558\uae30",
             wine_id=wine_id,
         )
     ]
@@ -64,27 +85,36 @@ def build_recommendation_actions(recommendation: dict | None) -> list[ChatAction
 
 @router.post("/chat", response_model=CustomChatResponse)
 async def chat(request: CustomChatRequest):
-    """실시간 소믈리에 상담."""
     initial_state = {
         "raw_input": request.message,
         "selected_wine": request.selected_wine,
         "selected_menu": request.selected_menu,
         "user_id": request.user_id,
         "mentioned_friends": request.mentioned_friends,
+        "history": request.history, # 추가: 과거 대화 이력 전달
     }
 
     settings = get_settings()
 
     if request.stream:
         async def stream_generator():
+            # [ULTIMATE HOTFIX] GMS 프록시의 버퍼링 및 초기 바이트 유실 문제를 해결하기 위해
+            # 약 2KB 크기의 벌크 더미 데이터를 먼저 전송하여 프록시 버퍼를 강제로 밀어냅니다.
+            dummy_padding = " " * 2048
+            yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
+            
             has_sent_content = False
 
-            async for event in sommelier_agent.astream_events(initial_state, version="v2"):
+            # v2 대신 v1을 사용하여 더 원시적인 이벤트를 캡처합니다. (짤림 방지)
+            async for event in sommelier_agent.astream_events(initial_state, version="v1"):
                 kind = event.get("event")
 
+                # v1에서는 on_chat_model_stream의 데이터 구조가 약간 다를 수 있으나 
+                # LangChain 추상화 레이어에서 대부분 호환됩니다.
                 if kind == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
-                    if content:
+                    chunk = event["data"]["chunk"]
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    if content is not None:
                         has_sent_content = True
                         yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
 
@@ -105,7 +135,7 @@ async def chat(request: CustomChatRequest):
         result = await sommelier_agent.ainvoke(initial_state)
         final_output = result.get("final_output")
         recommendation = result.get("food_wine_recommendation")
-        answer = final_output.main_message if final_output else "답변 생성 실패"
+        answer = final_output.main_message if final_output else "\ub2f5\ubcc0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694."
 
         return {
             "answer": answer,
@@ -120,7 +150,6 @@ async def chat(request: CustomChatRequest):
 
 @router.post("/refine", response_model=RefineResponse)
 async def refine(request: RefineRequest):
-    """OCR 정제 요청."""
     try:
         is_menu = request.task == SommelierTask.MENU_SCAN
         result_data = await ocr_refiner.refine_wine_info(request.text_content, is_menu=is_menu)

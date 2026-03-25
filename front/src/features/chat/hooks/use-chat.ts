@@ -19,9 +19,14 @@ export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [sessionId, setSessionId] = useState<string>('');
 
-  // 초기 채팅 내역 불러오기
+  // 초기 채팅 내역 및 세션 ID 설정
   useEffect(() => {
+    // 세션 ID 생성 (기존 세션이 없다면 새로 생성)
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setSessionId(newSessionId);
+
     const fetchHistory = async () => {
       try {
         const history = await chatApi.getHistory();
@@ -80,7 +85,8 @@ export const useChat = () => {
     setIsLoading(true);
 
     try {
-      await chatApi.sendChatStream(text, (chunk) => {
+      // API 호출 시 현재 sessionId 전달
+      await chatApi.sendChatStream(text, sessionId, (chunk) => {
         setMessages((prev) =>
           prev.map((msg) => (msg.id === botMessageId ? { ...msg, text: msg.text + chunk } : msg)),
         );
@@ -97,6 +103,21 @@ export const useChat = () => {
     } finally {
       setIsLoading(false);
     }
+  }, [sessionId]); // sessionId가 바뀔 때마다 함수 갱신
+
+  /**
+   * 새로운 채팅 시작 (세션 ID 초기화 및 메시지 비우기)
+   */
+  const startNewChat = useCallback(() => {
+    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    setSessionId(newSessionId);
+    setMessages([
+      {
+        id: 'welcome',
+        type: 'bot',
+        text: '새로운 대화를 시작합니다. 어떤 와인을 추천해드릴까요?',
+      },
+    ]);
   }, []);
 
   return {
@@ -104,5 +125,6 @@ export const useChat = () => {
     isLoading,
     isInitializing,
     sendMessage,
+    startNewChat, // 함수 노출
   };
 };

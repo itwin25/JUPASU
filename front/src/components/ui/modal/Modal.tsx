@@ -9,7 +9,7 @@ import Button from '../button/Button';
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
@@ -94,7 +94,7 @@ export default function Modal({
           <div className="flex flex-col gap-2.5">{footer}</div>
         ) : !hideDefaultFooter ? (
           <Button variant="primary" size="full" onClick={onClose}>
-            ?類ㅼ뵥
+            닫기
           </Button>
         ) : null}
       </div>

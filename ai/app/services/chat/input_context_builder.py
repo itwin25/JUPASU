@@ -4,10 +4,42 @@ import re
 from typing import Any
 
 
+FOOD_REQUEST_SUFFIXES = (
+    "와 어울리는 와인 추천해줘",
+    "랑 어울리는 와인 추천해줘",
+    "와 어울리는 와인 추천",
+    "랑 어울리는 와인 추천",
+    "어울리는 와인 추천해줘",
+    "어울리는 와인 추천",
+    "어울리는 와인",
+    "추천해줘",
+    "추천",
+)
+
+
 def _normalize_text(value: str | None) -> str:
     if not value:
         return ""
     return re.sub(r"\s+", " ", str(value)).strip()
+
+
+def _extract_food_text(raw_input: str) -> str:
+    normalized = _normalize_text(raw_input)
+    if not normalized:
+        return ""
+
+    for suffix in FOOD_REQUEST_SUFFIXES:
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)].strip()
+            break
+
+    for particle in ("이랑", "랑", "과", "와"):
+        if normalized.endswith(particle):
+            normalized = normalized[: -len(particle)].strip()
+            break
+
+    normalized = re.sub(r"[?.!,]+$", "", normalized).strip()
+    return normalized
 
 
 def _unique_preserve_order(values: list[str]) -> list[str]:
@@ -121,13 +153,13 @@ def build_chat_input_context(
         friend_names_raw.extend(_extract_from_keys(friend, ("nickname", "name", "username")))
     friend_names = _unique_preserve_order(friend_names_raw)
 
-    food_text = ", ".join(menu_foods) if menu_foods else normalized_input
+    food_text = ", ".join(menu_foods) if menu_foods else _extract_food_text(normalized_input)
 
     summary_lines = [
         f"- 사용자 원문: {normalized_input or '없음'}",
         f"- 추천 파이프라인용 음식 텍스트: {food_text or '없음'}",
-        f"- 메뉴판에서 추출/선택된 음식: {', '.join(menu_foods) if menu_foods else '없음'}",
-        f"- 메뉴판에서 추출/선택된 와인: {', '.join(menu_wines) if menu_wines else '없음'}",
+        f"- 메뉴판에서 추출한 음식: {', '.join(menu_foods) if menu_foods else '없음'}",
+        f"- 메뉴판에서 추출한 와인: {', '.join(menu_wines) if menu_wines else '없음'}",
         f"- 사용자가 선택한 와인: {selected_wine_name or '없음'}",
         f"- 함께 언급된 친구: {', '.join(friend_names) if friend_names else '없음'}",
     ]

@@ -181,25 +181,35 @@ export default function ScanPage() {
 
       <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6">
         {status === 'idle' && (
-          <div className="flex flex-col py-2">
-            <header className="mb-2">
+          <div className="flex flex-col pt-16 pb-4">
+            <header className="mb-4">
               <h1 className="text-text-main mb-1 text-2xl font-black">WINE SCAN</h1>
               <p className="text-text-main/40 text-sm font-medium">
                 와인 라벨을 스캔하면 정보를 알려드려요
               </p>
             </header>
 
-            <div className="relative mx-auto mt-4 mb-4 aspect-square w-full overflow-hidden rounded-[40px]">
+            <div className="mx-auto w-full overflow-hidden rounded-[40px]">
               <NextImage
                 src="/Scanning.jpg"
                 alt="Scanning Guide"
-                fill
+                width={500}
+                height={500}
                 priority
-                className="object-contain"
+                className="h-auto w-full"
               />
             </div>
 
-            <div className="space-y-6">
+            <div className="mt-6 space-y-6">
+              <Button
+                onClick={triggerUpload}
+                size="full"
+                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
+              >
+                <Camera size={24} />
+                와인 라벨 스캔하기
+              </Button>
+
               <div>
                 <div className="text-text-main mb-3 flex items-center gap-2 text-base font-black italic">
                   <span className="text-lg text-[#FF8A00]">⚡</span> 이렇게 스캔해 보세요
@@ -212,25 +222,18 @@ export default function ScanPage() {
                   ].map((tip) => (
                     <div
                       key={tip.n}
-                      className="border-primary-100 flex items-center gap-4 rounded-full border bg-white px-5 py-2 shadow-sm"
+                      className="border-primary-100 flex min-h-[60px] items-center gap-4 rounded-[20px] border bg-white px-5 py-3 shadow-sm"
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFE5E5] text-sm font-black text-[#B36262]">
                         {tip.n}
                       </span>
-                      <span className="text-text-main/60 text-sm font-bold">{tip.t}</span>
+                      <span className="text-text-main/60 break-keep-all text-[13px] font-bold leading-tight">
+                        {tip.t}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
-
-              <Button
-                onClick={triggerUpload}
-                size="full"
-                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
-              >
-                <Camera size={24} />
-                와인 라벨 스캔하기
-              </Button>
             </div>
           </div>
         )}
