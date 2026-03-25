@@ -25,6 +25,9 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
+    private static final List<String> ALLOWED_CHARACTER_BASES =
+            List.of("cat", "dog", "giraffe", "mouse", "tiger", "whale");
+
     // 사용자 고유 ID (PK)
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -91,13 +94,6 @@ public class User {
         this.nickname = nickname;
     }
 
-    /**
-     * 사용자의 캐릭터 키값을 변경
-     * @param character 변경할 캐릭터 식별 문자열
-     */
-    public void updateCharacter(String character) {
-        this.character = character;
-    }
 
     /**
      * 비밀번호를 새로운 암호화된 값으로 변경
@@ -115,6 +111,7 @@ public class User {
             this.reviewCount = 0;
         }
         this.reviewCount++;
+        syncCharacterWithReviewCount();
     }
 
     public void decreaseReviewCount() {
@@ -123,6 +120,74 @@ public class User {
             return;
         }
         this.reviewCount--;
+        syncCharacterWithReviewCount();
+    }
+
+
+    /**
+     * 사용자가 프로필에서 캐릭터를 변경할 때 호출.
+     * 예: cat1.svg, cat3.svg, /cat2.svg, cat 모두 허용
+     * 실제 저장은 현재 reviewCount 단계에 맞는 파일명으로 저장.
+     */
+    public void updateCharacter(String character) {
+        String base = extractCharacterBase(character);
+        this.character = buildCharacterFileName(base);
+    }
+
+    private void syncCharacterWithReviewCount() {
+        String base = extractCharacterBase(this.character);
+        this.character = buildCharacterFileName(base);
+    }
+
+    /**
+     * character 값에서 동물 종류만 추출.
+     * 허용 예:
+     * - cat
+     * - cat1
+     * - cat1.svg
+     * - /cat2.svg
+     */
+    private String extractCharacterBase(String character) {
+        if (character == null || character.isBlank()) {
+            return "tiger";
+        }
+
+        String normalized = character.trim();
+
+        if (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+
+        normalized = normalized.replaceAll("(?i)\\.svg$", "");
+        normalized = normalized.replaceAll("[1-3]$", "");
+
+        if (!ALLOWED_CHARACTER_BASES.contains(normalized)) {
+            return "tiger";
+        }
+
+        return normalized;
+    }
+
+    /**
+     * 리뷰 수 기준 단계 계산
+     * 0~4   -> 1
+     * 5~9   -> 2
+     * 10 이상 -> 3
+     */
+    private int calculateCharacterStage() {
+        int count = (this.reviewCount == null) ? 0 : this.reviewCount;
+
+        if (count >= 10) {
+            return 3;
+        }
+        if (count >= 5) {
+            return 2;
+        }
+        return 1;
+    }
+
+    private String buildCharacterFileName(String characterBase) {
+        return characterBase + calculateCharacterStage() + ".svg";
     }
 }
 

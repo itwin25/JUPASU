@@ -13,8 +13,8 @@ export const QUERY_KEY = {
     SCRAPS: (page: number = 0) => ['wine', 'scraps', page] as const,
   },
   USER: {
-    PROFILE: ['user', 'profile'],
-    ME: ['user', 'me'],
+  PROFILE: ['user', 'profile'] as const,
+  ME: ['user', 'me'] as const,
   },
   FRIEND: {
     LIST: ['friend', 'list'],
