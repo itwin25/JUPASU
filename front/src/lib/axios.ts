@@ -10,6 +10,11 @@ import { API_PATH } from '@/constants/api-path';
 let isRedirecting = false;
 
 /**
+ * 진행 중인 토큰 재발급 Promise (동시 요청 레이스 컨디션 방지)
+ */
+let refreshPromise: Promise<void> | null = null;
+
+/**
  * 공통 Axios 인스턴스 (인증 및 RTR 처리)
  */
 export const api = axios.create({
@@ -57,22 +62,30 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = authToken.getRefresh();
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshPromise) {
+          refreshPromise = (async () => {
+            const refreshToken = authToken.getRefresh();
+            if (!refreshToken) throw new Error('No refresh token');
 
-        const response = await axios.post(`${env.API_BASE_URL}${API_PATH.AUTH.REFRESH}`, null, {
-          headers: {
-            Authorization: `Bearer ${refreshToken}`,
-          },
-        });
+            const response = await axios.post(`${env.API_BASE_URL}${API_PATH.AUTH.REFRESH}`, null, {
+              headers: {
+                Authorization: `Bearer ${refreshToken}`,
+              },
+            });
 
-        const newAccessToken = response.headers['authorization']?.substring(7);
-        const newRefreshToken = response.headers['refresh-token'];
+            const newAccessToken = response.headers['authorization']?.substring(7);
+            const newRefreshToken = response.headers['refresh-token'];
 
-        if (newAccessToken) authToken.setAccess(newAccessToken);
-        if (newRefreshToken) authToken.setRefresh(newRefreshToken);
+            if (newAccessToken) authToken.setAccess(newAccessToken);
+            if (newRefreshToken) authToken.setRefresh(newRefreshToken);
+          })().finally(() => {
+            refreshPromise = null;
+          });
+        }
 
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        await refreshPromise;
+
+        originalRequest.headers.Authorization = `Bearer ${authToken.getAccess()}`;
         return api(originalRequest);
       } catch (refreshError) {
         if (!isRedirecting) {
