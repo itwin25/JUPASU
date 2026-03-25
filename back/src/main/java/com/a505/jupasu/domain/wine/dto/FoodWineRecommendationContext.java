@@ -6,6 +6,7 @@ import lombok.Builder;
 public record FoodWineRecommendationContext(
         Long userId,
         String foodText,
+        FoodContext foodContext,
         int candidateLimit,
         FoodWinePersonalizationSnapshot personalization
 ) {

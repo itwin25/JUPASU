@@ -42,14 +42,18 @@ class FoodWineRecommendationServiceTest {
     private FoodWineRecommendationQueryRepository queryRepository;
 
     private FoodWineRecommendationService service;
+    private FoodContextAnalyzer foodContextAnalyzer;
 
     @BeforeEach
     void setUp() {
+        foodContextAnalyzer = new FoodContextAnalyzer();
         service = new FoodWineRecommendationService(
                 userRepository,
                 preferenceRepository,
                 tasteReportRepository,
-                queryRepository
+                queryRepository,
+                foodContextAnalyzer,
+                new FoodWineReasonGenerator()
         );
     }
 
@@ -124,6 +128,28 @@ class FoodWineRecommendationServiceTest {
         assertThat(response.recommendedWine().wineId()).isEqualTo(303L);
     }
 
+    @Test
+    @DisplayName("multiple foods share one recommendation reason")
+    void recommend_handlesMultipleFoods() {
+        User user = stubContextLookups(1L);
+        FoodWineSearchCandidate topCandidate = buildSharedCandidate();
+
+        when(queryRepository.findTopCandidatesByQueryVector(anyString(), anyInt()))
+                .thenReturn(List.of(topCandidate));
+
+        FoodWineRecommendationResponse response = service.recommend(
+                user.getId(),
+                FoodWineRecommendationRequest.builder()
+                        .foodText("우삼겹 된장 덮밥, 김치 날치알밥")
+                        .candidateLimit(5)
+                        .build(),
+                "[0.1,0.2,0.3]"
+        );
+
+        assertThat(response.foodText()).isEqualTo("우삼겹 된장 덮밥, 김치 날치알밥");
+        assertThat(response.reason()).contains("진하고 고소한 맛", "양념");
+    }
+
     private User stubContextLookups(Long userId) {
         User user = buildUser(userId);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -137,6 +163,7 @@ class FoodWineRecommendationServiceTest {
         return FoodWineRecommendationContext.builder()
                 .userId(1L)
                 .foodText("스테이크")
+                .foodContext(foodContextAnalyzer.analyze("스테이크"))
                 .candidateLimit(5)
                 .personalization(FoodWinePersonalizationSnapshot.builder()
                         .source("TASTE_REPORT")
@@ -146,7 +173,7 @@ class FoodWineRecommendationServiceTest {
                         .sweetness(1.0)
                         .preferredWineTypes(List.of("RED"))
                         .preferredFlavors(List.of("OAK"))
-                        .summary("진한 레드 와인과 오크 풍미를 선호합니다.")
+                        .summary("묵직한 레드 와인과 오크 풍미를 좋아해요.")
                         .build())
                 .build();
     }
@@ -164,7 +191,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(3.0)
                 .tannin(4.0)
                 .sweetness(1.0)
-                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리고 오크 풍미가 살아 있는 레드 와인입니다.")
+                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리는 오크 풍미의 묵직한 레드 와인입니다.")
                 .foodPairings(List.of("소고기", "양고기"))
                 .foodSimilarity(0.58)
                 .build();
@@ -173,7 +200,7 @@ class FoodWineRecommendationServiceTest {
     private FoodWineSearchCandidate buildSeafoodSparklingCandidate() {
         return FoodWineSearchCandidate.builder()
                 .wineId(202L)
-                .nameKr("해산물에 어울리는 스파클링")
+                .nameKr("해산물용 스파클링")
                 .nameEn("Seafood Sparkling")
                 .wineType("SPARKLING")
                 .country("France")
@@ -183,7 +210,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(4.0)
                 .tannin(1.0)
                 .sweetness(2.0)
-                .embeddingTextKo("해산물과 치즈 플래터에 잘 어울리는 산뜻한 스파클링 와인입니다.")
+                .embeddingTextKo("해산물과 치즈에 잘 어울리는 산뜻한 스파클링 와인입니다.")
                 .foodPairings(List.of("해산물", "치즈"))
                 .foodSimilarity(0.61)
                 .build();
@@ -203,9 +230,28 @@ class FoodWineRecommendationServiceTest {
                 .acidity(3.0)
                 .tannin(4.0)
                 .sweetness(1.0)
-                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리고 붉은 과실과 오크 풍미가 살아 있는 레드 와인입니다.")
+                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리는 붉은 과실과 오크 풍미의 레드 와인입니다.")
                 .foodPairings(List.of("소고기", "양고기"))
                 .foodSimilarity(0.60)
+                .build();
+    }
+
+    private FoodWineSearchCandidate buildSharedCandidate() {
+        return FoodWineSearchCandidate.builder()
+                .wineId(404L)
+                .nameKr("함께 먹기 좋은 화이트")
+                .nameEn("Shared White")
+                .wineType("WHITE")
+                .country("Germany")
+                .region("Mosel")
+                .price(32000)
+                .body(3.1)
+                .acidity(3.4)
+                .tannin(1.0)
+                .sweetness(2.4)
+                .embeddingTextKo("고기 요리와 발효된 양념, 해산물 풍미가 섞인 음식과 잘 어울리는 산뜻한 화이트 와인입니다.")
+                .foodPairings(List.of("소고기", "해산물"))
+                .foodSimilarity(0.63)
                 .build();
     }
 
