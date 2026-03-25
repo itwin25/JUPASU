@@ -92,7 +92,7 @@ export default function ProfileEditPage() {
           <ChevronLeft size={20} className="text-text-main" />
         </Link>
         <h1 className="text-text-main mr-9 flex-1 text-center text-base font-black">
-          내 정보 수정
+          프로필 수정
         </h1>
       </header>
 
