@@ -8,13 +8,13 @@ from app.core.config import get_settings
 
 
 FOOD_RECOMMENDATION_CUES = (
-    "추천",
-    "어울",
-    "곁들",
-    "같이",
+    "와인",
+    "음식",
+    "메뉴",
+    "먹을",
     "마실",
-    "어떤 와인",
-    "무슨 와인",
+    "어울리는",
+    "추천",
 )
 
 
@@ -26,7 +26,7 @@ def should_request_food_recommendation(raw_input: str, input_context: dict[str, 
     if menu_foods and food_text:
         return True
 
-    if not food_text or food_text == normalized_input == "":
+    if not food_text:
         return False
 
     return any(cue in normalized_input for cue in FOOD_RECOMMENDATION_CUES)
@@ -93,15 +93,15 @@ async def request_food_wine_recommendation(
 
 def build_food_recommendation_summary(recommendation: dict[str, Any] | None) -> str:
     if not recommendation:
-        return "- 음식 기반 와인 추천 결과: 없음"
+        return "- 음식 기반 추천 결과: 없음"
 
     recommended_wine = recommendation.get("recommendedWine") or {}
     lines = [
-        "- 음식 기반 와인 추천 결과:",
+        "- 음식 기반 추천 결과:",
         f"  - 음식: {recommendation.get('foodText') or '없음'}",
         f"  - 추천 와인: {recommended_wine.get('nameKr') or '없음'}",
-        f"  - 타입: {recommended_wine.get('wineTypeLabel') or recommended_wine.get('wineType') or '없음'}",
-        f"  - 산지: {(recommended_wine.get('country') or '')} {(recommended_wine.get('region') or '')}".strip() or "없음",
+        f"  - 와인 타입: {recommended_wine.get('wineTypeLabel') or recommended_wine.get('wineType') or '없음'}",
+        f"  - 산지: {((recommended_wine.get('country') or '') + ' ' + (recommended_wine.get('region') or '')).strip() or '없음'}",
         f"  - 가격: {recommended_wine.get('price') or '없음'}",
         f"  - 매칭률: {recommendation.get('matchPercent') or '없음'}",
         f"  - 추천 이유: {recommendation.get('reason') or '없음'}",
