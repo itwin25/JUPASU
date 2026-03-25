@@ -11,7 +11,7 @@ import { api } from '@/lib/axios';
 const WINE_TYPES = ['RED', 'WHITE', 'SPARKLING', 'ROSE', 'DESSERT', 'FORTIFIED'];
 
 const SORT_OPTIONS = [
-  { key: 'RECOMMEND', label: '추천순' },
+  { key: 'RECOMMEND', label: '기본순' },
   { key: 'price,asc', label: '가격 낮은순' },
   { key: 'price,desc', label: '가격 높은순' },
   { key: 'rating,desc', label: '평점 높은순' },
@@ -44,7 +44,8 @@ export default function SearchPage() {
   const [isSortOpen, setIsSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 
-  const [selectedType, setSelectedType] = useState<string>('');
+  // ⭐️ 1. 단일 문자열에서 문자열 배열로 상태 변경
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedRating, setSelectedRating] = useState(0);
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
 
@@ -74,7 +75,9 @@ export default function SearchPage() {
       }
 
       if (searchQuery) params.keyword = searchQuery;
-      if (selectedType) params.type = selectedType;
+      
+      // ⭐️ 3. 배열에 담긴 여러 타입들을 쉼표로 이어붙여서 'types' 파라미터로 전송
+      if (selectedTypes.length > 0) params.types = selectedTypes.join(',');
 
       if (priceRange.min !== '') params.minPrice = Number(priceRange.min) * 10000;
       if (priceRange.max !== '') params.maxPrice = Number(priceRange.max) * 10000;
@@ -113,8 +116,13 @@ export default function SearchPage() {
     }
   };
 
+  // ⭐️ 2. 다중 선택이 가능하도록 토글 로직 변경
   const toggleType = (type: string) => {
-    setSelectedType((prev) => (prev === type ? '' : type));
+    setSelectedTypes((prev) =>
+      prev.includes(type)
+        ? prev.filter((t) => t !== type) // 이미 있으면 제거
+        : [...prev, type]                // 없으면 배열에 추가
+    );
   };
 
   return (
@@ -259,7 +267,8 @@ export default function SearchPage() {
         <div className="fixed inset-0 z-[100] bg-black/40 flex flex-col justify-end animate-in fade-in duration-300">
           <div className="absolute inset-0" onClick={() => setIsFilterOpen(false)} />
 
-          <div className="relative bg-white rounded-t-[40px] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom,2rem)]">
+          {/* ⭐️ 1. 필터 모달 전체의 높이를 살짝 늘렸습니다 (max-h-[90vh] -> max-h-[95vh]) */}
+          <div className="relative bg-white rounded-t-[40px] p-8 space-y-8 animate-in slide-in-from-bottom-full duration-300 max-h-[95vh] overflow-y-auto no-scrollbar">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-black text-text-main">필터</h2>
               <button onClick={() => setIsFilterOpen(false)} className="text-text-main/30 cursor-pointer p-1">
@@ -275,8 +284,8 @@ export default function SearchPage() {
                 {WINE_TYPES.map((type) => (
                   <Chip
                     key={type}
-                    active={selectedType === type}
-                    variant={selectedType === type ? 'primary' : 'secondary'}
+                    active={selectedTypes.includes(type)}
+                    variant={selectedTypes.includes(type) ? 'primary' : 'secondary'}
                     onClick={() => toggleType(type)}
                     className="px-5 text-xs font-bold border-none cursor-pointer"
                   >
@@ -290,24 +299,26 @@ export default function SearchPage() {
               <span className="text-sm font-black text-text-main">Price Range</span>
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-white border-2 border-primary-100 rounded-2xl p-2 flex items-center justify-center focus-within:border-[#B36262] transition-colors shadow-inner-sm">
+                  {/* ⭐️ 2. 입력창 글자 크기와 placeholder 크기를 text-sm으로 줄였습니다 */}
                   <input
                     type="number"
                     value={priceRange.min}
                     onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
                     placeholder="최소"
-                    className="w-full text-center font-black text-text-main outline-none placeholder:text-text-main/20 bg-transparent"
+                    className="w-full text-center text-sm font-black text-text-main outline-none placeholder:text-sm placeholder:text-text-main/20 bg-transparent"
                   />
                 </div>
 
                 <span className="text-text-main/30 font-bold">~</span>
 
                 <div className="flex-1 bg-white border-2 border-primary-100 rounded-2xl p-2 flex items-center justify-center focus-within:border-[#B36262] transition-colors shadow-inner-sm">
+                  {/* ⭐️ 2. 입력창 글자 크기와 placeholder 크기를 text-sm으로 줄였습니다 */}
                   <input
                     type="number"
                     value={priceRange.max}
                     onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
                     placeholder="최대"
-                    className="w-full text-center font-black text-text-main outline-none placeholder:text-text-main/20 bg-transparent"
+                    className="w-full text-center text-sm font-black text-text-main outline-none placeholder:text-sm placeholder:text-text-main/20 bg-transparent"
                   />
                 </div>
 
@@ -335,10 +346,11 @@ export default function SearchPage() {
               </div>
             </div>
 
-            <div className="pt-6 flex gap-3 border-t border-primary-100 bg-white sticky bottom-0 z-10">
+            {/* ⭐️ 1. 버튼이 잘리지 않도록 하단 패딩(pb-6)과 모바일 하단 여백을 충분히 추가했습니다 */}
+            <div className="pt-6 pb-[calc(env(safe-area-inset-bottom,1.5rem)+1.5rem)] flex gap-3 border-t border-primary-100 bg-white sticky bottom-0 z-10">
               <button
                 onClick={() => {
-                  setSelectedType('');
+                  setSelectedTypes([]);
                   setSelectedRating(0);
                   setPriceRange({ min: '', max: '' });
                 }}

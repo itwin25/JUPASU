@@ -17,4 +17,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     
     // 특정 유저의 채팅 내역을 시간 순서대로 가져오는 기능 추가
     List<ChatMessage> findByUserOrderByCreatedAtAsc(User user);
+
+    // 세션 ID로 최근 대화 내역을 시간 순서대로 가져오는 기능 추가
+    List<ChatMessage> findBySessionIdOrderByCreatedAtAsc(String sessionId);
 }

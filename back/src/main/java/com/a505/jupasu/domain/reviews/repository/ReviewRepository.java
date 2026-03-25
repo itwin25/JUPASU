@@ -30,6 +30,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query("select r from Review r join fetch r.wine w where r.user = :user order by r.createdAt desc")
     List<Review> findAllByUserWithWine(@Param("user") User user);
 
+    @Query(
+            value = "select r from Review r join fetch r.wine where r.user = :user order by r.createdAt desc",
+            countQuery = "select count(r) from Review r where r.user = :user"
+    )
+    Page<Review> findAllByUserWithWine(@Param("user") User user, Pageable pageable);
+
     // 유저가 작성한 리뷰 수 조회
     long countByUser(User user);
 

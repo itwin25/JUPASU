@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star, X } from 'lucide-react'; // ⭐️ X 아이콘 추가
+import { ChevronLeft, Heart, MoreHorizontal, PenSquare, Star, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ReviewModal } from '@/features/review/components';
@@ -86,20 +86,31 @@ const getCountryFlagUrl = (countryName: string | undefined | null) => {
   if (name.includes('프랑스') || name.includes('france') || name === 'fr') code = 'fr';
   else if (name.includes('이탈리아') || name.includes('italy') || name === 'it') code = 'it';
   else if (name.includes('스페인') || name.includes('spain') || name === 'es') code = 'es';
-  else if (name.includes('미국') || name.includes('usa') || name.includes('united states') || name === 'us') code = 'us';
+  else if (
+    name.includes('미국') ||
+    name.includes('usa') ||
+    name.includes('united states') ||
+    name === 'us'
+  )
+    code = 'us';
   else if (name.includes('칠레') || name.includes('chile') || name === 'cl') code = 'cl';
   else if (name.includes('호주') || name.includes('australia') || name === 'au') code = 'au';
-  else if (name.includes('아르헨티나') || name.includes('argentina') || name === 'ar') code = 'ar';
+  else if (name.includes('아르헨티나') || name.includes('argentina') || name === 'ar')
+    code = 'ar';
   else if (name.includes('독일') || name.includes('germany') || name === 'de') code = 'de';
-  else if (name.includes('뉴질랜드') || name.includes('new zealand') || name === 'nz') code = 'nz';
-  else if (name.includes('포르투갈') || name.includes('portugal') || name === 'pt') code = 'pt';
-  else if (name.includes('남아공') || name.includes('south africa') || name === 'za') code = 'za';
-  else if (name.includes('한국') || name.includes('korea') || name.includes('대한민국') || name === 'kr') code = 'kr';
+  else if (name.includes('뉴질랜드') || name.includes('new zealand') || name === 'nz')
+    code = 'nz';
+  else if (name.includes('포르투갈') || name.includes('portugal') || name === 'pt')
+    code = 'pt';
+  else if (name.includes('남아공') || name.includes('south africa') || name === 'za')
+    code = 'za';
+  else if (name.includes('한국') || name.includes('korea') || name.includes('대한민국') || name === 'kr')
+    code = 'kr';
 
   return code ? `https://flagcdn.com/w40/${code}.png` : null;
 };
 
-const parseDateStr = (dateVal: any) => {
+const parseDateStr = (dateVal: unknown) => {
   if (!dateVal) return 0;
   if (Array.isArray(dateVal)) {
     return new Date(
@@ -111,16 +122,16 @@ const parseDateStr = (dateVal: any) => {
       dateVal[5] || 0,
     ).getTime();
   }
-  return new Date(dateVal).getTime();
+  return new Date(dateVal as string | number | Date).getTime();
 };
 
-const formatDateStr = (dateVal: any) => {
+const formatDateStr = (dateVal: unknown) => {
   if (!dateVal) return '';
   let d: Date;
   if (Array.isArray(dateVal)) {
     d = new Date(dateVal[0], dateVal[1] - 1, dateVal[2], dateVal[3] || 0, dateVal[4] || 0);
   } else {
-    d = new Date(dateVal);
+    d = new Date(dateVal as string | number | Date);
   }
   if (isNaN(d.getTime())) return '';
   const yyyy = d.getFullYear();
@@ -149,8 +160,6 @@ export default function WineDetailPage({
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState<'recent' | 'rating'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-
-  // ⭐️ 툴팁 가시성 상태 관리 추가
   const [showTasteTooltip, setShowTasteTooltip] = useState(false);
 
   const {
@@ -160,32 +169,32 @@ export default function WineDetailPage({
   } = useQuery({
     queryKey: ['wine-detail', numericWineId],
     queryFn: () => api.get(`/wines/${numericWineId}`).then((res) => res.data.data),
+    enabled: Number.isFinite(numericWineId),
   });
 
-  const {
-    data: reviewData,
-    refetch: refetchReviews,
-  } = useWineReviewsQuery(numericWineId);
+  const { data: reviewData, refetch: refetchReviews } = useWineReviewsQuery(numericWineId);
 
   const createReviewMutation = useCreateReviewMutation();
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
 
-  const safeReviewList = useMemo<any[]>(() => {
+  const safeReviewList = useMemo<Record<string, any>[]>(() => {
     if (!reviewData) return [];
     const data = reviewData as any;
-    return Array.isArray(data) ? data : (data.content || []);
+    return Array.isArray(data) ? data : (data.content ?? []);
   }, [reviewData]);
 
-  const { data: scrapListData } = useWineScrapListQuery();
+  const { data: scrapListPageData } = useWineScrapListQuery(0);
   const wineScrapMutation = useWineScrapMutation();
+
+  const scrapItems = useMemo<any[]>(() => scrapListPageData?.content ?? [], [scrapListPageData]);
 
   const isScraped = useMemo(
     () =>
-      (scrapListData ?? []).some(
+      scrapItems.some(
         (item) => item.wineId === numericWineId || item.scrapId === numericWineId,
       ),
-    [scrapListData, numericWineId],
+    [scrapItems, numericWineId],
   );
 
   const wineInfo = useMemo<WineInfo | null>(() => {
@@ -234,7 +243,8 @@ export default function WineDetailPage({
   }, [wineDetail]);
 
   const reviews: ReviewItem[] = useMemo(() => {
-    let sortedReviews = [...safeReviewList];
+    const sortedReviews = [...safeReviewList];
+
     if (sortOrder === 'rating') {
       sortedReviews.sort((a, b) => b.rating - a.rating);
     } else {
@@ -287,13 +297,13 @@ export default function WineDetailPage({
   }, [wineInfo]);
 
   const userPolygonPoints = useMemo(() => {
-    if (!wineInfo || !wineInfo.userPreference) return '';
+    if (!wineInfo?.userPreference) return '';
 
     const pref = wineInfo.userPreference;
     const tasteValues = [
       pref.tannin,
       pref.body,
-      Math.min((pref.alcoholDegree! / 20) * 5, 5),
+      Math.min(((pref.alcoholDegree ?? 0) / 20) * 5, 5),
       pref.sweet,
       pref.acid,
     ];
@@ -500,7 +510,7 @@ export default function WineDetailPage({
                   </span>
                 </div>
                 <span className="text-[1.2rem] font-black tracking-[-0.035em] text-[#C96D72]">
-                  ₩{wineInfo.price}
+                  {wineInfo.price === '-' ? '-' : `₩${wineInfo.price}`}
                 </span>
               </div>
 
@@ -554,8 +564,7 @@ export default function WineDetailPage({
               <div className="space-y-4">
                 <div className="flex items-center justify-between relative">
                   <h3 className="text-text-main text-[1.05rem] font-black">맛 프로필</h3>
-                  
-                  {/* ⭐️ '?' 버튼을 버튼 태그로 변경하고 토글 이벤트 추가 */}
+
                   <button
                     onClick={() => setShowTasteTooltip(!showTasteTooltip)}
                     className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white hover:bg-[#b55b60] transition-colors focus:outline-none"
@@ -564,22 +573,35 @@ export default function WineDetailPage({
                     ?
                   </button>
 
-                  {/* ⭐️ 클릭 시 나타나는 툴팁 창 */}
                   {showTasteTooltip && (
                     <div className="absolute right-0 top-7 z-50 w-[15rem] rounded-[1rem] border border-primary-100 bg-white p-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
                       <div className="mb-2 flex items-center justify-between">
                         <span className="text-[0.8rem] font-black text-text-main">지표 설명</span>
-                        <button onClick={() => setShowTasteTooltip(false)} className="p-1 text-text-main/40 hover:text-text-main">
+                        <button
+                          onClick={() => setShowTasteTooltip(false)}
+                          className="p-1 text-text-main/40 hover:text-text-main"
+                        >
                           <X size={14} />
                         </button>
                       </div>
                       <div className="space-y-2 text-[0.75rem] font-medium text-text-main/80">
-                        <p><span className="font-bold text-[#C96D72]">BODY (바디):</span> 와인이 입안에서 느껴지는 무게감이나 점성입니다.</p>
-                        <p><span className="font-bold text-[#C96D72]">SWEET (당도):</span> 와인에 남아있는 잔당으로 인한 단맛의 정도입니다.</p>
-                        <p><span className="font-bold text-[#C96D72]">ACID (산미):</span> 입에 침이 고이게 만드는 신맛의 강도입니다.</p>
-                        <p><span className="font-bold text-[#C96D72]">TANNIN (탄닌):</span> 포도 껍질과 씨에서 나오는 떫은맛과 쌉쌀함입니다.</p>
+                        <p>
+                          <span className="font-bold text-[#C96D72]">BODY (바디):</span> 와인이
+                          입안에서 느껴지는 무게감이나 점성입니다.
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#C96D72]">SWEET (당도):</span> 와인에
+                          남아있는 잔당으로 인한 단맛의 정도입니다.
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#C96D72]">ACID (산미):</span> 입에 침이
+                          고이게 만드는 신맛의 강도입니다.
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#C96D72]">TANNIN (탄닌):</span> 포도
+                          껍질과 씨에서 나오는 떫은맛과 쌉쌀함입니다.
+                        </p>
                       </div>
-                      {/* 말풍선 꼬리 */}
                       <div className="absolute -top-2 right-2 h-4 w-4 rotate-45 border-l border-t border-primary-100 bg-white" />
                     </div>
                   )}
@@ -639,11 +661,11 @@ export default function WineDetailPage({
                   {wineInfo.userPreference && (
                     <div className="flex items-center gap-2 pr-1">
                       <div className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#D9AD70]"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#D9AD70]" />
                         <span className="text-text-main/50 text-[0.68rem] font-bold">내 취향</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#C96D72]"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#C96D72]" />
                         <span className="text-text-main/50 text-[0.68rem] font-bold">와인</span>
                       </div>
                     </div>
@@ -668,6 +690,7 @@ export default function WineDetailPage({
                           />
                         );
                       })}
+
                       {Array.from({ length: 5 }).map((_, i) => {
                         const angle = (i * 72 - 90) * (Math.PI / 180);
                         return (
@@ -695,19 +718,19 @@ export default function WineDetailPage({
                       />
                     </svg>
 
-                    <span className="text-text-main/60 absolute top-[-0.3rem] left-1/2 -translate-x-1/2 text-[0.8rem] font-bold">
+                    <span className="text-text-main/60 absolute top-[-0.3rem] left-1/2 -translate-x-1/2 text-[10px] leading-none font-medium">
                       탄닌
                     </span>
-                    <span className="text-text-main/60 absolute top-[32%] right-[0.2rem] text-[0.8rem] font-bold">
+                    <span className="text-text-main/60 absolute top-[32%] right-[0.2rem] text-[10px] leading-none font-medium">
                       바디
                     </span>
-                    <span className="text-text-main/60 absolute right-[2.5rem] bottom-[2%] text-[0.8rem] font-bold">
+                    <span className="text-text-main/60 absolute right-[2.5rem] bottom-[2%] text-[10px] leading-none font-medium">
                       도수
                     </span>
-                    <span className="text-text-main/60 absolute bottom-[2%] left-[3.5rem] -translate-x-1/2 text-[0.8rem] font-bold">
+                    <span className="text-text-main/60 absolute bottom-[2%] left-[3.5rem] -translate-x-1/2 text-[10px] leading-none font-medium">
                       당도
                     </span>
-                    <span className="text-text-main/60 absolute top-[32%] left-[0.2rem] text-[0.8rem] font-bold">
+                    <span className="text-text-main/60 absolute top-[32%] left-[0.2rem] text-[10px] leading-none font-medium">
                       산미
                     </span>
                   </div>
@@ -878,7 +901,9 @@ export default function WineDetailPage({
                                   key={star}
                                   size={12}
                                   fill={star <= review.rating ? '#FF9A3D' : 'none'}
-                                  className={star <= review.rating ? 'text-[#FF9A3D]' : 'text-primary-100'}
+                                  className={
+                                    star <= review.rating ? 'text-[#FF9A3D]' : 'text-primary-100'
+                                  }
                                 />
                               ))}
                             </div>

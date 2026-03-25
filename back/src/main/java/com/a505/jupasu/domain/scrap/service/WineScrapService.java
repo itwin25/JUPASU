@@ -12,6 +12,8 @@ import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,9 +61,9 @@ public class WineScrapService {
      * @param user 현재 로그인한 사용자 엔티티
      * @return 마이페이지 UI 요구사항에 맞춘 스크랩 와인 정보 목록
      */
-    public List<ScrapListResponse> getMyScrapList(User user) {
-        return wineScrapRepository.findAllByUserWithWine(user).stream()
-                .map(ScrapListResponse::from)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public Page<ScrapListResponse> getMyScrapList(User user, Pageable pageable) {
+        return wineScrapRepository.findAllByUserWithWine(user, pageable)
+                .map(ScrapListResponse::from);
     }
 }
