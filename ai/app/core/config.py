@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     LANGSMITH_API_KEY: str | None = None
     LANGSMITH_PROJECT: str = "Jupasu"
     
+    # Database Config (pgvector)
+    # docker-compose.yml 기준으로 설정된 기본값. 환경변수(.env)로 덮어쓸 수 있음
+    POSTGRES_USER: str = "jupasu_user"
+    POSTGRES_PASSWORD: str = "jupasu_pass"
+    POSTGRES_HOST: str = "127.0.0.1"
+    POSTGRES_PORT: int = 15432
+    POSTGRES_DB: str = "jupasu"
+    @property
+    def sync_database_url(self) -> str:
+        # DB 연결용 URL을 자동으로 만들어주는 프로퍼티
+        return f"postgresql+psycopg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    
     # OCR Config (비활성화 상태)
     OCR_MODEL_NAME: str = "microsoft/trocr-base-handwritten"
     
