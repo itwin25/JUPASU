@@ -8,10 +8,25 @@ import {
 } from '../types/review.types';
 import { ApiResponse } from '@/types/api.types';
 
+type PageResponse<T> = {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+
+
 export const reviewApi = {
   // 마이페이지 리뷰 (기존 컨트롤러 명세를 따름)
-  getMyReviews: () =>
-    api.get<ApiResponse<MyPageReview[]>>('/users/reviews').then((res) => res.data.data),
+  getMyReviews: (page: number = 0) =>
+    api
+      .get<ApiResponse<PageResponse<MyPageReview>>>('/users/reviews', {
+        params: { page },
+      })
+      .then((res) => res.data.data),
 
   // [GET] 와인 리뷰 목록 조회
   getWineReviews: (wineId: string | number) =>

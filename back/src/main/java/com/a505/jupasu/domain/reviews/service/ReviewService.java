@@ -65,6 +65,7 @@ public class ReviewService {
                 .build();
 
         reviewRepository.save(review);
+        user.increaseReviewCount();
 
         wine.addUserReviewRating(request.getRating());
 
@@ -121,6 +122,7 @@ public class ReviewService {
         int oldRating = review.getRating();
 
         review.getWine().removeUserReviewRating(oldRating);
+        review.getUser().decreaseReviewCount();
         reviewRepository.delete(review);
 
         preferenceRepository.findByUserId(userId).ifPresent(preference ->
@@ -134,10 +136,10 @@ public class ReviewService {
      * * @param user 현재 인증된 사용자 객체
      * @return 마이페이지용 리뷰 응답 DTO 리스트
      */
-    public List<MyPageReviewResponse> getMyReviews(User user) {
-        return reviewRepository.findAllByUserWithWine(user).stream()
-                .map(MyPageReviewResponse::from)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public Page<MyPageReviewResponse> getMyReviews(User user, Pageable pageable) {
+        return reviewRepository.findAllByUserWithWine(user, pageable)
+                .map(MyPageReviewResponse::from);
     }
 
 

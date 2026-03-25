@@ -5,9 +5,13 @@ import com.a505.jupasu.domain.reviews.service.ReviewService;
 import com.a505.jupasu.global.common.ApiResponse;
 import com.a505.jupasu.global.security.auth.LoginUserCustom;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,8 +32,11 @@ public class UserReviewController {
      * @return 사용자의 닉네임, 별점, 와인 정보 등이 포함된 리뷰 응답 리스트 (최신순)
      */
     @GetMapping
-    public ApiResponse<List<MyPageReviewResponse>> getMyReviews(
-            @AuthenticationPrincipal LoginUserCustom loginUser) {
-        return ApiResponse.success(reviewService.getMyReviews(loginUser.getUser()));
+    public ApiResponse<Page<MyPageReviewResponse>> getMyReviews(
+            @AuthenticationPrincipal LoginUserCustom loginUser,
+            @RequestParam(defaultValue = "0") int page) {
+
+        Pageable pageable = PageRequest.of(page, 3);
+        return ApiResponse.success(reviewService.getMyReviews(loginUser.getUser(), pageable));
     }
 }

@@ -25,19 +25,21 @@ export function useWineQuickRecommendQuery() {
   });
 }
 
-export function useWineScrapListQuery() {
+export function useWineScrapListQuery(page: number = 0) {
   return useQuery({
-    queryKey: QUERY_KEY.WINE.SCRAPS,
-    queryFn: wineApi.getScraps,
+    queryKey: QUERY_KEY.WINE.SCRAPS(page),
+    queryFn: () => wineApi.getScraps(page),
+    placeholderData: (previousData) => previousData,
   });
 }
 
 export function useWineScrapMutation() {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: wineApi.scrap,
     onSuccess: (_, wineId) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.WINE.SCRAPS });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY.WINE.SCRAPS_BASE });
       queryClient.invalidateQueries({ queryKey: QUERY_KEY.WINE.DETAIL(wineId) });
     },
   });

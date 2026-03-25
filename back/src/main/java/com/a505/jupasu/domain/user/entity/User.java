@@ -105,5 +105,24 @@ public class User {
     public void updatePassword(String encodedPassword) {
         this.passwordHash = encodedPassword;
     }
+
+    /**
+     * 리뷰 갯수 관련 로직
+     */
+
+    public void increaseReviewCount() {
+        if (this.reviewCount == null) {
+            this.reviewCount = 0;
+        }
+        this.reviewCount++;
+    }
+
+    public void decreaseReviewCount() {
+        if (this.reviewCount == null || this.reviewCount <= 0) {
+            this.reviewCount = 0;
+            return;
+        }
+        this.reviewCount--;
+    }
 }
 
