@@ -605,7 +605,7 @@ export default function MyPage() {
                 {isReportLoading
                   ? '리포트를 불러오는 중이에요...'
                   : tasteReport?.mainTitle ||
-                    "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
+                  "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
               </p>
 
               <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
@@ -1083,9 +1083,9 @@ export default function MyPage() {
         initialData={
           editingReview
             ? {
-                rating: editingReview.rating,
-                content: editingReview.content,
-              }
+              rating: editingReview.rating,
+              content: editingReview.content,
+            }
             : undefined
         }
         wineInfo={{
