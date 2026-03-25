@@ -38,6 +38,7 @@ import {
   useWineScrapMutation,
 } from '@/features/wine/hooks/useWineListQuery';
 import { cn } from '@/lib/utils';
+import type { UserMyPageResponse, UserSearchResponse } from '@/types/user.types';
 
 type ReviewItem = {
   id: number;
@@ -46,6 +47,7 @@ type ReviewItem = {
   rating: number;
   content: string;
   date: string;
+  wineImageUrl?: string;
 };
 
 type WishlistItem = {
@@ -76,12 +78,25 @@ const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 const modalClassName =
   'w-[calc(100vw-1rem)] max-w-[20.5rem] rounded-[1.7rem] bg-[#F7F5F1] px-3.5 py-4 sm:max-w-[21.5rem] sm:px-4';
 
-function resolveCharacterImage(character?: string, level: number = 1) {
-  if (!character) return '/tiger1.png';
-  if (character.startsWith('/') || character.includes('.')) {
-    return character.startsWith('/') ? character : `/${character}`;
-  }
-  return `/${character}${level}.png`;
+function getCharacterBase(character?: string) {
+  if (!character) return 'tiger';
+
+  return character
+    .replace(/^\//, '')
+    .replace(/\.svg$/i, '')
+    .replace(/[1-3]$/, '');
+}
+
+function getCharacterStage(reviewCount: number) {
+  if (reviewCount >= 10) return 3;
+  if (reviewCount >= 5) return 2;
+  return 1;
+}
+
+function resolveCharacterImage(character?: string, reviewCount: number = 0) {
+  const base = getCharacterBase(character);
+  const stage = getCharacterStage(reviewCount);
+  return `/${base}${stage}.svg`;
 }
 
 function getCountryCode(country?: string) {
@@ -172,7 +187,9 @@ function calculateRadarPoint(
 }
 
 export default function MyPage() {
-  const { data: profile, isLoading } = useUserMyPage();
+  const { data: profile, isLoading }: { data: UserMyPageResponse | undefined; isLoading: boolean } =
+    useUserMyPage();
+
   const { data: friendListData } = useFriendListQuery();
   const { data: pendingFriendListData } = usePendingFriendListQuery();
   const { data: tasteReport, isLoading: isReportLoading } = useTasteReportQuery();
@@ -198,8 +215,13 @@ export default function MyPage() {
   const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
   const [friendSearchQuery, setFriendSearchQuery] = useState('');
 
-  const { data: searchResults = [], isFetching: isSearching } =
-    useSearchUsersQuery(friendSearchQuery);
+  const {
+    data: searchResults = [],
+    isFetching: isSearching,
+  }: {
+    data: UserSearchResponse[] | undefined;
+    isFetching: boolean;
+  } = useSearchUsersQuery(friendSearchQuery);
 
   const [reviewOverrides, setReviewOverrides] = useState<
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
@@ -259,6 +281,7 @@ export default function MyPage() {
           date: Number.isNaN(createdDate.getTime())
             ? ''
             : createdDate.toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
+          wineImageUrl: review.wineImageUrl || DEFAULT_WINE_IMAGE_URL,
         };
       }),
     [myReviews, reviewOverrides],
@@ -279,7 +302,7 @@ export default function MyPage() {
         friendId: friend.friendId,
         name: friend.nickname,
         winesTasted: friend.reviewCount,
-        avatar: resolveCharacterImage(friend.character),
+        avatar: resolveCharacterImage(friend.character, friend.reviewCount ?? 0),
       })),
     [friendListData],
   );
@@ -305,7 +328,7 @@ export default function MyPage() {
         friendId: friend.requesterId,
         name: friend.nickname,
         winesTasted: friend.reviewCount,
-        avatar: resolveCharacterImage(friend.character),
+        avatar: resolveCharacterImage(friend.character, friend.reviewCount ?? 0),
       })),
     [pendingFriendListData],
   );
@@ -330,9 +353,9 @@ export default function MyPage() {
   const wishlistTotalPages = Math.max(1, Math.ceil(currentWishlistCount / PAGE_SIZE));
   const reviewTotalPages = Math.max(1, Math.ceil(currentReviewCount / PAGE_SIZE));
 
-  const currentLevel = Math.min(Math.floor(currentReviewCount / 5) + 1, 5);
-  const progressInLevel = currentLevel === 5 ? 5 : currentReviewCount % 5;
-  const progressPercentage = (progressInLevel / 5) * 100;
+  const currentStage = Math.min(Math.floor(currentReviewCount / 5) + 1, 3);
+  const progressInStage = currentStage === 3 ? 5 : currentReviewCount % 5;
+  const progressPercentage = (progressInStage / 5) * 100;
 
   const handleLogout = () => {
     handleSignout();
@@ -512,7 +535,7 @@ export default function MyPage() {
           <div className="flex items-center gap-3">
             <div className="bg-primary-100 relative h-16 w-16 overflow-hidden rounded-full">
               <Image
-                src={resolveCharacterImage(profile?.character ?? 'tiger', currentLevel)}
+                src={resolveCharacterImage(profile?.character, currentReviewCount)}
                 alt="프로필 이미지"
                 fill
                 className="object-cover"
@@ -669,8 +692,13 @@ export default function MyPage() {
               </div>
 
               <div className="mt-4 flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F6EAE6] text-[16px]">
-                  🧑🏻
+                <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-[#F6EAE6]">
+                  <Image
+                    src="/chatbot_profile.svg"
+                    alt="챗봇 프로필"
+                    fill
+                    className="object-cover"
+                  />
                 </div>
                 <p className="text-text-main/80 text-[12px] leading-5 font-medium">
                   {isReportLoading
@@ -736,7 +764,8 @@ export default function MyPage() {
       <Modal
         isOpen={activeModal === 'terms'}
         onClose={() => setActiveModal(null)}
-        title={<div className="w-full text-center">와인 용어 설명</div>}
+        title="와인 용어 설명"
+        centerTitle
         hideDefaultFooter
         className={modalClassName}
       >
@@ -929,7 +958,16 @@ export default function MyPage() {
                   className="rounded-[1.25rem] border border-[#B97B79] bg-[#FBFAF7] p-2.5 shadow-sm"
                 >
                   <div className="flex gap-2.5">
-                    <div className="h-16 w-12 shrink-0 rounded-[0.8rem] bg-[#E6E3DE]" />
+                    <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-[0.8rem] bg-[#E6E3DE]">
+                      <img
+                        src={review.wineImageUrl || DEFAULT_WINE_IMAGE_URL}
+                        alt={review.wineName}
+                        className="h-full w-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
+                        }}
+                      />
+                    </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-1">
@@ -1054,13 +1092,15 @@ export default function MyPage() {
           id: editingReview?.wineId,
           name: editingReview?.wineName ?? '',
           category: '',
+          image: editingReview?.wineImageUrl,
         }}
       />
 
       <Modal
         isOpen={deletingReviewId !== null}
         onClose={() => setDeletingReviewId(null)}
-        title={<div className="w-full text-center">리뷰 삭제</div>}
+        title="리뷰 삭제"
+        centerTitle
         className="w-[calc(100vw-2rem)] max-w-[18.5rem] rounded-[1.55rem] bg-[#F7F5F1] px-3.5 py-4"
         footer={
           <div className="flex gap-2">
@@ -1228,7 +1268,7 @@ export default function MyPage() {
 
             <div className="max-h-[50vh] space-y-2.5 overflow-y-auto pr-1">
               {searchResults.length > 0 ? (
-                searchResults.map((f) => {
+                searchResults.map((f: UserSearchResponse) => {
                   const isInvitedLocally = sentInviteIds.includes(f.userId);
                   const displayStatus = isInvitedLocally ? 'PENDING' : f.friendStatus;
 
@@ -1240,7 +1280,7 @@ export default function MyPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
                           <Image
-                            src={resolveCharacterImage(f.character ?? undefined)}
+                            src={resolveCharacterImage(f.character ?? undefined, f.reviewCount ?? 0)}
                             alt={f.nickname}
                             fill
                             className="object-cover"
