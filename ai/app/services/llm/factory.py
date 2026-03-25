@@ -3,6 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from app.core.config import get_settings
 from app.services.llm.gms_client import GmsGoogleGenAI
+from app.services.llm.gms_client_v2 import GmsMultiTurnGoogleGenAI # 추가
 
 from functools import lru_cache
 
@@ -25,8 +26,8 @@ def get_llm() -> BaseChatModel:
             temperature=0
         )
     elif settings.LLM_PROVIDER == "gms-sdk":
-        # SSAFY GMS 공식 google-genai SDK 방식 사용
-        return GmsGoogleGenAI(
+        # v2 멀티턴 지원 클라이언트로 교체
+        return GmsMultiTurnGoogleGenAI(
             api_key=settings.GMS_API_KEY,
             model_name=settings.GEMINI_MODEL_NAME,
             max_output_tokens=512
