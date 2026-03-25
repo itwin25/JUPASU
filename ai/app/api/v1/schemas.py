@@ -62,7 +62,8 @@ class CustomChatRequest(BaseModel):
     selected_wine: Optional[dict] = None
     selected_menu: Optional[dict] = None
     user_id: Any
-    session_id: str = "session-123"
+    session_id: str # 고정값 제거: 호출 시 반드시 고유 세션 ID를 전달해야 함
+    history: List[ChatMessage] = Field(default=[]) # 과거 대화 이력 필드 추가
     stream: bool = False
     mentioned_friends: List[dict] = Field(default=[])
 

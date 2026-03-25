@@ -4,12 +4,12 @@ import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Send, ChevronLeft, Heart } from 'lucide-react';
+import { Plus, Send, ChevronLeft, Heart, RotateCcw } from 'lucide-react';
 import { useChat } from '@/features/chat/hooks/use-chat';
 
 export default function ChatPage() {
   const router = useRouter();
-  const { messages, sendMessage, isLoading } = useChat();
+  const { messages, sendMessage, isLoading, startNewChat } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
 
@@ -47,11 +47,20 @@ export default function ChatPage() {
             <ChevronLeft size={18} />
             뒤로가기
           </button>
+          
+          <button
+            onClick={startNewChat}
+            className="flex items-center gap-1.5 rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
+          >
+            <RotateCcw size={16} />
+            새 채팅
+          </button>
+
           <Link
             href="/chat/history"
             className="rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
           >
-            전체 대화 보기
+            기록
           </Link>
         </header>
 
