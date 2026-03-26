@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { cookies } from 'next/headers';
 
 // 타입을 직접 정의하여 외부 의존성 제거
-interface OCRResult {
+export interface OCRResult {
   text: string;
   score: number;
   box: any[];
@@ -24,10 +24,11 @@ async function getOcrService() {
   const modelDir = path.join(process.cwd(), 'public', 'models', 'server');
   const dictDir = path.join(process.cwd(), 'public', 'models', 'dicts');
 
+  // 메뉴판 스캔을 위해 한국어 모델(rec_ko.onnx)과 사전(ko_dict.txt) 사용
   const [detBuffer, recBuffer, dictText] = await Promise.all([
     fs.readFile(path.join(modelDir, 'det_server.onnx')),
-    fs.readFile(path.join(modelDir, 'rec_latin.onnx')),
-    fs.readFile(path.join(dictDir, 'latin_dict.txt'), 'utf-8'),
+    fs.readFile(path.join(modelDir, 'rec_ko.onnx')),
+    fs.readFile(path.join(dictDir, 'ko_dict.txt'), 'utf-8'),
   ]);
 
   const dictArray = dictText.replace(/\r/g, '').split('\n');
@@ -58,15 +59,17 @@ async function getOcrService() {
 /**
  * [완전 격리] 어떤 외부 라이브러리도 쓰지 않는 순수 Fetch 통신
  */
-async function callBackendRefine(task: string, text: string) {
+async function callBackendRefine(task: string, text: string | string[]) {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('jupasu_access_token')?.value;
     
-    // 환경 변수조차 직접 문자열로 처리하여 env.ts 의존성 제거
-    const internalUrl = 'http://backend:8080/api/ai/refine';
+    // 로컬 환경 및 도커 환경 모두 대응 (환경 변수 권장)
+    const internalUrl = process.env.NODE_ENV === 'production' 
+      ? 'http://backend:8080/api/ai/refine'
+      : 'http://localhost:8080/api/ai/refine';
 
-    console.log(`📡 [Server Action] Pure Fetch Start: ${task}`);
+    console.log(`📡 [Server Action] Pure Fetch Start: ${task} (Parallel Support)`);
 
     const response = await fetch(internalUrl, {
       method: 'POST',
@@ -78,31 +81,24 @@ async function callBackendRefine(task: string, text: string) {
       cache: 'no-store',
     });
 
-    console.log(`📡 [Backend Response] Status: ${response.status}`);
-
     if (!response.ok) {
       console.error('❌ Backend Response Not OK');
       return null;
     }
 
     const json = await response.json();
-    console.log('✨ [AI Service Provider]:', json.data.provider || 'unknown');
-    console.log('✨ [Backend JSON Data]:', JSON.stringify(json, null, 2));
-    return json.data;
+    return json; // data 필드 포함 전체 반환
   } catch (err) {
     console.error('❌ callBackendRefine Error:', err);
     return null;
   }
 }
 
-export async function executeOcrAction(formData: FormData) {
+/**
+ * 단일 이미지 OCR 수행 내부 함수
+ */
+async function processSingleImage(buffer: Buffer) {
   try {
-    const imageFile = formData.get('image') as File;
-    const taskType = (formData.get('task') as string) || 'LABEL_SCAN';
-    
-    if (!imageFile) throw new Error('No image');
-
-    const buffer = Buffer.from(await imageFile.arrayBuffer());
     const ocrService = await getOcrService();
 
     const { data, info } = await sharp(buffer)
@@ -124,16 +120,70 @@ export async function executeOcrAction(formData: FormData) {
     }));
 
     const text = simplifiedResults.filter(r => r.score > 0.6).map(r => r.text).join(' ');
+    
+    return { text, results: simplifiedResults, info };
+  } catch (err) {
+    console.error('❌ processSingleImage Error:', err);
+    return { text: '', results: [], info: { width: 0, height: 0 } };
+  }
+}
 
-    // 백엔드 호출
-    const refinedData = await callBackendRefine(taskType, text || 'unknown');
+/**
+ * 다중 이미지 OCR 수행 및 결과 정제
+ */
+export async function executeOcrAction(formData: FormData) {
+  try {
+    const images = formData.getAll('image') as File[];
+    const taskType = (formData.get('task') as string) || 'LABEL_SCAN';
+    
+    if (!images || images.length === 0) throw new Error('No images provided');
+
+    console.log(`📸 [OCR Action] Parallel Processing ${images.length} images for task: ${taskType}`);
+
+    // [Scatter] 모든 이미지를 병렬로 처리 시작
+    const processTasks = images.map(async (imageFile) => {
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      return processSingleImage(buffer);
+    });
+
+    // [Gather] 모든 이미지 처리가 완료될 때까지 대기
+    const processedResults = await Promise.all(processTasks);
+
+    const allResults: OCRResult[] = [];
+    const textList: string[] = [];
+    let lastInfo = { width: 0, height: 0 };
+
+    for (const res of processedResults) {
+      if (res.text) textList.push(res.text);
+      allResults.push(...res.results);
+      lastInfo = res.info;
+    }
+
+    // [Step 3] 백엔드 호출 (ApiResponse<RefineResponse> 형태)
+    console.log(`📤 [Server Action] Sending to Backend (Task: ${taskType}, Images: ${textList.length})`);
+    if (taskType === 'MENU_SCAN') {
+      console.log('📝 Extracted Text List Header:', textList.map(t => t.substring(0, 50) + '...'));
+    }
+
+    const apiResponse = await callBackendRefine(
+      taskType,
+      textList.join('\n') || 'unknown'
+    );
+
+    console.log('📥 [Server Action] Received from Backend:', JSON.stringify(apiResponse, null, 2));
+
+    // ApiResponse.data -> RefineResponse
+    const refineResponse = apiResponse?.data || null;
+    
+    // RefineResponse.data -> { wineNames, foodNames }
+    const refinedData = refineResponse?.data || null;
 
     return {
       success: true,
-      results: simplifiedResults,
-      refined: refinedData?.data || null,
-      provider: refinedData?.provider || 'unknown',
-      imageInfo: { width: info.width, height: info.height },
+      results: allResults,
+      refined: refinedData,
+      provider: refineResponse?.provider || 'unknown',
+      imageInfo: lastInfo,
     };
 
   } catch (error: any) {
