@@ -507,14 +507,14 @@ export default function WineDetailPage({
 
   if (isWineLoading || !wineInfo) {
     return (
-      <div className="bg-background min-h-screen pb-28 flex items-center justify-center font-bold text-text-main/40">
+      <div className="bg-background min-h-screen pb-0 flex items-center justify-center font-bold text-text-main/40">
         와인 정보를 불러오는 중입니다...
       </div>
     );
   }
 
   return (
-    <div className="bg-background min-h-screen pb-28">
+    <div className="bg-background min-h-screen pb-0">
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none;
