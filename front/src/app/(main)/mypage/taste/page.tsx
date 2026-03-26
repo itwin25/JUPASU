@@ -129,7 +129,7 @@ function PreferenceFormContent({
         </h1>
       </header>
 
-      <main className="animate-in fade-in slide-in-from-right-8 flex-1 space-y-8 px-4 py-5 pb-24 duration-300">
+      <main className="animate-in fade-in slide-in-from-right-8 flex-1 space-y-8 px-4 py-5 pb-0 duration-300">
         <div className="space-y-10">
           <div className="space-y-2">
             <h2 className="text-primary-700 text-xs font-black tracking-widest uppercase">
