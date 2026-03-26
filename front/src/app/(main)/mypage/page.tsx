@@ -487,7 +487,7 @@ export default function MyPage() {
   }, [tasteReport]);
 
   return (
-    <div className="bg-background min-h-screen pb-24">
+    <div className="bg-background min-h-screen pb-0">
       <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
         <h1 className="text-text-main text-2xl font-black">My Page</h1>
         <button
