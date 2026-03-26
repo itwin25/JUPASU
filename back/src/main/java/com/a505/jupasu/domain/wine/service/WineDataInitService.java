@@ -102,12 +102,6 @@ public class WineDataInitService {
                 int star4 = parseInt(distribution.get("4"));
                 int star5 = parseInt(distribution.get("5"));
 
-                int distributionSum = star1 + star2 + star3 + star4 + star5;
-                if (externalRatingCount > 0 && distributionSum > 0 && distributionSum != externalRatingCount) {
-                    log.warn("⚠️ rating count mismatch - wine: {}, count: {}, distributionSum: {}",
-                            raw.wineName(), externalRatingCount, distributionSum);
-                }
-
                 Object[] sweetnessInfo = WineDataParser.parseTaste(taste.get("sweetness"));
                 Object[] acidityInfo = WineDataParser.parseTaste(taste.get("acidity"));
                 Object[] bodyInfo = WineDataParser.parseTaste(taste.get("boldness"));

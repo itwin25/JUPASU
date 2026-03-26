@@ -1,137 +1,93 @@
-version: "3.8"
-
 services:
   # Database: PostgreSQL 18 with pgvector extension
-  postgres:
+  db:
     image: pgvector/pgvector:pg18
-    container_name: jupasu-postgres-local
-    restart: unless-stopped
+    container_name: db-postgres
+    restart: always
     environment:
-      POSTGRES_DB: jupasu
-      POSTGRES_USER: jupasu_user
-      POSTGRES_PASSWORD: jupasu_pass
-      TZ: Asia/Seoul
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jupasu_user -d jupasu"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - backend-network-local
 
   # Cache & Session: Redis
   redis:
-    image: redis:7-alpine
-    container_name: jupasu-redis-local
-    restart: unless-stopped
+    image: redis:7.4-alpine
+    container_name: cache-redis
+    restart: always
     ports:
       - "6379:6379"
-    networks:
-      - backend-network-local
 
-  # AI Service: Python 3.12 (Build from local)
-  ai:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    container_name: jupasu-ai-local
-    restart: unless-stopped
-    ports:
-      - "8001:8000"
-    env_file:
-      - .env
-    volumes:
-      - ./ai/app:/app/app
-      - ./ai/data:/app/data
-      - ./ai/logs:/app/logs
-    networks:
-      - backend-network-local
-    depends_on:
-      postgres:
-        condition: service_healthy
+  # # AI Service: Python 3.12 (KoNLPy, Scikit-learn)
+  # ai:
+  #   build:
+  #     context: ./ai
+  #     dockerfile: Dockerfile
+  #   container_name: ai-fastapi
+  #   restart: always
+  #   depends_on:
+  #     - db
+  #   ports:
+  #     - 18000:18000
 
   # Backend: Spring Boot 4.0 (Java 21)
   backend:
     build:
       context: ./back
       dockerfile: Dockerfile
-    container_name: jupasu-backend-local
-    restart: unless-stopped
+    container_name: backend-spring
+    restart: always
     environment:
-      Spring_Profiles_Active: local
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/jupasu
-      SPRING_DATASOURCE_USERNAME: jupasu_user
-      SPRING_DATASOURCE_PASSWORD: jupasu_pass
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
-      AI_SERVICE_URL: http://ai:8000
-      JWT_SECRET: ${JWT_SECRET:-VGhpc0lzQUR1bW15U2VjcmV0S2V5Rm9yVGVzdGluZ1B1cnBvc2VzMTIzNDU2Nzg5MA==}
-      MAIL_USERNAME: ${MAIL_USERNAME:-jupasu476@gmail.com}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-xdlssayvecbfctub}
-      ALLOWED_ORIGINS: "http://localhost,http://localhost:80,https://localhost"
+      AI_SERVICE_URL: http://ai:18000
+      JWT_SECRET: ${JWT_SECRET}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      SOURCE_IMAGE_DIR: /app/data/image
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
+    volumes:
+      - /home/ubuntu/data:/app/data:ro
+      - ./uploads:/app/uploads
     ports:
       - "8080:8080"
-    volumes:
-      - ./back/uploads:/app/uploads
-      - C:/PJT/S14P21A505/data:/app/data
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_started
-      ai:
-        condition: service_started
-    networks:
-      - backend-network-local
-      - frontend-network-local
+      # ai:
+      #   condition: service_started
 
-  # Frontend: Next.js (React 19)
+      # Frontend: Next.js (React 19)
   frontend:
     build:
       context: ./front
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: /api
-    container_name: jupasu-frontend-local
-    restart: unless-stopped
+        - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
+    container_name: front-nextjs
+    restart: always
     environment:
-      NEXT_PUBLIC_API_URL: /api
-      NODE_ENV: production
-      NEXT_TELEMETRY_DISABLED: 1
-    expose:
-      - "80"
-    depends_on:
-      - backend
-    networks:
-      - frontend-network-local
-
-  # Reverse Proxy: Nginx
-  nginx:
-    image: nginx:alpine
-    container_name: jupasu-nginx-local
-    restart: unless-stopped
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
     ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - "3000:80"
     depends_on:
-      - frontend
       - backend
-    networks:
-      - frontend-network-local
-      - backend-network-local
-
-networks:
-  frontend-network-local:
-    driver: bridge
-  backend-network-local:
-    driver: bridge
 
 volumes:
-  postgres_local_data:
+  postgres_data:
