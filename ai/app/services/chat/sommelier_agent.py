@@ -15,6 +15,7 @@ from app.services.chat.food_wine_recommendation_client import (
 )
 from app.services.chat.input_context_builder import build_chat_input_context
 from app.services.llm.factory import get_llm
+from app.services.rag.chat_retrieval_service import perform_hybrid_recommendation
 
 logger = logging.getLogger(__name__)
 
