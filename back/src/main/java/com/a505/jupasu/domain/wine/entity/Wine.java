@@ -75,6 +75,7 @@ public class Wine extends BaseEntity {
 
     private OffsetDateTime embeddingGeneratedAt;
 
+    @jakarta.persistence.Convert(converter = com.a505.jupasu.domain.wine.util.VectorConverter.class)
     @Column(columnDefinition = "vector(1536)")
     private float[] embedding;
 
