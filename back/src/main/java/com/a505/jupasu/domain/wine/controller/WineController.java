@@ -191,19 +191,38 @@ public class WineController {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 친구 목록 조회 (없으면 빈 리스트)
+        // 1. 후보군 와인 ID 리스트 준비
+        List<Long> candidateIds = request.getCandidateWineIds();
+
+        // 2. 만약 AI 서버에서 벡터를 보내줬다면, 백엔드에서 직접 pgvector 검색 수행 (권장 구조)
+        if (request.getQueryVector() != null && !request.getQueryVector().isBlank()) {
+            List<Wine> similarWines = wineRepository.findSimilarWinesByVector(
+                    request.getQueryVector(),
+                    request.getWineType(),
+                    30 // 상위 30개 추출
+            );
+            candidateIds = similarWines.stream()
+                    .map(Wine::getId)
+                    .collect(Collectors.toList());
+        }
+
+        if (candidateIds == null || candidateIds.isEmpty()) {
+            return ApiResponse.success("추천할 수 있는 후보 와인이 없습니다.", 
+                WineQuickRecommendResponse.of(List.of(), List.of()));
+        }
+
+        // 3. 친구 목록 조회 (없으면 빈 리스트)
         List<User> friends = (request.getFriendIds() == null || request.getFriendIds().isEmpty())
                 ? List.of()
                 : userRepository.findAllById(request.getFriendIds());
 
-        // 친구 정보(friendIds)를 기반으로 User 엔티티를 불러오는 로직은 기획에 맞춰 추가 가능
-        // 우선은 본인 기준으로 30개를 강력하게 재정렬하여 반환
+        // 4. 베이지안 수학 정량식으로 최종 Re-ranking
         WineQuickRecommendResponse response = wineRecommendationCalculator.ragReRank(
                 user,
                 friends,
-                request.getCandidateWineIds()
+                candidateIds
         );
 
-        return ApiResponse.success("RAG 기반 와인 재정렬 성공", response);
+        return ApiResponse.success("RAG 기반 와인 추천 및 재정렬 성공", response);
     }
 }
