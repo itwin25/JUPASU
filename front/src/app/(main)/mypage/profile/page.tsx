@@ -109,7 +109,7 @@ export default function ProfileEditPage() {
   }
 
   return (
-    <div className="bg-background flex min-h-screen flex-col pb-10">
+    <div className="bg-background flex min-h-screen flex-col pb-0">
       <header className="bg-background/80 sticky top-0 z-10 flex items-center px-4 py-4 backdrop-blur-md">
         <Link
           href="/mypage"
@@ -122,7 +122,7 @@ export default function ProfileEditPage() {
         </h1>
       </header>
 
-      <main className="flex-1 space-y-8 px-4 pb-32">
+      <main className="flex-1 space-y-8 px-4 pb-0">
         <div className="relative flex justify-center pt-2">
           <div className="bg-primary-100 relative h-24 w-24 overflow-hidden rounded-full border-4 border-white shadow-md">
             <Image src={resolveAvatarSrc(previewAvatar)} alt="Avatar" fill className="object-cover" />

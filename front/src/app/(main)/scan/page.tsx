@@ -157,7 +157,7 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="bg-background no-scrollbar flex min-h-screen flex-col">
+    <div className="bg-background no-scrollbar flex min-h-screen flex-col -mb-[calc(var(--bottom-nav-height)+var(--safe-bottom)+1rem)]">
       <input
         type="file"
         ref={fileInputRef}
@@ -179,7 +179,7 @@ export default function ScanPage() {
         </header>
       )}
 
-      <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6">
+      <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6 bottom-nav-safe">
         {status === 'idle' && (
           <div className="flex flex-col pt-16 pb-4">
             <header className="mb-4">
