@@ -47,14 +47,20 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/**",
-                                // "/api/admin/wines/**",
                                 "/api/wines/recommendations/food/internal",
                                 "/actuator/prometheus",
-                                "/actuator/health",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/images/**",
-                                "/error"
+                                "/actuator/health"
+                                //swagger 추가
+                                , "/swagger-ui/**", "/v3/api-docs/**"
+                                //테스트용 api 추가
+                                , "/api/dummy/**"
+                                //데이터 삽입용 api 추가
+                                ,"/api/admin/wines/**"
+                                , "/api/wines/recommend/rag"
+                                // 이미지 서빙용
+                                , "/images/**"
+                                // 에러 페이지 허용
+                                , "/error"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
