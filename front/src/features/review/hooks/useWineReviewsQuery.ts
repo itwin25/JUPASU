@@ -24,9 +24,13 @@ export function useCreateReviewMutation() {
 
   return useMutation({
     mutationFn: reviewApi.create,
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) });
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.ME }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.PROFILE }),
+      ]);
     },
   });
 }
@@ -36,9 +40,13 @@ export function useUpdateReviewMutation() {
 
   return useMutation({
     mutationFn: (data: UpdateReviewRequest) => reviewApi.update(data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) });
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.ME }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.PROFILE }),
+      ]);
     },
   });
 }
@@ -48,9 +56,13 @@ export function useDeleteReviewMutation() {
 
   return useMutation({
     mutationFn: (data: DeleteReviewRequest) => reviewApi.delete(data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) });
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.MY_BASE }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.REVIEW.LIST(variables.wineId) }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.ME }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY.USER.PROFILE }),
+      ]);
     },
   });
 }

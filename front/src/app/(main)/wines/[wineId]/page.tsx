@@ -26,6 +26,8 @@ const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
 type ReviewItem = {
   id: number;
   user: string;
+  userId: number | null;
+  isOwner: boolean;
   rating: number;
   content: string;
   date: string;
@@ -35,9 +37,10 @@ type ReviewItem = {
 type SimilarWine = {
   id: number;
   name: string;
-  desc: string;
+  subText: string;
+  imageUrl: string;
+  rating: string;
   price: string;
-  match: number;
 };
 
 type TasteProfile = {
@@ -110,6 +113,11 @@ const getCountryFlagUrl = (countryName: string | undefined | null) => {
   return code ? `https://flagcdn.com/w40/${code}.png` : null;
 };
 
+const normalizeText = (value: unknown) => {
+  if (typeof value !== 'string') return '';
+  return value.trim().toLowerCase();
+};
+
 const parseDateStr = (dateVal: unknown) => {
   if (!dateVal) return 0;
   if (Array.isArray(dateVal)) {
@@ -174,6 +182,49 @@ export default function WineDetailPage({
 
   const { data: reviewData, refetch: refetchReviews } = useWineReviewsQuery(numericWineId);
 
+  const { data: meData } = useQuery({
+    queryKey: ['users', 'me'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/users/me');
+        return response.data?.data ?? null;
+      } catch (error: any) {
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          return null;
+        }
+
+        console.error('Failed to fetch current user info', error);
+        return null;
+      }
+    },
+    retry: false,
+  });
+
+  const currentUser = useMemo(() => {
+    const id =
+      meData?.userId ??
+      meData?.id ??
+      meData?.memberId ??
+      meData?.user?.id ??
+      meData?.user?.userId ??
+      meData?.member?.id ??
+      null;
+
+    const nickname =
+      meData?.nickname ??
+      meData?.userNickname ??
+      meData?.name ??
+      meData?.user?.nickname ??
+      meData?.user?.userNickname ??
+      meData?.member?.nickname ??
+      '';
+
+    return {
+      id: id !== null && id !== undefined ? Number(id) : null,
+      nickname: normalizeText(nickname),
+    };
+  }, [meData]);
+
   const createReviewMutation = useCreateReviewMutation();
   const updateReviewMutation = useUpdateReviewMutation();
   const deleteReviewMutation = useDeleteReviewMutation();
@@ -228,7 +279,23 @@ export default function WineDetailPage({
       reason: null,
       tasteGroups: (wineDetail.tasteGroups || []) as string[],
       foods: (wineDetail.pairingFoods || []) as string[],
-      similarWines: [],
+      similarWines: Array.isArray(wineDetail.similarWines)
+        ? wineDetail.similarWines.map((wine: any) => ({
+            id: Number(wine.wineId ?? wine.id ?? 0),
+            name: wine.nameKr || wine.nameEn || '이름 없는 와인',
+            subText:
+              wine.nameKr && wine.nameEn && wine.nameKr !== wine.nameEn
+                ? wine.nameEn
+                : wine.country || wine.grapeVariety || '',
+            imageUrl:
+              wine.imageUrl && wine.imageUrl !== '/default_wine.png'
+                ? wine.imageUrl
+                : DEFAULT_WINE_IMAGE_URL,
+            rating: Number(wine.averageRating || 0).toFixed(1),
+            price:
+              typeof wine.price === 'number' && wine.price > 0 ? wine.price.toLocaleString() : '-',
+          }))
+        : [],
       imageUrl: wineDetail.imageUrl,
       userPreference: wineDetail.userPreference
         ? {
@@ -251,15 +318,42 @@ export default function WineDetailPage({
       sortedReviews.sort((a, b) => parseDateStr(b.createdAt) - parseDateStr(a.createdAt));
     }
 
-    return sortedReviews.map((r) => ({
-      id: r.id || r.reviewId,
-      user: r.userNickname || r.nickname || '익명',
-      rating: r.rating,
-      content: r.content,
-      date: formatDateStr(r.createdAt),
-      avatar: '🍷',
-    }));
-  }, [safeReviewList, sortOrder]);
+    return sortedReviews.map((r) => {
+      const reviewUserId =
+        r.userId ??
+        r.memberId ??
+        r.writerId ??
+        r.authorId ??
+        r.user?.id ??
+        r.user?.userId ??
+        r.user?.memberId ??
+        r.member?.id ??
+        null;
+
+      const reviewNickname = normalizeText(
+        r.userNickname ?? r.nickname ?? r.user?.nickname ?? r.user?.userNickname ?? r.member?.nickname ?? '',
+      );
+
+      const isOwnerById =
+        reviewUserId !== null && currentUser.id !== null && Number(reviewUserId) === Number(currentUser.id);
+
+      const isOwnerByNickname =
+        Boolean(currentUser.nickname) && Boolean(reviewNickname) && currentUser.nickname === reviewNickname;
+
+      const isOwner = Boolean(r.isOwner) || isOwnerById || isOwnerByNickname;
+
+      return {
+        id: r.id || r.reviewId,
+        user: r.userNickname || r.nickname || r.user?.nickname || '익명',
+        userId: reviewUserId !== null && reviewUserId !== undefined ? Number(reviewUserId) : null,
+        isOwner,
+        rating: r.rating,
+        content: r.content,
+        date: formatDateStr(r.createdAt),
+        avatar: '🍷',
+      };
+    });
+  }, [safeReviewList, sortOrder, currentUser]);
 
   const ratingBarTotal = useMemo(() => {
     if (!wineInfo) return 0;
@@ -760,20 +854,39 @@ export default function WineDetailPage({
                     {wineInfo.similarWines.map((wine) => (
                       <Link key={wine.id} href={`/wines/${wine.id}`} className="block">
                         <div className="border-primary-100 flex items-center gap-3 rounded-[1.45rem] border bg-white px-3 py-3 shadow-[0_8px_20px_rgba(51,34,17,0.035)] transition-transform active:scale-[0.985]">
-                          <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center rounded-[1rem] bg-[#FCE7E7] text-[1.8rem]">
-                            🍷
+                          <div className="h-[4.7rem] w-[4.7rem] shrink-0 overflow-hidden rounded-[1rem] bg-[#FCE7E7]">
+                            <img
+                              src={wine.imageUrl}
+                              alt={wine.name}
+                              className="h-full w-full object-contain p-2"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
+                                e.currentTarget.onerror = null;
+                              }}
+                            />
                           </div>
+
                           <div className="min-w-0 flex-1 space-y-1">
                             <h4 className="text-text-main truncate text-[0.92rem] font-black">
                               {wine.name}
                             </h4>
-                            <p className="text-text-main/42 truncate text-[0.7rem] font-medium">
-                              {wine.desc}
-                            </p>
-                            <p className="text-[0.88rem] font-black text-[#C96D72]">₩{wine.price}</p>
+
+                            {wine.subText && (
+                              <p className="text-text-main/42 truncate text-[0.7rem] font-medium">
+                                {wine.subText}
+                              </p>
+                            )}
+
+                            <div className="flex items-center gap-1.5 text-[0.78rem] font-black text-[#FF9A3D]">
+                              <Star size={13} fill="#FF9A3D" className="text-[#FF9A3D]" />
+                              <span>{wine.rating}</span>
+                            </div>
                           </div>
-                          <div className="rounded-full bg-[#C96D72] px-2.5 py-1 text-[0.62rem] font-black text-white">
-                            {wine.match}% MATCH
+
+                          <div className="shrink-0 text-right">
+                            <p className="text-[0.88rem] font-black text-[#C96D72]">
+                              {wine.price === '-' ? '-' : `₩${wine.price}`}
+                            </p>
                           </div>
                         </div>
                       </Link>
@@ -910,33 +1023,35 @@ export default function WineDetailPage({
                           </div>
                         </div>
 
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              setActiveMenuId(activeMenuId === review.id ? null : review.id)
-                            }
-                            className="text-text-main/28 p-1"
-                          >
-                            <MoreHorizontal size={18} />
-                          </button>
-                          {activeMenuId === review.id && (
-                            <div className="border-primary-100 absolute top-full right-0 z-30 mt-1 w-20 rounded-[0.9rem] border bg-white p-1 shadow-xl">
-                              <button
-                                onClick={() => handleOpenEditModal(review)}
-                                className="text-text-main w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black hover:bg-gray-50"
-                              >
-                                수정
-                              </button>
-                              <div className="bg-primary-100/60 mx-1 h-px" />
-                              <button
-                                onClick={() => handleReviewDelete(review.id)}
-                                className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50"
-                              >
-                                삭제
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        {review.isOwner && (
+                          <div className="relative">
+                            <button
+                              onClick={() =>
+                                setActiveMenuId(activeMenuId === review.id ? null : review.id)
+                              }
+                              className="text-text-main/28 p-1"
+                            >
+                              <MoreHorizontal size={18} />
+                            </button>
+                            {activeMenuId === review.id && (
+                              <div className="border-primary-100 absolute top-full right-0 z-30 mt-1 w-20 rounded-[0.9rem] border bg-white p-1 shadow-xl">
+                                <button
+                                  onClick={() => handleOpenEditModal(review)}
+                                  className="text-text-main w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black hover:bg-gray-50"
+                                >
+                                  수정
+                                </button>
+                                <div className="bg-primary-100/60 mx-1 h-px" />
+                                <button
+                                  onClick={() => handleReviewDelete(review.id)}
+                                  className="w-full rounded-[0.7rem] py-2 text-center text-[0.7rem] font-black text-red-400 hover:bg-red-50"
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <p className="text-text-main/68 mt-4 text-[0.9rem] leading-[1.7] font-medium whitespace-pre-wrap">
