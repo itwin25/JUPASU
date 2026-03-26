@@ -17,6 +17,79 @@ class MenuInfo(BaseModel):
     wineNames: list[str] = Field(default=[], description="메뉴판에서 추출된 와인 이름 리스트")
     foodNames: list[str] = Field(default=[], description="메뉴판에서 추출된 음식/안주 이름 리스트")
 
+
+def _normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "")).strip()
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        normalized = _normalize_whitespace(value)
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(normalized)
+    return result
+
+
+def _looks_like_noise(value: str) -> bool:
+    normalized = _normalize_whitespace(value)
+    if not normalized:
+        return True
+    if len(normalized) <= 1:
+        return True
+    if re.fullmatch(r"[0-9]{4}", normalized):
+        return True
+    if re.fullmatch(r"N\.?V\.?", normalized, flags=re.IGNORECASE):
+        return True
+    if re.fullmatch(r"[0-9.'\"()\-/:& ]+", normalized):
+        return True
+    return False
+
+
+def _contains_hangul(value: str) -> bool:
+    return bool(re.search(r"[가-힣]", value or ""))
+
+
+def _extract_menu_candidates_from_text(ocr_text: str) -> Dict[str, Any]:
+    raw_lines = re.split(r"[\n\r,;]+", ocr_text or "")
+    candidates = [_normalize_whitespace(line) for line in raw_lines]
+    candidates = [line for line in candidates if line and not _looks_like_noise(line)]
+
+    food_names: list[str] = []
+    wine_names: list[str] = []
+
+    for candidate in candidates:
+        if _contains_hangul(candidate):
+            food_names.append(candidate)
+            continue
+
+        if len(candidate) < 4:
+            continue
+
+        if re.search(r"[A-Za-z]", candidate):
+            wine_names.append(candidate)
+
+    return {
+        "wineNames": _dedupe_preserve_order(wine_names),
+        "foodNames": _dedupe_preserve_order(food_names),
+    }
+
+
+def _merge_menu_info(primary: Dict[str, Any] | None, fallback: Dict[str, Any]) -> Dict[str, Any]:
+    primary = primary or {}
+    wine_names = _dedupe_preserve_order(list(primary.get("wineNames") or []) + list(fallback.get("wineNames") or []))
+    food_names = _dedupe_preserve_order(list(primary.get("foodNames") or []) + list(fallback.get("foodNames") or []))
+    return {
+        "wineNames": wine_names,
+        "foodNames": food_names,
+    }
+
 class OCRRefiner:
     def __init__(self):
         self.settings = get_settings()
@@ -59,14 +132,21 @@ class OCRRefiner:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ])
-                
-                return result.model_dump()
+
+                refined = result if isinstance(result, dict) else result.model_dump()
+                fallback = _extract_menu_candidates_from_text(ocr_text)
+                merged = _merge_menu_info(refined, fallback)
+
+                if not merged["wineNames"] and not merged["foodNames"]:
+                    logger.warning("Menu OCR refinement returned empty result. OCR text: %s", ocr_text[:500])
+
+                return merged
 
         except Exception as e:
             logger.error(f"Error during OCR refinement: {e}")
             if not is_menu:
                 return {"winery": "", "wineName": "", "vintage": ""}
-            return {"wineNames": [], "foodNames": []}
+            return _extract_menu_candidates_from_text(ocr_text)
 
 # 싱글톤 인스턴스
 ocr_refiner = OCRRefiner()
