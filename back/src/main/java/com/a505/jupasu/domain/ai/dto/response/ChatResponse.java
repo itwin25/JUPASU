@@ -2,7 +2,6 @@ package com.a505.jupasu.domain.ai.dto.response;
 
 import com.a505.jupasu.domain.ai.entity.ChatMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.*;
 
@@ -21,7 +20,7 @@ public class ChatResponse {
     private Long id;
     private String role;
     private String content;
-    private JsonNode card;
+    private Map<String, Object> card;
     private List<Map<String, Object>> actions;
     private LocalDateTime createdAt;
 
@@ -36,13 +35,13 @@ public class ChatResponse {
                 .build();
     }
 
-    private static JsonNode parseCard(String cardJson) {
+    private static Map<String, Object> parseCard(String cardJson) {
         if (cardJson == null || cardJson.isBlank()) {
             return null;
         }
 
         try {
-            return OBJECT_MAPPER.readTree(cardJson);
+            return OBJECT_MAPPER.readValue(cardJson, new TypeReference<>() {});
         } catch (Exception exception) {
             return null;
         }

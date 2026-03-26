@@ -111,45 +111,54 @@ export default function ChatPage() {
                 <>
                   <Link
                     href={latestBotMessage.card.detail_url || '#'}
-                    className="mt-4 block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4 transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(155,106,66,0.12)]"
+                    className="relative mt-4 block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4 pr-10 transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(155,106,66,0.12)]"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] bg-white shadow-sm">
+                    <div className="flex items-center gap-2.5">
+                      <div className="ml-[-0.15rem] flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] bg-white p-2 shadow-sm">
                         <Image
                           src={latestBotMessage.card.image_url || '/default_wine.png'}
                           alt={latestBotMessage.card.name_kr}
                           width={64}
                           height={64}
-                          className="h-16 w-16 object-cover"
+                          className="h-full w-full object-contain"
                         />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <h3 className="text-text-main truncate text-[1rem] font-black">
                               {latestBotMessage.card.name_kr}
                             </h3>
-                            <p className="text-text-main/55 text-[0.8rem] font-semibold">
+                            <p className="text-text-main/55 text-[0.72rem] font-semibold">
                               {latestBotMessage.card.subtitle || '추천 와인'}
                             </p>
                           </div>
 
                           <div className="flex items-start gap-2">
                             {typeof latestBotMessage.card.match_percent === 'number' && (
-                              <span className="shrink-0 rounded-full bg-[#C78354] px-3 py-1.5 text-[0.72rem] font-black text-white">
-                                {latestBotMessage.card.match_percent}% MATCH
+                              <span className="relative top-[-0.15rem] shrink-0 rounded-full bg-[#C78354] px-3 py-1.5 text-[0.72rem] font-black text-white">
+                                {latestBotMessage.card.match_percent}%
                               </span>
                             )}
-                            <ChevronRight size={18} className="mt-1 shrink-0 text-[#9B6A42]" />
                           </div>
                         </div>
 
-                        <p className="mt-2 text-[1rem] font-black text-[#B36262]">
+                        <p
+                          className={`mt-2 font-black text-[#B36262] ${
+                            !latestBotMessage.card.price || latestBotMessage.card.price <= 0
+                              ? 'text-[0.84rem]'
+                              : 'text-[1rem]'
+                          }`}
+                        >
                           {formatPrice(latestBotMessage.card.price)}
                         </p>
                       </div>
                     </div>
+                    <ChevronRight
+                      size={18}
+                      className="absolute top-1/2 right-4 -translate-y-1/2 text-[#9B6A42]"
+                    />
                   </Link>
 
                   <button

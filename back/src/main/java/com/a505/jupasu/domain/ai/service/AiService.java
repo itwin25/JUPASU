@@ -175,4 +175,16 @@ public class AiService {
                 .map(ChatResponse::from)
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public List<ChatResponse> getChatHistoryBySessionId(String email, String sessionId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
+                .stream()
+                .filter(message -> message.getUser().getId().equals(user.getId()))
+                .map(ChatResponse::from)
+                .collect(Collectors.toList());
+    }
 }

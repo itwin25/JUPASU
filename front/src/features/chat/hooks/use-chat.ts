@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { chatApi } from '../api/chat.api';
 import { ChatAction, ChatCard, ChatMessageResponse, ChatStreamChunk } from '../types/chat.types';
 
+const SESSION_STORAGE_KEY = 'chat_session_id';
+
 export interface ChatMessage {
   id: string | number;
   type: 'bot' | 'user';
@@ -11,6 +13,21 @@ export interface ChatMessage {
 }
 
 const createSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+const getOrCreateSessionId = () => {
+  if (typeof window === 'undefined') {
+    return createSessionId();
+  }
+
+  const stored = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (stored) {
+    return stored;
+  }
+
+  const next = createSessionId();
+  window.sessionStorage.setItem(SESSION_STORAGE_KEY, next);
+  return next;
+};
 
 const buildWelcomeMessage = (text?: string): ChatMessage => ({
   id: 'welcome',
@@ -37,11 +54,12 @@ export const useChat = () => {
   const [sessionId, setSessionId] = useState<string>('');
 
   useEffect(() => {
-    setSessionId(createSessionId());
+    const activeSessionId = getOrCreateSessionId();
+    setSessionId(activeSessionId);
 
     const fetchHistory = async () => {
       try {
-        const history = await chatApi.getHistory();
+        const history = await chatApi.getHistory(activeSessionId);
         setMessages(history.length > 0 ? mapHistoryToMessages(history) : [buildWelcomeMessage()]);
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
@@ -75,6 +93,11 @@ export const useChat = () => {
     async (text: string) => {
       if (!text.trim()) return;
 
+      const activeSessionId = sessionId || getOrCreateSessionId();
+      if (!sessionId) {
+        setSessionId(activeSessionId);
+      }
+
       const userMessage: ChatMessage = {
         id: Date.now(),
         type: 'user',
@@ -94,7 +117,7 @@ export const useChat = () => {
       setIsLoading(true);
 
       try {
-        await chatApi.sendChatStream(text, sessionId, (chunk) => {
+        await chatApi.sendChatStream(text, activeSessionId, (chunk) => {
           applyStreamChunk(botMessageId, chunk);
         });
       } catch (error) {
@@ -117,7 +140,11 @@ export const useChat = () => {
   );
 
   const startNewChat = useCallback(() => {
-    setSessionId(createSessionId());
+    const nextSessionId = createSessionId();
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(SESSION_STORAGE_KEY, nextSessionId);
+    }
+    setSessionId(nextSessionId);
     setMessages([
       buildWelcomeMessage(
         '새 대화를 시작했어요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.',

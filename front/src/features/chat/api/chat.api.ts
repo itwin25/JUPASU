@@ -21,8 +21,10 @@ const parseStreamPayload = (raw: string): ChatStreamChunk | null => {
 };
 
 export const chatApi = {
-  getHistory: async () => {
-    const { data } = await api.get<{ data: ChatMessageResponse[] }>(`${API_PATH.AI.CHAT}/history`);
+  getHistory: async (sessionId?: string) => {
+    const { data } = await api.get<{ data: ChatMessageResponse[] }>(`${API_PATH.AI.CHAT}/history`, {
+      params: sessionId ? { session_id: sessionId } : undefined,
+    });
     return data.data;
   },
 
