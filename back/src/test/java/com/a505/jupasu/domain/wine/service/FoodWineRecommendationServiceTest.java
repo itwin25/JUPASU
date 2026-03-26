@@ -191,7 +191,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(3.0)
                 .tannin(4.0)
                 .sweetness(1.0)
-                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리는 오크 풍미의 묵직한 레드 와인입니다.")
+                .richDescription("스테이크와 소고기 요리에 잘 어울리는 오크 풍미의 묵직한 레드 와인입니다.")
                 .foodPairings(List.of("소고기", "양고기"))
                 .foodSimilarity(0.58)
                 .build();
@@ -210,7 +210,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(4.0)
                 .tannin(1.0)
                 .sweetness(2.0)
-                .embeddingTextKo("해산물과 치즈에 잘 어울리는 산뜻한 스파클링 와인입니다.")
+                .richDescription("해산물과 치즈에 잘 어울리는 산뜻한 스파클링 와인입니다.")
                 .foodPairings(List.of("해산물", "치즈"))
                 .foodSimilarity(0.61)
                 .build();
@@ -230,7 +230,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(3.0)
                 .tannin(4.0)
                 .sweetness(1.0)
-                .embeddingTextKo("스테이크와 소고기 요리에 잘 어울리는 붉은 과실과 오크 풍미의 레드 와인입니다.")
+                .richDescription("스테이크와 소고기 요리에 잘 어울리는 붉은 과실과 오크 풍미의 레드 와인입니다.")
                 .foodPairings(List.of("소고기", "양고기"))
                 .foodSimilarity(0.60)
                 .build();
@@ -249,7 +249,7 @@ class FoodWineRecommendationServiceTest {
                 .acidity(3.4)
                 .tannin(1.0)
                 .sweetness(2.4)
-                .embeddingTextKo("고기 요리와 발효된 양념, 해산물 풍미가 섞인 음식과 잘 어울리는 산뜻한 화이트 와인입니다.")
+                .richDescription("고기 요리와 발효된 양념, 해산물 풍미가 섞인 음식과 잘 어울리는 산뜻한 화이트 와인입니다.")
                 .foodPairings(List.of("소고기", "해산물"))
                 .foodSimilarity(0.63)
                 .build();

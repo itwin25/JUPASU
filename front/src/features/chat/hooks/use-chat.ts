@@ -1,19 +1,34 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { chatApi } from '../api/chat.api';
-import { ChatMessageResponse } from '../types/chat.types';
+import { ChatAction, ChatCard, ChatMessageResponse, ChatStreamChunk } from '../types/chat.types';
 
 export interface ChatMessage {
   id: string | number;
   type: 'bot' | 'user';
   text: string;
-  options?: string[];
-  recommendation?: {
-    name: string;
-    category: string;
-    price: string;
-    match: number;
-  };
+  card?: ChatCard | null;
+  actions?: ChatAction[];
 }
+
+const createSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+const buildWelcomeMessage = (text?: string): ChatMessage => ({
+  id: 'welcome',
+  type: 'bot',
+  text:
+    text ?? '소믈리에에게 물어보세요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.',
+  card: null,
+  actions: [],
+});
+
+const mapHistoryToMessages = (history: ChatMessageResponse[]): ChatMessage[] =>
+  history.map((msg) => ({
+    id: msg.id,
+    type: msg.role === 'user' ? 'user' : 'bot',
+    text: msg.content,
+    card: msg.card ?? null,
+    actions: msg.actions ?? [],
+  }));
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -21,42 +36,16 @@ export const useChat = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [sessionId, setSessionId] = useState<string>('');
 
-  // 초기 채팅 내역 및 세션 ID 설정
   useEffect(() => {
-    // 세션 ID 생성 (기존 세션이 없다면 새로 생성)
-    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    setSessionId(newSessionId);
+    setSessionId(createSessionId());
 
     const fetchHistory = async () => {
       try {
         const history = await chatApi.getHistory();
-        const formattedHistory: ChatMessage[] = history.map((msg) => ({
-          id: msg.id,
-          type: msg.role === 'user' ? 'user' : 'bot',
-          text: msg.content,
-        }));
-
-        if (formattedHistory.length === 0) {
-          // 초기 환영 메시지
-          setMessages([
-            {
-              id: 'welcome',
-              type: 'bot',
-              text: '어떤 와인을 추천해드릴까요?',
-            },
-          ]);
-        } else {
-          setMessages(formattedHistory);
-        }
+        setMessages(history.length > 0 ? mapHistoryToMessages(history) : [buildWelcomeMessage()]);
       } catch (error) {
         console.error('Failed to fetch chat history:', error);
-        setMessages([
-          {
-            id: 'welcome',
-            type: 'bot',
-            text: '어떤 와인을 추천해드릴까요?',
-          },
-        ]);
+        setMessages([buildWelcomeMessage()]);
       } finally {
         setIsInitializing(false);
       }
@@ -65,58 +54,74 @@ export const useChat = () => {
     fetchHistory();
   }, []);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+  const applyStreamChunk = useCallback((botMessageId: number, chunk: ChatStreamChunk) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== botMessageId) return msg;
 
-    const userMessage: ChatMessage = {
-      id: Date.now(),
-      type: 'user',
-      text: text,
-    };
+        const nextText = chunk.content ?? chunk.answer;
 
-    const botMessageId = Date.now() + 1;
-    const botMessagePlaceholder: ChatMessage = {
-      id: botMessageId,
-      type: 'bot',
-      text: '',
-    };
+        return {
+          ...msg,
+          text: nextText ? msg.text + nextText : msg.text,
+          card: chunk.card !== undefined ? chunk.card : msg.card,
+          actions: chunk.actions ?? msg.actions ?? [],
+        };
+      }),
+    );
+  }, []);
 
-    setMessages((prev) => [...prev, userMessage, botMessagePlaceholder]);
-    setIsLoading(true);
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
 
-    try {
-      // API 호출 시 현재 sessionId 전달
-      await chatApi.sendChatStream(text, sessionId, (chunk) => {
-        setMessages((prev) =>
-          prev.map((msg) => (msg.id === botMessageId ? { ...msg, text: msg.text + chunk } : msg)),
-        );
-      });
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === botMessageId
-            ? { ...msg, text: '오류가 발생했습니다. 다시 시도해주세요.' }
-            : msg,
-        ),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [sessionId]); // sessionId가 바뀔 때마다 함수 갱신
+      const userMessage: ChatMessage = {
+        id: Date.now(),
+        type: 'user',
+        text,
+      };
 
-  /**
-   * 새로운 채팅 시작 (세션 ID 초기화 및 메시지 비우기)
-   */
-  const startNewChat = useCallback(() => {
-    const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    setSessionId(newSessionId);
-    setMessages([
-      {
-        id: 'welcome',
+      const botMessageId = Date.now() + 1;
+      const botPlaceholder: ChatMessage = {
+        id: botMessageId,
         type: 'bot',
-        text: '새로운 대화를 시작합니다. 어떤 와인을 추천해드릴까요?',
-      },
+        text: '',
+        card: null,
+        actions: [],
+      };
+
+      setMessages((prev) => [...prev, userMessage, botPlaceholder]);
+      setIsLoading(true);
+
+      try {
+        await chatApi.sendChatStream(text, sessionId, (chunk) => {
+          applyStreamChunk(botMessageId, chunk);
+        });
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === botMessageId
+              ? {
+                  ...msg,
+                  text: '메시지를 전송하는 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.',
+                }
+              : msg,
+          ),
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [applyStreamChunk, sessionId],
+  );
+
+  const startNewChat = useCallback(() => {
+    setSessionId(createSessionId());
+    setMessages([
+      buildWelcomeMessage(
+        '새 대화를 시작했어요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.',
+      ),
     ]);
   }, []);
 
@@ -125,6 +130,6 @@ export const useChat = () => {
     isLoading,
     isInitializing,
     sendMessage,
-    startNewChat, // 함수 노출
+    startNewChat,
   };
 };

@@ -240,7 +240,7 @@ public class FoodWineRecommendationService {
         Double sweetnessScore = metricMatchScore(personalization.sweetness(), candidate.sweetness());
         Double alcoholScore = null;
         Double typeScore = typeMatchScore(personalization.preferredWineTypes(), candidate.wineType());
-        Double flavorScore = flavorMatchScore(personalization.preferredFlavors(), candidate.embeddingTextKo());
+        Double flavorScore = flavorMatchScore(personalization.preferredFlavors(), candidate.richDescription());
         Double priceScore = priceMatchScore(
                 candidate.price(),
                 personalization.preferredPriceMin(),
@@ -311,12 +311,12 @@ public class FoodWineRecommendationService {
                 .anyMatch(type -> type.equals(normalizedType)) ? 1.0 : 0.0;
     }
 
-    private Double flavorMatchScore(List<String> preferredFlavors, String embeddingTextKo) {
-        if (preferredFlavors == null || preferredFlavors.isEmpty() || !StringUtils.hasText(embeddingTextKo)) {
+    private Double flavorMatchScore(List<String> preferredFlavors, String richDescription) {
+        if (preferredFlavors == null || preferredFlavors.isEmpty() || !StringUtils.hasText(richDescription)) {
             return null;
         }
 
-        String loweredText = embeddingTextKo.toLowerCase(Locale.ROOT);
+        String loweredText = richDescription.toLowerCase(Locale.ROOT);
         long hitCount = preferredFlavors.stream()
                 .map(flavor -> flavor.toUpperCase(Locale.ROOT))
                 .map(FLAVOR_KEYWORDS::get)
