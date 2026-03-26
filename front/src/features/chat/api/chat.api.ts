@@ -4,6 +4,30 @@ import { ChatMessageResponse } from '../types/chat.types';
 import { authToken } from '@/features/auth/utils/auth-token';
 import { env } from '@/lib/env';
 
+interface WineCardData {
+  wine_id?: number;
+  name_kr?: string;
+  name_en?: string;
+  subtitle?: string;
+  price?: number;
+  match_percent?: number;
+  image_url?: string;
+}
+
+interface ActionData {
+  label: string;
+}
+
+interface ChatStreamMetadata {
+  cards?: WineCardData[];
+  actions?: ActionData[];
+}
+
+interface SelectedMenuContext {
+  wineNames?: string[];
+  foodNames?: string[];
+}
+
 export const chatApi = {
   /**
    * 전체 채팅 내역 조회
@@ -17,9 +41,10 @@ export const chatApi = {
    * 실시간 소믈리에 채팅 전송 (Streaming)
    */
   sendChatStream: async (
-    message: string, 
-    sessionId: string, 
-    onMessage: (text: string, metadata?: any) => void
+    message: string,
+    sessionId: string,
+    onMessage: (text: string, metadata?: ChatStreamMetadata) => void,
+    selectedMenu?: SelectedMenuContext,
   ) => {
     const token = authToken.getAccess();
     const url = `${env.API_BASE_URL}${API_PATH.AI.CHAT}`;
@@ -30,9 +55,10 @@ export const chatApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         message,
-        session_id: sessionId
+        session_id: sessionId,
+        ...(selectedMenu ? { selected_menu: selectedMenu } : {}),
       }),
     });
 
@@ -73,7 +99,7 @@ export const chatApi = {
               if (parsed.cards || parsed.actions) {
                 onMessage('', { cards: parsed.cards, actions: parsed.actions });
               }
-            } catch (e) {
+            } catch {
               // JSON이 아닐 경우 순수 텍스트로 취급
               if (dataString && !dataString.startsWith('{')) {
                 onMessage(dataString);
