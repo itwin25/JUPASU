@@ -11,6 +11,7 @@ import com.a505.jupasu.domain.wine.dto.WineRecommendationItem;
 import com.a505.jupasu.domain.wine.entity.Wine;
 import com.a505.jupasu.domain.wine.entity.vo.TasteProfile;
 import com.a505.jupasu.domain.wine.repository.WineFoodPairingRepository;
+import com.a505.jupasu.domain.wine.repository.WineRepository;
 import com.a505.jupasu.domain.wine.service.WineQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -57,6 +58,7 @@ public class WineRecommendationCalculator {
         double s = rawScore / 100.0;
         return (int) Math.round(100.0 / (1.0 + Math.exp(-6.0 * (s - 0.35))));
     }
+    private final WineRepository wineRepository;
 
     // ── 스케일 정보 ──────────────────────────────────────────────────────────────
     // W_i (TasteProfile): 0.0 ~ 5.0 (Vivino 원본 스케일)
@@ -371,21 +373,35 @@ public class WineRecommendationCalculator {
     // ── score: 최종 추천 점수 계산 (calibrate 결과를 입력으로 받음) ────────────────
 
     /**
-     * NULL 인식 베이지안 교정 모델 기반 추천도 계산
+     * NULL 인식 베이지안 교정 모델 기반 추천도 계산 (기존 엄격 모드 래퍼)
+     * 모든 기존 호출(quickList, allQuickLists, getMatch 등)은 이쪽을 통해 relaxValidation=false 유지.
      *
      * @return 0~100 정수 추천 점수. Integer.MIN_VALUE 는 추천 목록 제외를 의미.
      */
     private int score(Wine wine, DrinkingSituation situation, Preference pref, CalibratedProfile cal) {
+        return score(wine, situation, pref, cal, false);
+    }
+
+    /**
+     * relaxValidation=true 이면 isReal* 플래그를 무시하고 존재하는 데이터를 모두 사용.
+     * RAG 전용 경로(ragReRank)에서만 true 로 호출.
+     */
+    private int score(Wine wine, DrinkingSituation situation, Preference pref, CalibratedProfile cal, boolean relaxValidation) {
         TasteProfile tp = wine.getTasteProfile();
 
         // ── ① 유효성 지시 함수 𝟙_i ──────────────────────────────────────────────
-        // isReal* = false → 값 없음 → 𝟙 = 0, 해당 차원을 계산에서 제외
-        boolean validSweet  = tp != null && Boolean.TRUE.equals(tp.getIsRealSweetness()) && tp.getSweetness() > 0;
-        boolean validAcid   = tp != null && Boolean.TRUE.equals(tp.getIsRealAcidity())   && tp.getAcidity() > 0;
-        boolean validBody   = tp != null && Boolean.TRUE.equals(tp.getIsRealBody())      && tp.getBody() > 0;
-        boolean validTannin = tp != null && Boolean.TRUE.equals(tp.getIsRealTannin())    && tp.getTannin() > 0;
-        boolean validAlc    = Boolean.TRUE.equals(wine.getIsRealAlcoholDegree())
-                           && wine.getAlcoholDegree() != null && wine.getAlcoholDegree() > 0;
+        // relaxValidation=false(기본): isReal*=true 인 차원만 사용 (기존 동작 유지)
+        // relaxValidation=true(RAG전용): isReal 무시, 값이 존재하면 유효로 처리
+        boolean validSweet  = tp != null && tp.getSweetness()     != null && tp.getSweetness()     > 0
+                              && (relaxValidation || Boolean.TRUE.equals(tp.getIsRealSweetness()));
+        boolean validAcid   = tp != null && tp.getAcidity()       != null && tp.getAcidity()       > 0
+                              && (relaxValidation || Boolean.TRUE.equals(tp.getIsRealAcidity()));
+        boolean validBody   = tp != null && tp.getBody()          != null && tp.getBody()           > 0
+                              && (relaxValidation || Boolean.TRUE.equals(tp.getIsRealBody()));
+        boolean validTannin = tp != null && tp.getTannin()        != null && tp.getTannin()         > 0
+                              && (relaxValidation || Boolean.TRUE.equals(tp.getIsRealTannin()));
+        boolean validAlc    = wine.getAlcoholDegree()             != null && wine.getAlcoholDegree() > 0
+                              && (relaxValidation || Boolean.TRUE.equals(wine.getIsRealAlcoholDegree()));
         int nValid = (validSweet ? 1 : 0) + (validAcid ? 1 : 0)
                    + (validBody ? 1 : 0) + (validTannin ? 1 : 0) + (validAlc ? 1 : 0);
 
@@ -431,8 +447,9 @@ public class WineRecommendationCalculator {
         float sPrice = calcSPrice(wine, pref, situation, validPrice);
 
         // ── ⑦ 데이터 부재 와인 제외 ───────────────────────────────────────────
-        // (당도, 산도, 바디, 탄닌, 가격) 5가지 핵심 데이터가 모두 '진짜'이고 '0보다 큰' 와인만 추천
-        if (!(validSweet && validAcid && validBody && validTannin && validPrice)) {
+        // 엄격 모드(기존): 5가지 모두 진짜 데이터여야만 추천
+        // RAG 완화 모드: isReal 여부와 무관하게 포함 (pgvector가 이미 선별한 결과)
+        if (!relaxValidation && !(validSweet && validAcid && validBody && validTannin && validPrice)) {
             return Integer.MIN_VALUE;
         }
 
@@ -674,6 +691,60 @@ public class WineRecommendationCalculator {
         for (float s : scores) product *= s;
         return (float) Math.pow(product, 1.0 / scores.size());
     }
+
+/**
+ * AI 엔진이 1차 필터링한 30개의 후보(Candidate) 와인들 내에서만
+ * 사용자(+친구) 취향을 블렌딩하여 가우시안/베이지안 Re-ranking을 수행합니다.
+ */
+public WineQuickRecommendResponse ragReRank(User mainUser, List<User> friends, List<Long> candidateIds) {
+    // 1. 본인 취향 프로필
+    Preference mainPref = preferenceRepository.findByUserId(mainUser.getId()).orElse(null);
+    List<Review> mainReviews = reviewRepository.findAllByUserWithWine(mainUser);
+    CalibratedProfile mainProfile = calibrate(mainPref, mainReviews);
+    // 2. 친구들 취향 프로필 수집
+    List<CalibratedProfile> allProfiles = new ArrayList<>();
+    allProfiles.add(mainProfile);
+    for (User friend : friends) {
+        Preference friendPref = preferenceRepository.findByUserId(friend.getId()).orElse(null);
+        List<Review> friendReviews = reviewRepository.findAllByUserWithWine(friend);
+        allProfiles.add(calibrate(friendPref, friendReviews));
+    }
+    // 3. 취향 프로필 단순 평균 블렌딩 (NaN 차원은 제외)
+    CalibratedProfile blended = blendProfiles(allProfiles);
+    // 4. 후보 와인만 조회하여 점수 계산
+    List<Wine> candidateWines = wineRepository.findAllByIdIn(candidateIds);
+    PriorityQueue<WineScore> minHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
+    for (Wine wine : candidateWines) {
+        // relaxValidation=true: isReal 무시, 있는 데이터 그대로 사용
+        int match = score(wine, null, mainPref, blended, true);
+        if (match == Integer.MIN_VALUE) match = 0; // 안전망
+        addToHeap(minHeap, new WineScore(match, wine), 1);
+    }
+    return WineQuickRecommendResponse.of(heapToList(minHeap, null), List.of());
+}
+/** 여러 취향 프로필의 단순 평균을 구한다 (NaN 무시) */
+private CalibratedProfile blendProfiles(List<CalibratedProfile> profiles) {
+    if (profiles.size() == 1) return profiles.get(0);
+    float[] sums = new float[8];
+    int[]   cnts = new int[8];
+    for (CalibratedProfile p : profiles) {
+        float[] vals = {p.uHatSweet(), p.uHatAcid(), p.uHatBody(), p.uHatTannin(),
+                        p.sigmaSweet(), p.sigmaAcid(), p.sigmaBody(), p.sigmaTannin()};
+        for (int i = 0; i < 8; i++) {
+            if (!Float.isNaN(vals[i])) { sums[i] += vals[i]; cnts[i]++; }
+        }
+    }
+    return new CalibratedProfile(
+        cnts[0] > 0 ? sums[0]/cnts[0] : Float.NaN,
+        cnts[1] > 0 ? sums[1]/cnts[1] : Float.NaN,
+        cnts[2] > 0 ? sums[2]/cnts[2] : Float.NaN,
+        cnts[3] > 0 ? sums[3]/cnts[3] : Float.NaN,
+        cnts[4] > 0 ? sums[4]/cnts[4] : SIGMA_BASE,
+        cnts[5] > 0 ? sums[5]/cnts[5] : SIGMA_BASE,
+        cnts[6] > 0 ? sums[6]/cnts[6] : SIGMA_BASE,
+        cnts[7] > 0 ? sums[7]/cnts[7] : SIGMA_BASE
+    );
+}
 
     record WineScore(int match, Wine wine) {}
 }
