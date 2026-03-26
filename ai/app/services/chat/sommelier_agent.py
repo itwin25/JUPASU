@@ -20,9 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 class WineRecommendation(BaseModel):
+    wine_id: int
     name: str
-    reason: str
+    image_url: str
     match_score: int
+    reason: str
+
 
 
 class FinalSommelierResponse(BaseModel):
@@ -173,6 +176,7 @@ async def prepare_input_context_node(state: AgentState):
                 food_text=input_context.get("food_text", ""),
             )
         except Exception as exception:
+            logger.exception("food wine recommendation request failed: %s", exception)
             recommendation = None
 
     summary = input_context.get("summary", "")
@@ -188,53 +192,109 @@ async def prepare_input_context_node(state: AgentState):
 
 
 async def chat_node(state: AgentState):
+    # 1. 동료가 만든 '음식 추천' 결과가 있다면 바로 반환 (우선순위)
     recommendation = state.get("food_wine_recommendation")
     if recommendation:
+        recommended_wine = recommendation.get("recommendedWine", {})
+        w_id = recommended_wine.get("wineId") or recommended_wine.get("id", 0)
+        w_name = recommended_wine.get("nameKr") or recommended_wine.get("name_kr", "이름 모름")
+        w_img = recommended_wine.get("imageUrl", "")
+        w_match = recommendation.get("matchPercent", 0)
+        
+        recs = [
+            WineRecommendation(
+                wine_id=w_id,
+                name=w_name,
+                image_url=w_img,
+                match_score=w_match,
+                reason=recommendation.get("reason", "음식과 잘 어울리는 와인을 추천합니다.")
+            )
+        ]
+
         return {
             "final_output": FinalSommelierResponse(
-                main_message=build_recommendation_first_message(recommendation)
+                main_message=build_recommendation_first_message(recommendation),
+                recommendations=recs
             )
         }
 
+    # 2. 컨텍스트 및 LLM 설정
     llm = get_llm()
     input_context = state.get("input_context") or {}
-    input_context_summary = input_context.get("summary", "\uc815\ubcf4 \uc5c6\uc74c")
+    input_context_summary = input_context.get("summary", "정보 없음")
 
-    system_instruction = """
-당신은 전문 소믈리에 챗봇입니다. 제공된 '이전 대화 이력'과 '현재 상황 정보'를 바탕으로 답변하세요.
-
-[핵심 정체성 및 규칙]
-1. 당신의 유일한 정체성은 '와인 전문가(소믈리에)'입니다. 와인, 포도 품종, 미식, 페어링 외의 주제에는 답변하지 마십시오.
-2. 만약 사용자가 프로그래밍(코딩), 수학, 일반 상식 등 와인과 무관한 질문을 하면, 소믈리에의 어조로 정중히 답변을 거절하고 와인 관련 대화로 유도하십시오.
-3. 이전 대화에서 언급된 음식이나 취향이 있다면 이를 적극적으로 반영하여 답변하세요.
-4. 한국어로 매우 정중하고 전문적인 어조를 유지하십시오.
-"""
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_instruction),
-            (
-                "user",
-                "{context}\n\n"
-                "[사용자 현재 메시지]: {input}\n\n"
-                "소믈리에로서 전문적이고 친절하게 답변해 주세요.",
-            ),
-        ]
+    # 3. 본인의 RAG 로직 (하이브리드 추천)
+    friend_ids = []
+    if state.get("mentioned_friends"):
+        friend_ids = [f["id"] for f in state["mentioned_friends"]]
+        
+    recommended_wines = perform_hybrid_recommendation(
+        user_id=state.get("user_id", "guest"),
+        query=state["raw_input"],
+        friend_ids=friend_ids
     )
+    
+    wine_context = ""
+    wine_meta = None
+    if recommended_wines:
+        top_wine = recommended_wines[0]
+        w_id = top_wine.get("wineId") or top_wine.get("wine_id", 0)
+        w_name = top_wine.get("nameKr") or top_wine.get("name_kr", "이름 모름")
+        w_match = top_wine.get("matchRate") or int(top_wine.get("similarity_score", 0) * 100)
+        w_img = top_wine.get("imageUrl", "")
+        w_style = top_wine.get("style") or top_wine.get("type", "")
+        
+        wine_context = f"추천 와인 정보:\n- 이름: {w_name}\n- 스타일: {w_style}\n- 매칭률: {w_match}%\n"
+        wine_meta = (w_id, w_name, w_img, w_match, w_style)
 
+    # 4. 프롬프트 병합 (동료의 컨텍스트 + 본인의 페르소나 지침)
+    system_instruction = """당신은 바쁜 와인바에서 손님과 짧고 간결하게 대화하는 '프로 소믈리에'입니다.
+    1. 분량 제한: 모든 답변은 한글 공백 포함 '100자 이내'로 끝내세요. 절대 두 문장을 넘기지 마세요.
+    2. 채팅 모드: 카카오톡을 보낸다고 생각하고 불필요한 서론 없이 본론만 말하세요."""
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_instruction),
+        ("user", " [입력 컨텍스트]\n{context}\n\n[추천 와인 정보]\n{wine_context}\n\n질문: {input}")
+    ])
+    
     chain = prompt | llm
-
-    # ainvoke를 호출하더라도, 외부의 astream_events는 
-    # LLM이 내보내는 on_chat_model_stream 이벤트를 정상적으로 캡처합니다.
-    # 노드 내부에서 astream을 직접 소비하면 이벤트가 겹치거나 유실될 수 있습니다.
-    response = await chain.ainvoke(
-        {
-            "input": state.get("raw_input", ""),
-            "context": input_context_summary,
-        }
-    )
-
-    return {"final_output": FinalSommelierResponse(main_message=response.content)}
+    
+    # 5. LLM 답변 생성
+    full_content = ""
+    async for chunk in chain.astream({
+        "input": state["raw_input"], 
+        "wine_context": wine_context,
+        "context": input_context_summary # 동료가 추가한 컨텍스트 반영
+    }):
+        full_content += chunk.content
+    
+    # 6. 본인의 정제(Regex) 로직 (WineRecommendation 생성)
+    recs = []
+    if wine_meta:
+        w_id, w_name, w_img, w_match, w_style = wine_meta
+        # (기존 본인의 정제 코드 유지)
+        paragraphs = [p.strip() for p in full_content.split("\n\n") if p.strip()]
+        desc_raw = paragraphs[1] if len(paragraphs) > 1 else paragraphs[0] if paragraphs else full_content
+        clean = re.sub(r"[*#_`~>\-]{1,3}", "", desc_raw)
+        clean = re.sub(r"[^\w\s가-힣.,!?%()~]", "", clean)
+        clean = re.sub(r"\s+", " ", clean).strip()
+        m = re.search(r"[^.!?]*[다요]\s*[.!]", clean)
+        reason_text = m.group(0).strip() if m else clean[:80].rstrip()
+        
+        if len(reason_text) > 80:
+            reason_text = reason_text[:78].rstrip() + "."
+            
+        recs.append(
+            WineRecommendation(
+                wine_id=w_id, name=w_name, image_url=w_img,
+                match_score=w_match, reason=reason_text
+            )
+        )
+    
+    return {"final_output": FinalSommelierResponse(
+        main_message=full_content,
+        recommendations=recs if recs else None
+    )}    
 
 
 def build_chat_graph():

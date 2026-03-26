@@ -11,11 +11,14 @@ from app.api.v1.schemas import (
     RefineRequest,
     RefineResponse,
     SommelierTask,
+    TasteReportSummaryRequest,
+    TasteReportSummaryResponse,
 )
 from app.core.config import get_settings
 from app.core.security import verify_internal_api_key
 from app.services.chat.sommelier_agent import sommelier_agent
 from app.services.ocr.refiner import ocr_refiner
+from app.services.taste.taste_report_service import generate_taste_report_summary
 
 router = APIRouter(dependencies=[Depends(verify_internal_api_key)])
 
@@ -144,6 +147,30 @@ async def chat(request: CustomChatRequest):
             "card": build_recommendation_card(recommendation),
             "actions": build_recommendation_actions(recommendation),
         }
+    except Exception as exception:
+        raise HTTPException(status_code=500, detail=str(exception))
+
+
+@router.post("/taste-report/summary", response_model=TasteReportSummaryResponse)
+async def taste_report_summary(request: TasteReportSummaryRequest):
+    """사용자의 맛 프로파일을 받아 AI 취향 요약 텍스트를 생성합니다.
+    TasteReport가 outdated 상태일 때만 Java 백엔드에서 호출합니다."""
+    try:
+        result = await generate_taste_report_summary(
+            nickname=request.nickname,
+            avg_sweetness=request.avg_sweetness,
+            avg_acidity=request.avg_acidity,
+            avg_body=request.avg_body,
+            avg_tannin=request.avg_tannin,
+            avg_alcohol=request.avg_alcohol,
+        )
+        return TasteReportSummaryResponse(
+            main_title=result["mainTitle"],
+            taste_type_tag=result["tasteTypeTag"],
+            content=result["content"],
+            best_description=result["bestDescription"],
+            worst_description=result["worstDescription"],
+        )
     except Exception as exception:
         raise HTTPException(status_code=500, detail=str(exception))
 

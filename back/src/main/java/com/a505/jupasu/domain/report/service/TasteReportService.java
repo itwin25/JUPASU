@@ -9,22 +9,38 @@ import com.a505.jupasu.domain.reviews.entity.Review;
 import com.a505.jupasu.domain.reviews.repository.ReviewRepository;
 import com.a505.jupasu.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 취향 리포트 생성 및 분석 비즈니스 로직을 담당하는 서비스
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TasteReportService {
     private final ReviewRepository reviewRepository;
     private final TasteReportRepository tasteReportRepository;
     private final PreferenceRepository preferenceRepository;
+    private final RestTemplate restTemplate;
 
+    @Value("${ai.server.base-url:http://localhost:8001}")
+    private String aiServerBaseUrl;
+
+    @Value("${ai.server.internal-api-key:dev-secret-key}")
+    private String internalApiKey;
+
+    private static final String AI_TASTE_SUMMARY_PATH = "/v1/taste-report/summary";
     private static final double PREFERENCE_WEIGHT = 5.0;
 
     /**
@@ -63,7 +79,15 @@ public class TasteReportService {
         Preference preference = preferenceRepository.findByUserId(user.getId()).orElse(null);
 
         if (reviews.isEmpty() && preference == null) {
-            return null;
+            return TasteReportResponse.builder()
+                    .radarChart(TasteReportResponse.RadarData.builder()
+                            .sweetness(2.5).acidity(2.5).body(2.5).tannin(2.5).alcohol(10.0).build())
+                    .mainTitle(user.getNickname() + "님의 취향을 스캐닝 중입니다!")
+                    .tasteTypeTag("분석 대기")
+                    .content("리뷰를 추가하시거나 취향 설정을 마치시면 더 정확한 분석이 제공됩니다.")
+                    .bestDescription("다양한 와인을 탐색하며 나만의 Best를 찾아보세요.")
+                    .worstDescription("아직 피해야 할 와인이 없네요!")
+                    .build();
         }
 
         // 가중 평균 계산
@@ -99,15 +123,67 @@ public class TasteReportService {
         double avgTannin = sumTan / totalWeight;
         double avgAlcohol = sumAlc / totalWeight;
 
-        // 3. 임시 텍스트 생성 (AI 도입 전까지 사용할 템플릿)
-        String title = user.getNickname() + "님은 '밸런스가 좋은' 와인 취향이에요!";
-        String content = String.format("평균적으로 당도 %.1f, 산도 %.1f의 와인을 선호하시네요.", avgSweetness, avgAcidity);
+        // 3. Python AI 서버 호출 → AI 텍스트 생성
+        String aiTitle = null;
+        String aiContent = null;
+        String aiTasteTypeTag = null;
+        String aiBestDescription = null;
+        String aiWorstDescription = null;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Internal-Api-Key", internalApiKey);
 
-        // 4. 저장 및 반환
+            Map<String, Object> body = Map.of(
+                    "nickname", user.getNickname(),
+                    "avg_sweetness", avgSweetness,
+                    "avg_acidity", avgAcidity,
+                    "avg_body", avgBody,
+                    "avg_tannin", avgTannin,
+                    "avg_alcohol", avgAlcohol
+            );
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> aiResponse = restTemplate.postForObject(
+                    aiServerBaseUrl + AI_TASTE_SUMMARY_PATH,
+                    new HttpEntity<>(body, headers),
+                    Map.class
+            );
+
+            if (aiResponse != null) {
+                aiTitle           = (String) aiResponse.get("main_title");
+                aiTasteTypeTag    = (String) aiResponse.get("taste_type_tag");
+                aiContent         = (String) aiResponse.get("content");
+                aiBestDescription = (String) aiResponse.get("best_description");
+                aiWorstDescription = (String) aiResponse.get("worst_description");
+            }
+        } catch (Exception e) {
+            log.warn("AI 취향 리포트 생성 실패, 임시 텍스트 사용: {}", e.getMessage());
+            try {
+                java.nio.file.Files.writeString(
+                    java.nio.file.Paths.get("C:/Users/SSAFY/Desktop/S14P21A505/back/taste_error_log.txt"),
+                    "AI Error: " + e.getMessage() + "\n" + java.util.Arrays.toString(e.getStackTrace()),
+                    java.nio.file.StandardOpenOption.CREATE, 
+                    java.nio.file.StandardOpenOption.APPEND
+                );
+            } catch (Exception ignore) {}
+        }
+
+        // 4. AI 실패 시 폴백 텍스트
+        String title = aiTitle != null ? aiTitle
+                : user.getNickname() + "님의 와인 취향이에요!";
+        String content = aiContent != null ? aiContent
+                : String.format("평균적으로 당도 %.1f, 산도 %.1f의 와인을 선호하시네요.", avgSweetness, avgAcidity);
+        String tasteTypeTag    = aiTasteTypeTag    != null ? aiTasteTypeTag    : "밸런스형";
+        String bestDescription = aiBestDescription != null ? aiBestDescription : "균형 잡힌 미디엄 바디 와인을 추천해 드려요!";
+        String worstDescription = aiWorstDescription != null ? aiWorstDescription : "탄닌이 강한 풀바디 레드는 다소 부담스러우실 수 있어요.";
+
+        // 5. 저장 및 반환
         TasteReport report = tasteReportRepository.findByUser(user)
                 .orElseGet(() -> TasteReport.builder().user(user).build());
 
-        report.updateResult(avgSweetness, avgAcidity, avgBody, avgTannin, avgAlcohol, title, content);
+        report.updateResult(avgSweetness, avgAcidity, avgBody, avgTannin, avgAlcohol,
+                title, content, tasteTypeTag, bestDescription, worstDescription);
         report.setCreatedAt(LocalDateTime.now());
 
         tasteReportRepository.save(report);

@@ -31,14 +31,16 @@ public record WineDetailResponse(
         Integer matchRate,
         List<String> pairingFoods,
         List<String> tasteGroups,
-        UserPreferenceResponse userPreference
+        UserPreferenceResponse userPreference,
+        List<SimilarWineResponse> similarWines
 ) {
     public static WineDetailResponse of(
             Wine wine,
             Integer matchRate,
             List<String> pairingFoods,
             List<String> tasteGroups,
-            Preference preference
+            Preference preference,
+            List<SimilarWineResponse> similarWines
     ) {
         Double averageRating = 0.0;
         Integer reviewCount = 0;
@@ -85,6 +87,7 @@ public record WineDetailResponse(
                 .pairingFoods(pairingFoods)
                 .tasteGroups(tasteGroups)
                 .userPreference(preference != null ? UserPreferenceResponse.from(preference) : null)
+                .similarWines(similarWines)
                 .build();
     }
 }
