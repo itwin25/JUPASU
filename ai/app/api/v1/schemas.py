@@ -92,3 +92,23 @@ class CustomChatResponse(BaseModel):
     provider: Optional[str] = None
     card: Optional[ChatCardData] = None
     actions: List[ChatActionData] = Field(default=[])
+
+
+# ─── 취향 리포트 AI 요약 ───────────────────────────────────────────
+
+class TasteReportSummaryRequest(BaseModel):
+    nickname: str
+    avg_sweetness: float
+    avg_acidity: float
+    avg_body: float
+    avg_tannin: float
+    avg_alcohol: float
+
+
+class TasteReportSummaryResponse(BaseModel):
+    main_title: str
+    taste_type_tag: str
+    content: str
+    best_description: str
+    worst_description: str
+

@@ -8,7 +8,7 @@ if sys.platform == "win32":
 from app.services.chat.sommelier_agent import sommelier_agent
 
 def run_test():
-    test_query = "친구들이랑 마실 로제 와인 추천해줘. 너무 달지 않았으면 좋겠어"
+    test_query = "봄에 마실 와인 추천해줘. 신걸로"
     print(f"🔍 [테스트 시작] 질문: {test_query}\n")
     print("⏳ AI 소믈리에가 답변을 생성 중입니다... (RAG + LLM)\n")
     
