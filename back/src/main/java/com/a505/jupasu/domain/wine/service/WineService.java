@@ -5,6 +5,7 @@ import com.a505.jupasu.domain.preference.entity.Preference;
 import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
+import com.a505.jupasu.domain.wine.dto.SimilarWineResponse;
 import com.a505.jupasu.domain.wine.dto.WineDetailResponse;
 import com.a505.jupasu.domain.wine.dto.WineSearchCondition;
 import com.a505.jupasu.domain.wine.dto.WineSearchResponse;
@@ -36,6 +37,7 @@ public class WineService {
     private final WineFoodPairingRepository wineFoodPairingRepository;
     private final WineTasteGroupRepository wineTasteGroupRepository;
     private final WineRecommendationCalculator wineRecommendationCalculator;
+    private final WineSearchService wineSearchService;
 
     public Page<WineSearchResponse> searchWines(WineSearchCondition condition, Pageable pageable) {
         List<Long> matchingIds = null;
@@ -68,10 +70,15 @@ public class WineService {
         List<String> pairingFoods = wineFoodPairingRepository.findFoodNamesByWineId(wineId);
 
         List<String> tasteGroup = wineTasteGroupRepository.findTasteNamesByWineId(wineId);
-        // 4. 취향 적중률 계산 현재는 95 고정
+        // 4. 취향 적중률 계산
         int matchRate = wineRecommendationCalculator.getMatch(user, wine);
 
+        //유사한 와인 3개 추천
+        List<SimilarWineResponse> similarWines = wineRepository.findSimilarTastes(wine, 3).stream()
+                .filter(similarWine -> !similarWine.getId().equals(wineId))
+                .map(SimilarWineResponse::from)
+                .toList();
 
-        return WineDetailResponse.of(wine, matchRate, pairingFoods, tasteGroup, preference);
+        return WineDetailResponse.of(wine, matchRate, pairingFoods, tasteGroup, preference, similarWines);
     }
 }
