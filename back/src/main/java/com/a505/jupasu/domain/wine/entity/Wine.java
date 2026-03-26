@@ -13,6 +13,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import java.time.OffsetDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -68,7 +69,14 @@ public class Wine extends BaseEntity {
     private String imageUrl;
 
     @Column(columnDefinition = "TEXT")
-    private String embeddingTextKo;
+    private String richDescription;
+
+    private String embeddingModel;
+
+    private OffsetDateTime embeddingGeneratedAt;
+
+    @Column(columnDefinition = "vector(1536)")
+    private float[] embedding;
 
     public void initializeExternalRatings(
             double externalAverageRating,

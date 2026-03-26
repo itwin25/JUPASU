@@ -22,4 +22,16 @@ public interface WineRepository extends JpaRepository<Wine, Long>, WineRepositor
     List<Long> findMatchingIdsByKeyword(@Param("keyword") String keyword);
 
     List<Wine> findAllByIdIn(List<Long> wineIds);
+
+    @Query(value =
+            "SELECT * FROM wine w " +
+            "WHERE w.embedding IS NOT NULL " +
+            "AND (:wineType IS NULL OR w.type = :wineType) " +
+            "ORDER BY w.embedding <=> cast(:queryEmbedding as vector) " +
+            "LIMIT :limit", nativeQuery = true)
+    List<Wine> findSimilarWinesByVector(
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("wineType") String wineType,
+            @Param("limit") int limit
+    );
 }
