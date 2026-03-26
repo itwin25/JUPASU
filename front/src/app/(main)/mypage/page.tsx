@@ -345,7 +345,10 @@ export default function MyPage() {
   const serverWishlistTotalCount = scrapListPageData?.totalElements ?? profile?.wishlistCount ?? 0;
   const serverReviewTotalCount = myReviewsPageData?.totalElements ?? profile?.reviewCount ?? 0;
 
-  const currentWishlistCount = Math.max(0, serverWishlistTotalCount - removedWishlistWineIds.length);
+  const currentWishlistCount = Math.max(
+    0,
+    serverWishlistTotalCount - removedWishlistWineIds.length,
+  );
   const currentReviewCount = Math.max(0, serverReviewTotalCount - deletedReviewIds.length);
   const currentFriendCount =
     friendListData !== undefined ? visibleFriends.length : (profile?.friendCount ?? 0);
@@ -423,9 +426,7 @@ export default function MyPage() {
       status,
     });
 
-    setRemovedPendingRequestIds((prev) =>
-      prev.includes(requestId) ? prev : [...prev, requestId],
-    );
+    setRemovedPendingRequestIds((prev) => (prev.includes(requestId) ? prev : [...prev, requestId]));
 
     if (status === 'ACCEPTED' && target) {
       setOptimisticAcceptedFriends((prev) => [
@@ -605,7 +606,7 @@ export default function MyPage() {
                 {isReportLoading
                   ? '리포트를 불러오는 중이에요...'
                   : tasteReport?.mainTitle ||
-                  "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
+                    "와인초보님은 '상큼하고 가벼운' 화이트 와인 취향이에요!"}
               </p>
 
               <div className="relative mx-auto mt-3 flex h-[250px] w-full max-w-[250px] items-center justify-center">
@@ -687,7 +688,7 @@ export default function MyPage() {
 
               <div className="mt-1 flex justify-center">
                 <span className="rounded-full bg-[#F6EAE6] px-4 py-1.5 text-[10px] font-black text-[#C98674]">
-                  과일향 러버 타입
+                  {isReportLoading ? '데이터 분석 중' : tasteReport?.tasteTypeTag || '밸런스형'}
                 </span>
               </div>
 
@@ -1083,9 +1084,9 @@ export default function MyPage() {
         initialData={
           editingReview
             ? {
-              rating: editingReview.rating,
-              content: editingReview.content,
-            }
+                rating: editingReview.rating,
+                content: editingReview.content,
+              }
             : undefined
         }
         wineInfo={{
@@ -1133,7 +1134,9 @@ export default function MyPage() {
       <Modal
         isOpen={activeModal === 'friends'}
         onClose={() => setActiveModal(null)}
-        title={friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'}
+        title={
+          friendTab === 'list' ? '친구 목록' : friendTab === 'search' ? '친구 검색' : '친구 요청'
+        }
         centerTitle
         hideDefaultFooter
         className={modalClassName}
@@ -1280,7 +1283,10 @@ export default function MyPage() {
                       <div className="flex items-center gap-3">
                         <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#8E5A45]">
                           <Image
-                            src={resolveCharacterImage(f.character ?? undefined, f.reviewCount ?? 0)}
+                            src={resolveCharacterImage(
+                              f.character ?? undefined,
+                              f.reviewCount ?? 0,
+                            )}
                             alt={f.nickname}
                             fill
                             className="object-cover"
