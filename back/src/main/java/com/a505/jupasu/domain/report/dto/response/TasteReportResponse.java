@@ -44,10 +44,10 @@ public class TasteReportResponse {
                         .alcohol(formatValue(report.getAvgAlcohol()))
                         .build())
                 .mainTitle(report.getMainTitle())
-                .tasteTypeTag("밸런스")
+                .tasteTypeTag(report.getTasteTypeTag())
                 .content(report.getContent())
-                .bestDescription("피노 누아 계열을 더 탐색해 보세요!")
-                .worstDescription("무거운 바디감의 와인은 피하는 게 좋아요.")
+                .bestDescription(report.getBestDescription())
+                .worstDescription(report.getWorstDescription())
                 .build();
     }
 

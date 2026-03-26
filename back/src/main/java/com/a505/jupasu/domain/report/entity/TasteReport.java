@@ -46,7 +46,9 @@ public class TasteReport {
      * 리포트 데이터를 한꺼번에 업데이트하는 도메인 메서드
      */
     public void updateResult(double avgSweetness, double avgAcidity, double avgBody,
-                             double avgTannin, double avgAlcohol, String mainTitle, String content) {
+                             double avgTannin, double avgAlcohol,
+                             String mainTitle, String content,
+                             String tasteTypeTag, String bestDescription, String worstDescription) {
         this.avgSweetness = avgSweetness;
         this.avgAcidity = avgAcidity;
         this.avgBody = avgBody;
@@ -54,6 +56,9 @@ public class TasteReport {
         this.avgAlcohol = avgAlcohol;
         this.mainTitle = mainTitle;
         this.content = content;
+        this.tasteTypeTag = tasteTypeTag;
+        this.bestDescription = bestDescription;
+        this.worstDescription = worstDescription;
     }
 
     /**
