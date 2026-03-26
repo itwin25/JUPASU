@@ -1,15 +1,21 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import NextImage from 'next/image';
 import { Camera, Plus, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
 import { useOCR } from '../hooks/useOCR';
 
+interface MenuRefinedResult {
+  wineNames?: string[];
+  foodNames?: string[];
+}
+
 interface MenuScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAnalysisComplete: (data: any) => void;
+  onAnalysisComplete: (data: MenuRefinedResult) => void;
 }
 
 export default function MenuScannerModal({
@@ -21,7 +27,7 @@ export default function MenuScannerModal({
   const [previews, setPreviews] = useState<string[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +38,7 @@ export default function MenuScannerModal({
   // 이미지 압축 유틸리티 (최대 1600px, 0.7 퀄리티)
   const compressImage = async (file: File): Promise<File> => {
     return new Promise((resolve) => {
-      const img = new Image();
+      const img = new window.Image();
       img.src = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(img.src);
@@ -53,13 +59,17 @@ export default function MenuScannerModal({
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          } else {
-            resolve(file);
-          }
-        }, 'image/jpeg', 0.7);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.7,
+        );
       };
       img.onerror = () => resolve(file);
     });
@@ -106,22 +116,26 @@ export default function MenuScannerModal({
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob(async (blob) => {
-        if (blob) {
-          setIsCapturing(true);
-          try {
-            const rawFile = new File([blob], `menu_${Date.now()}.jpg`, { type: 'image/jpeg' });
-            const optimizedFile = await compressImage(rawFile);
-            const url = URL.createObjectURL(optimizedFile);
-            
-            setImages(prev => [...prev, optimizedFile]);
-            setPreviews(prev => [...prev, url]);
-            stopCamera();
-          } finally {
-            setIsCapturing(false);
+      canvas.toBlob(
+        async (blob) => {
+          if (blob) {
+            setIsCapturing(true);
+            try {
+              const rawFile = new File([blob], `menu_${Date.now()}.jpg`, { type: 'image/jpeg' });
+              const optimizedFile = await compressImage(rawFile);
+              const url = URL.createObjectURL(optimizedFile);
+
+              setImages((prev) => [...prev, optimizedFile]);
+              setPreviews((prev) => [...prev, url]);
+              stopCamera();
+            } finally {
+              setIsCapturing(false);
+            }
           }
-        }
-      }, 'image/jpeg', 0.9);
+        },
+        'image/jpeg',
+        0.9,
+      );
     }
   }, [stopCamera]);
 
@@ -134,8 +148,8 @@ export default function MenuScannerModal({
     try {
       const optimizedFile = await compressImage(file);
       const url = URL.createObjectURL(optimizedFile);
-      setImages(prev => [...prev, optimizedFile]);
-      setPreviews(prev => [...prev, url]);
+      setImages((prev) => [...prev, optimizedFile]);
+      setPreviews((prev) => [...prev, url]);
     } finally {
       setIsCapturing(false);
     }
@@ -144,8 +158,8 @@ export default function MenuScannerModal({
   // 이미지 삭제
   const removeImage = (index: number) => {
     URL.revokeObjectURL(previews[index]);
-    setImages(prev => prev.filter((_, i) => i !== index));
-    setPreviews(prev => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
+    setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   // 분석 시작
@@ -154,12 +168,19 @@ export default function MenuScannerModal({
 
     try {
       const result = await executeOCR(images, 'MENU_SCAN');
-      if (result.success) {
+      if (result.success && result.refined) {
         onAnalysisComplete(result.refined);
         onClose();
+      } else {
+        const errMsg =
+          'error' in result && typeof result.error === 'string'
+            ? result.error
+            : '메뉴판 분석에 실패했습니다. Spring 서버와 AI 서버가 실행 중인지 확인해주세요.';
+        alert(errMsg);
       }
     } catch (err) {
       console.error('Analysis failed:', err);
+      alert('메뉴판 분석 중 오류가 발생했습니다.');
     }
   };
 
@@ -219,11 +240,15 @@ export default function MenuScannerModal({
             </div>
           ) : (
             <div className="h-full w-full">
-              <img
-                src={previews[previews.length - 1]}
-                alt="Latest"
-                className="h-full w-full object-contain"
-              />
+              <div className="relative h-full w-full">
+                <NextImage
+                  src={previews[previews.length - 1]}
+                  alt="Latest"
+                  fill
+                  unoptimized
+                  className="object-contain"
+                />
+              </div>
               <div className="absolute top-3 right-3 rounded-full bg-black/40 px-3 py-1 text-xs font-bold text-white backdrop-blur-md">
                 {images.length} / 5
               </div>
@@ -232,7 +257,7 @@ export default function MenuScannerModal({
 
           {(isAnalyzing || isCapturing) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-black/60 text-white">
-              <Loader2 className="animate-spin text-primary-400" size={40} />
+              <Loader2 className="text-primary-400 animate-spin" size={40} />
               <p className="text-[15px] font-bold">
                 {isCapturing ? '이미지 최적화 중...' : '와인 목록 분석 중...'}
               </p>
@@ -244,10 +269,16 @@ export default function MenuScannerModal({
         <div className="flex gap-2 overflow-x-auto pt-2 pb-2">
           {previews.map((url, idx) => (
             <div key={url} className="relative h-16 w-16 shrink-0 rounded-lg bg-gray-100">
-              <img src={url} alt="Preview" className="h-full w-full rounded-lg object-cover" />
+              <NextImage
+                src={url}
+                alt="Preview"
+                fill
+                unoptimized
+                className="rounded-lg object-cover"
+              />
               <button
                 onClick={() => removeImage(idx)}
-                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary-700 text-white shadow-md active:scale-90"
+                className="bg-primary-700 absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white shadow-md active:scale-90"
               >
                 <X size={12} />
               </button>
@@ -258,13 +289,13 @@ export default function MenuScannerModal({
             <div className="flex gap-2">
               <button
                 onClick={startCamera}
-                className="flex h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed border-primary-200 bg-primary-50 text-primary-600 transition-colors hover:bg-primary-100 active:scale-95"
+                className="border-primary-200 bg-primary-50 text-primary-600 hover:bg-primary-100 flex h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed transition-colors active:scale-95"
               >
                 <Camera size={20} />
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed border-primary-200 bg-primary-50 text-primary-600 transition-colors hover:bg-primary-100 active:scale-95"
+                className="border-primary-200 bg-primary-50 text-primary-600 hover:bg-primary-100 flex h-16 w-16 items-center justify-center rounded-lg border-2 border-dashed transition-colors active:scale-95"
               >
                 <Plus size={20} />
               </button>
