@@ -10,12 +10,13 @@ from pydantic import BaseModel, Field
 from app.api.v1.schemas import ChatMessage
 from app.services.chat.food_wine_recommendation_client import (
     build_food_recommendation_summary,
+    request_menu_pairing_recommendations,
     request_food_wine_recommendation,
     should_request_food_recommendation,
 )
 from app.services.chat.input_context_builder import build_chat_input_context
 from app.services.llm.factory import get_llm
-from app.services.rag.chat_retrieval_service import perform_hybrid_recommendation
+from app.services.rag.hybrid_candidate_retrieval_service import perform_hybrid_candidate_recommendation
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ class AgentState(TypedDict):
     input_context: Optional[dict]
     food_wine_recommendation: Optional[dict]
     final_output: Optional[FinalSommelierResponse]
+    wine_card: Optional[dict]            # 메뉴판 스캔 시 프론트에 전달할 카드 데이터
+    wine_cards: Optional[List[dict]]     # 메뉴판 스캔 시 프론트에 전달할 카드 데이터 목록
 
 
 FOOD_REQUEST_SUFFIXES = (
@@ -58,6 +61,20 @@ FOOD_REQUEST_SUFFIXES = (
     "\uc5b4\uc6b8\ub9ac\ub294 \uc640\uc778",
     "\ucd94\ucc9c\ud574\uc918",
     "\ucd94\ucc9c",
+)
+
+MENU_NEXT_RECOMMENDATION_CUES = (
+    "별로",
+    "다른",
+    "또 추천",
+    "다른 추천",
+    "다음 추천",
+    "다른 와인",
+    "다른 조합",
+    "변경",
+    "말고",
+    "먹고 싶",
+    "먹고싶",
 )
 
 
@@ -129,6 +146,182 @@ def build_recommendation_first_message(recommendation: dict) -> str:
     particle = choose_with_particle(food_label)
     lead = f"{food_label}{particle} \ud568\uaed8\ub77c\uba74 {wine_name}\ub97c \ucd94\ucc9c\ub4dc\ub9b4\uac8c\uc694."
     return "\n".join([lead, reason])
+
+
+def build_menu_pairings_message(pairings: list[dict]) -> str:
+    intro = "메뉴판 분석과 유저 취향을 함께 반영해 가장 잘 맞는 조합을 먼저 추천드릴게요."
+    sections: list[str] = []
+
+    for index, pairing in enumerate(pairings, start=1):
+        recommendation = pairing.get("recommendation") or {}
+        recommended_wine = recommendation.get("recommendedWine") or {}
+        wine_name = (
+            recommended_wine.get("nameKr")
+            or recommended_wine.get("nameEn")
+            or "추천 와인"
+        )
+        food_label = normalize_food_label(pairing.get("foodName"))
+        reason = polish_recommendation_reason(
+            recommendation.get("reason") or "",
+            food_label,
+            recommendation.get("foodText"),
+        )
+        sections.append(
+            "\n".join(
+                [
+                    f"{index}. 메뉴판 음식: {food_label}",
+                    f"메뉴판 와인: {wine_name}",
+                    f"추천 이유: {reason}",
+                ]
+            )
+        )
+
+    return "\n\n".join([intro, *sections]).strip()
+
+
+def build_menu_pairing_follow_up(pairing: dict) -> str:
+    recommendation = pairing.get("recommendation") or {}
+    recommended_wine = recommendation.get("recommendedWine") or {}
+    wine_name = (
+        recommended_wine.get("nameKr")
+        or recommended_wine.get("nameEn")
+        or "이 와인"
+    )
+    food_label = normalize_food_label(pairing.get("foodName"))
+    return f"{food_label}에는 {wine_name}을 먼저 추천드릴게요. 마음에 안 들면 다른 조합도 이어서 추천해드릴게요."
+
+
+def build_menu_pairing_cards(pairings: list[dict]) -> list[dict]:
+    cards: list[dict] = []
+    for pairing in pairings:
+        recommendation = pairing.get("recommendation") or {}
+        recommended_wine = recommendation.get("recommendedWine") or {}
+        country = recommended_wine.get("country") or ""
+        wine_type_label = recommended_wine.get("wineTypeLabel") or recommended_wine.get("wineType") or ""
+        subtitle_parts = [part for part in (country, wine_type_label) if part]
+        cards.append(
+            {
+                "wine_id": recommended_wine.get("wineId"),
+                "name_kr": recommended_wine.get("nameKr"),
+                "name_en": recommended_wine.get("nameEn"),
+                "subtitle": " ".join(subtitle_parts) if subtitle_parts else None,
+                "price": recommended_wine.get("price"),
+                "match_percent": recommendation.get("matchPercent"),
+                "image_url": recommended_wine.get("imageUrl"),
+            }
+        )
+    return cards
+
+
+def _normalize_overlap_text(value: str | None) -> str:
+    if not value:
+        return ""
+    lowered = str(value).lower().strip()
+    lowered = re.sub(r"[^a-z0-9가-힣]+", "", lowered)
+    return lowered
+
+
+def _has_meaningful_food_overlap(menu_food: str, user_input: str) -> bool:
+    normalized_food = _normalize_overlap_text(menu_food)
+    normalized_input = _normalize_overlap_text(user_input)
+    if not normalized_food or not normalized_input:
+        return False
+
+    if normalized_food in normalized_input or normalized_input in normalized_food:
+        return True
+
+    min_overlap = 2 if any("\uac00" <= char <= "\ud7a3" for char in normalized_food) else 3
+    for start in range(0, max(0, len(normalized_food) - min_overlap + 1)):
+        for end in range(len(normalized_food), start + min_overlap - 1, -1):
+            fragment = normalized_food[start:end]
+            if len(fragment) < min_overlap:
+                continue
+            if fragment in normalized_input:
+                return True
+    return False
+
+
+def extract_previous_menu_pairings(history: List[ChatMessage] | List[dict] | None) -> list[dict[str, str]]:
+    pairings: list[dict[str, str]] = []
+    if not history:
+        return pairings
+
+    for entry in history:
+        role = getattr(entry, "role", None) or (entry.get("role") if isinstance(entry, dict) else None)
+        content = getattr(entry, "content", None) or (entry.get("content") if isinstance(entry, dict) else None)
+        if role not in ("assistant", "bot") or not content:
+            continue
+
+        sections = re.split(r"(?=\d+\.\s*\**\s*메뉴판\s*음식)", content)
+        for section in sections:
+            food_match = re.search(r"메뉴판\s*음식[:\s*]+([^\n]+)", section)
+            wine_match = re.search(r"메뉴판\s*와인[:\s*]+([^\n]+)", section)
+            if food_match and wine_match:
+                pairings.append(
+                    {
+                        "foodName": food_match.group(1).strip(),
+                        "wineName": wine_match.group(1).strip(),
+                    }
+                )
+
+    return pairings
+
+
+def resolve_menu_target_foods(
+    raw_input: str,
+    menu_foods: list[str],
+    previous_pairings: list[dict[str, str]],
+) -> list[str]:
+    normalized_input = (raw_input or "").strip()
+    if not menu_foods:
+        return []
+
+    mentioned_foods = [
+        food
+        for food in menu_foods
+        if food and _has_meaningful_food_overlap(food, normalized_input)
+    ]
+    if mentioned_foods:
+        return mentioned_foods
+
+    if any(cue in normalized_input for cue in MENU_NEXT_RECOMMENDATION_CUES):
+        recommended_foods = {
+            pairing.get("foodName", "").strip().casefold()
+            for pairing in previous_pairings
+            if pairing.get("foodName")
+        }
+        unrecommended_foods = [
+            food for food in menu_foods if food.strip().casefold() not in recommended_foods
+        ]
+        if unrecommended_foods:
+            return unrecommended_foods
+
+    return menu_foods
+
+
+def should_handle_menu_pairing_request(
+    raw_input: str,
+    menu_foods: list[str],
+    menu_wines: list[str],
+    previous_pairings: list[dict[str, str]],
+) -> bool:
+    if not menu_foods:
+        return False
+
+    normalized_input = (raw_input or "").strip()
+    if normalized_input == "메뉴판 스캔 완료":
+        return True
+
+    if any(cue in normalized_input for cue in MENU_NEXT_RECOMMENDATION_CUES):
+        return True
+
+    if any(_has_meaningful_food_overlap(food, normalized_input) for food in menu_foods):
+        return True
+
+    if previous_pairings and ("추천" in normalized_input or "어울리" in normalized_input):
+        return True
+
+    return False
 
 
 def convert_history_to_base_messages(history: List[ChatMessage] | List[dict] | None) -> List[BaseMessage]:
@@ -222,14 +415,61 @@ async def chat_node(state: AgentState):
     # 2. 컨텍스트 및 LLM 설정
     llm = get_llm()
     input_context = state.get("input_context") or {}
+    raw_history = state.get("history")
     input_context_summary = input_context.get("summary", "정보 없음")
+
+    # 2-1. 메뉴판 스캔 전용 경로 (selected_menu에 foodNames가 있는 경우)
+    menu_wines = input_context.get("menu_wines") or []
+    menu_foods = input_context.get("menu_foods") or []
+    previous_pairings = extract_previous_menu_pairings(raw_history)
+    if should_handle_menu_pairing_request(
+        state.get("raw_input", ""),
+        menu_foods,
+        menu_wines,
+        previous_pairings,
+    ):
+        target_foods = resolve_menu_target_foods(
+            state.get("raw_input", ""),
+            menu_foods,
+            previous_pairings,
+        )
+        excluded_wine_names = [pairing.get("wineName", "") for pairing in previous_pairings]
+        pairings = []
+        try:
+            pairings = await request_menu_pairing_recommendations(
+                user_id=state.get("user_id", ""),
+                menu_foods=menu_foods,
+                menu_wines=menu_wines,
+                target_foods=target_foods,
+                excluded_wine_names=excluded_wine_names,
+                max_pairings=1,
+            )
+        except Exception as exc:
+            logger.exception("메뉴판 스캔 food recommendation 실패: %s", exc)
+
+        if pairings:
+            first_pairing = pairings[0]
+            return {
+                "final_output": FinalSommelierResponse(
+                    main_message="\n\n".join(
+                        [
+                            build_menu_pairing_follow_up(first_pairing),
+                            build_menu_pairings_message(pairings),
+                        ]
+                    )
+                ),
+                "wine_cards": build_menu_pairing_cards([first_pairing]),
+            }
+
+        intro = "메뉴판을 분석했지만 취향에 맞는 와인을 찾지 못했어요. 다시 시도해 주세요."
+        return {"final_output": FinalSommelierResponse(main_message=intro)}
 
     # 3. 본인의 RAG 로직 (하이브리드 추천)
     friend_ids = []
     if state.get("mentioned_friends"):
         friend_ids = [f["id"] for f in state["mentioned_friends"]]
         
-    recommended_wines = perform_hybrid_recommendation(
+    recommended_wines = perform_hybrid_candidate_recommendation(
         user_id=state.get("user_id", "guest"),
         query=state["raw_input"],
         friend_ids=friend_ids

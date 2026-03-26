@@ -123,12 +123,22 @@ async def chat(request: CustomChatRequest):
 
                 elif kind == "on_chain_end" and event.get("name") == "chat":
                     output = event.get("data", {}).get("output", {})
-                    if output and not has_sent_content:
-                        final_out = output.get("final_output")
-                        if final_out:
-                            content = final_out.main_message if hasattr(final_out, "main_message") else str(final_out)
-                            if content:
-                                yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
+                    if output:
+                        # LLM 스트리밍이 없었던 경우(메뉴판 스캔 등) 텍스트 fallback 전송
+                        if not has_sent_content:
+                            final_out = output.get("final_output")
+                            if final_out:
+                                content = final_out.main_message if hasattr(final_out, "main_message") else str(final_out)
+                                if content:
+                                    has_sent_content = True
+                                    yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
+                        # 와인 카드 데이터 전송 (메뉴판 스캔 전용)
+                        wine_cards = output.get("wine_cards")
+                        if wine_cards:
+                            yield f"data: {json.dumps({'cards': wine_cards, 'actions': []}, ensure_ascii=False)}\n\n"
+                        wine_card = output.get("wine_card")
+                        if wine_card and not wine_cards:
+                            yield f"data: {json.dumps({'cards': [wine_card], 'actions': []}, ensure_ascii=False)}\n\n"
 
             yield "data: [DONE]\n\n"
 
