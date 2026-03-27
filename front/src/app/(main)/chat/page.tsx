@@ -139,7 +139,7 @@ export default function ChatPage() {
                   {latestBotMessage.recommendations.map((rec, index) => (
                     <div
                       key={rec.wine_id || index}
-                      onClick={() => rec.wine_id && router.push(`/wine/${rec.wine_id}`)}
+                      onClick={() => rec.wine_id && router.push(`/wines/${rec.wine_id}`)}
                       className="cursor-pointer rounded-[1.6rem] border border-[#F1D991] bg-[#FFF9EB] p-3.5 transition-shadow hover:shadow-md active:scale-[0.98]"
                     >
                       <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ export default function ChatPage() {
               {latestBotMessage?.card && (
                 <>
                   <Link
-                    href={`/wine/${latestBotMessage.card.wine_id}`}
+                    href={`/wines/${latestBotMessage.card.wine_id}`}
                     className="relative mt-4 block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4 pr-10 transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(155,106,66,0.12)]"
                   >
                     <div className="flex items-center gap-2.5">
