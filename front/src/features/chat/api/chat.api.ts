@@ -30,6 +30,11 @@ interface SelectedMenuContext {
   foodNames?: string[];
 }
 
+export interface MentionedFriend {
+  id: number;
+  nickname: string;
+}
+
 export const chatApi = {
   /**
    * 세션 ID를 기반으로 채팅 이력을 조회합니다.
@@ -43,7 +48,7 @@ export const chatApi = {
 
   /**
    * 실시간 소믈리에 채팅 전송 (Streaming)
-   * 
+   *
    * @param message - 사용자의 입력 메시지
    * @param sessionId - 현재 대화 세션의 ID
    * @param onChunk - 스트림 데이터 수신 시 실행될 콜백 함수
@@ -54,6 +59,7 @@ export const chatApi = {
     sessionId: string,
     onChunk: (chunk: ChatStreamChunk) => void,
     selectedMenu?: SelectedMenuContext,
+    mentionedFriends?: MentionedFriend[],
   ) => {
     const token = authToken.getAccess();
     // 프록시 설정을 위해 '/api' 접두사 사용
@@ -71,6 +77,7 @@ export const chatApi = {
         message,
         session_id: sessionId,
         ...(selectedMenu ? { selected_menu: selectedMenu } : {}),
+        mentioned_friends: mentionedFriends || [],
       }),
     });
 
@@ -92,7 +99,7 @@ export const chatApi = {
 
       // 스트림 데이터를 디코딩하여 버퍼에 추가
       buffer += decoder.decode(value, { stream: true });
-      
+
       // 개행 문자를 기준으로 데이터 조각을 분리하여 처리
       const parts = buffer.split(/\n\n|\n/);
       buffer = parts.pop() || '';
@@ -101,7 +108,7 @@ export const chatApi = {
         const lines = part.split('\n');
         for (const line of lines) {
           const trimmedLine = line.trim();
-          
+
           // SSE 이벤트 주석이나 빈 줄 무시
           if (!trimmedLine || trimmedLine.startsWith('event:')) continue;
 
@@ -109,7 +116,7 @@ export const chatApi = {
           if (!trimmedLine.startsWith('data:')) continue;
 
           const data = trimmedLine.substring(5).trim();
-          
+
           // 스트림 종료 신호 확인
           if (data === '[DONE]') {
             return;

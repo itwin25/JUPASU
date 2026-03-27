@@ -27,6 +27,11 @@ export interface SelectedMenuContext {
   foodNames?: string[];
 }
 
+export interface MentionedFriend {
+  id: number;
+  nickname: string;
+}
+
 export interface ChatMessage {
   id: string | number;
   type: 'bot' | 'user';
@@ -53,11 +58,16 @@ const getOrCreateSessionId = () => {
 
 /** 메뉴판 페어링 인트로 랜덤 생성 */
 const PAIRING_INTROS = [
-  (name: string) => `${name}님의 취향에 맞는 멋진 페어링을 찾았습니다!\n깊이 있는 풍미를 즐기시는 분께 특별히 추천드립니다.`,
-  (name: string) => `${name}님, 메뉴판에서 환상의 조합을 발견했습니다!\n오늘의 식사를 더욱 특별하게 만들어줄 페어링입니다.`,
-  (name: string) => `${name}님께 딱 맞는 페어링을 골라봤습니다!\n메뉴판 속에서 최고의 궁합을 찾았습니다.`,
-  (name: string) => `${name}님의 메뉴판을 분석해보았습니다!\n취향을 고려한 특별한 조합을 추천드립니다.`,
-  (name: string) => `${name}님, 소믈리에가 엄선한 페어링입니다!\n이 조합이라면 만족스러운 식사가 될 거예요.`,
+  (name: string) =>
+    `${name}님의 취향에 맞는 멋진 페어링을 찾았습니다!\n깊이 있는 풍미를 즐기시는 분께 특별히 추천드립니다.`,
+  (name: string) =>
+    `${name}님, 메뉴판에서 환상의 조합을 발견했습니다!\n오늘의 식사를 더욱 특별하게 만들어줄 페어링입니다.`,
+  (name: string) =>
+    `${name}님께 딱 맞는 페어링을 골라봤습니다!\n메뉴판 속에서 최고의 궁합을 찾았습니다.`,
+  (name: string) =>
+    `${name}님의 메뉴판을 분석해보았습니다!\n취향을 고려한 특별한 조합을 추천드립니다.`,
+  (name: string) =>
+    `${name}님, 소믈리에가 엄선한 페어링입니다!\n이 조합이라면 만족스러운 식사가 될 거예요.`,
 ];
 
 function getRandomPairingIntro(nickname?: string): string {
@@ -79,7 +89,9 @@ function parseMenuPairings(responseText: string): MenuRecommendation[] {
     if (!section.trim()) return;
     const foodMatch = section.match(/메뉴판\s*음식[:\s*]+([^\n]+)/);
     const wineMatch = section.match(/메뉴판\s*와인[:\s*]+([^\n]+)/);
-    const reasonsMatch = section.match(/추천\s*이유[:\s*]*([\s\S]+?)(?=\n\s*\d+\.\s*\**\s*메뉴판|$)/);
+    const reasonsMatch = section.match(
+      /추천\s*이유[:\s*]*([\s\S]+?)(?=\n\s*\d+\.\s*\**\s*메뉴판|$)/,
+    );
 
     if (foodMatch && wineMatch) {
       let reasons: string[] = [];
@@ -122,30 +134,39 @@ export const useChat = () => {
   const [activeMode, setActiveMode] = useState<'general' | 'menu'>('general');
 
   /** 히스토리 데이터를 메시지 객체로 변환 */
-  const mapHistoryToMessages = useCallback((history: ChatMessageResponse[]): ChatMessage[] => {
-    return history.map((msg) => {
-      const base: ChatMessage = {
-        id: msg.id,
-        type: msg.role === 'user' ? 'user' : 'bot',
-        text: msg.content,
-        card: msg.card ?? null,
-        actions: msg.actions ?? [],
-      };
+  const mapHistoryToMessages = useCallback(
+    (history: ChatMessageResponse[]): ChatMessage[] => {
+      return history.map((msg) => {
+        const base: ChatMessage = {
+          id: msg.id,
+          type: msg.role === 'user' ? 'user' : 'bot',
+          text: msg.content,
+          card: msg.card ?? null,
+          actions: msg.actions ?? [],
+        };
 
-      if (msg.role === 'user' && (msg.content === '메뉴판 스캔 완료' || msg.content.includes('메뉴판 음식 목록:'))) {
-        base.displayText = '🍷 메뉴판으로 추천받기';
-      }
-
-      if (msg.role !== 'user' && (msg.content.includes('메뉴판 음식') || msg.content.includes('메뉴판음식'))) {
-        const pairings = parseMenuPairings(msg.content);
-        if (pairings.length > 0) {
-          base.text = getRandomPairingIntro(nickname);
-          base.menuPairings = pairings;
+        if (
+          msg.role === 'user' &&
+          (msg.content === '메뉴판 스캔 완료' || msg.content.includes('메뉴판 음식 목록:'))
+        ) {
+          base.displayText = '🍷 메뉴판으로 추천받기';
         }
-      }
-      return base;
-    });
-  }, [nickname]);
+
+        if (
+          msg.role !== 'user' &&
+          (msg.content.includes('메뉴판 음식') || msg.content.includes('메뉴판음식'))
+        ) {
+          const pairings = parseMenuPairings(msg.content);
+          if (pairings.length > 0) {
+            base.text = getRandomPairingIntro(nickname);
+            base.menuPairings = pairings;
+          }
+        }
+        return base;
+      });
+    },
+    [nickname],
+  );
 
   useEffect(() => {
     const activeSessionId = getOrCreateSessionId();
@@ -184,14 +205,20 @@ export const useChat = () => {
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string, displayText?: string, selectedMenu?: SelectedMenuContext) => {
+    async (
+      text: string,
+      displayText?: string,
+      selectedMenu?: SelectedMenuContext,
+      mentionedFriends?: MentionedFriend[],
+    ) => {
       if (!text.trim()) return;
 
       const activeSessionId = sessionId || getOrCreateSessionId();
       if (!sessionId) setSessionId(activeSessionId);
 
       // 메뉴 모드 컨텍스트 결정
-      const effectiveSelectedMenu = selectedMenu ?? (activeMode === 'menu' ? (selectedMenuContext ?? undefined) : undefined);
+      const effectiveSelectedMenu =
+        selectedMenu ?? (activeMode === 'menu' ? (selectedMenuContext ?? undefined) : undefined);
       if (selectedMenu) {
         setSelectedMenuContext(selectedMenu);
         setActiveMode('menu');
@@ -227,7 +254,8 @@ export const useChat = () => {
             if (nextText) fullBotText += nextText;
             applyStreamChunk(botMessageId, chunk);
           },
-          effectiveSelectedMenu
+          effectiveSelectedMenu,
+          mentionedFriends,
         );
 
         // 스트리밍 완료 후 메뉴판 페어링 추가 분석
@@ -247,7 +275,10 @@ export const useChat = () => {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === botMessageId
-              ? { ...msg, text: '메시지를 전송하는 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.' }
+              ? {
+                  ...msg,
+                  text: '메시지를 전송하는 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.',
+                }
               : msg,
           ),
         );

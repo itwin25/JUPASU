@@ -3,9 +3,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Send, ChevronLeft, ChevronRight, Heart, RotateCcw, X } from 'lucide-react';
 import { useChat } from '@/features/chat/hooks/use-chat';
+import { friendApi } from '@/features/friend/api/friend.api';
+import { FriendListItem } from '@/features/friend/types/friend.types';
 import MenuScannerModal from '@/features/scan/components/MenuScannerModal';
 import { useWineScrapMutation } from '@/features/wine/hooks/useWineListQuery';
 
@@ -29,12 +31,23 @@ export default function ChatPage() {
     enterMenuMode,
     exitMenuMode,
   } = useChat();
-  
+
   const { mutateAsync: toggleScrap, isPending: isScrapPending } = useWineScrapMutation();
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [isMenuScanOpen, setIsMenuScanOpen] = useState(false);
   const [scrappedWineIds, setScrappedWineIds] = useState<number[]>([]);
+
+  // 맨션 관련 상태
+  const [friends, setFriends] = useState<FriendListItem[]>([]);
+  const [showMentionOverlay, setShowMentionOverlay] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [mentionedFriends, setMentionedFriends] = useState<{ id: number; nickname: string }[]>([]);
+
+  // 친구 목록 가져오기
+  useEffect(() => {
+    friendApi.getFriends().then(setFriends).catch(console.error);
+  }, []);
 
   const latestBotMessage = useMemo(
     () => [...messages].reverse().find((msg) => msg.type === 'bot'),
@@ -52,10 +65,53 @@ export default function ChatPage() {
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
-    sendMessage(inputValue.trim());
+
+    // 실제 메시지에 포함된 맨션 친구들만 필터링 (삭제되었을 수 있으므로)
+    const activeMentions = mentionedFriends.filter((f) => inputValue.includes(`@${f.nickname}`));
+
+    sendMessage(inputValue.trim(), undefined, undefined, activeMentions);
     setInputValue('');
+    setMentionedFriends([]);
     setShowMenu(false);
+    setShowMentionOverlay(false);
   };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    // 맨션 트리거 감지 (@ 이후 텍스트 추출)
+    const lastAtIdx = value.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const textAfterAt = value.slice(lastAtIdx + 1);
+      // 공백이 있으면 맨션 모드 종료
+      if (!textAfterAt.includes(' ')) {
+        setMentionFilter(textAfterAt);
+        setShowMentionOverlay(true);
+        return;
+      }
+    }
+    setShowMentionOverlay(false);
+  };
+
+  const handleSelectFriend = (friend: FriendListItem) => {
+    const lastAtIdx = inputValue.lastIndexOf('@');
+    if (lastAtIdx === -1) return;
+
+    const beforeAt = inputValue.slice(0, lastAtIdx);
+    const newValue = `${beforeAt}@${friend.nickname} `;
+
+    setInputValue(newValue);
+    setMentionedFriends((prev) => {
+      if (prev.find((f) => f.id === friend.friendId)) return prev;
+      return [...prev, { id: friend.friendId, nickname: friend.nickname }];
+    });
+    setShowMentionOverlay(false);
+  };
+
+  const filteredFriends = friends.filter((f) =>
+    f.nickname.toLowerCase().includes(mentionFilter.toLowerCase()),
+  );
 
   const handleToggleScrap = async () => {
     if (!currentWineId || isScrapPending) return;
@@ -368,6 +424,24 @@ export default function ChatPage() {
             )}
 
             <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
+              {showMentionOverlay && filteredFriends.length > 0 && (
+                <div className="absolute right-4 bottom-full left-4 z-[30] mb-3 max-h-48 overflow-y-auto rounded-2xl border border-white/20 bg-white/95 p-2 shadow-[0_10px_30px_rgba(0,0,0,0.15)] backdrop-blur-md">
+                  <div className="px-2 py-1.5 text-[0.7rem] font-bold text-[#9B6A42] opacity-60">
+                    함께 마시는 친구 태그
+                  </div>
+                  {filteredFriends.map((friend) => (
+                    <button
+                      key={friend.friendId}
+                      onClick={() => handleSelectFriend(friend)}
+                      className="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 transition-colors hover:bg-[#FDF6E9] active:bg-[#F9EBD3]"
+                    >
+                      <span className="text-[14px] font-bold text-[#4A3428]">
+                        @{friend.nickname}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 onClick={() => setShowMenu((prev) => !prev)}
                 className="border-primary-100 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[#B36262] transition-transform active:scale-95"
@@ -383,8 +457,17 @@ export default function ChatPage() {
                     : '소믈리에에게 물어보세요... (@김친구)'
                 }
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (showMentionOverlay && filteredFriends.length > 0) {
+                      handleSelectFriend(filteredFriends[0]);
+                      e.preventDefault();
+                    } else {
+                      handleSend();
+                    }
+                  }
+                }}
               />
 
               <button
