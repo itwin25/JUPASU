@@ -197,7 +197,7 @@ export default function MyPage() {
   const [wishlistPage, setWishlistPage] = useState(0);
   const [reviewPage, setReviewPage] = useState(0);
 
-  const { data: myReviewsPageData } = useMyReviewsQuery(reviewPage);
+  const { data: myReviewsPageData, refetch: refetchMyReviews } = useMyReviewsQuery(reviewPage);
   const { data: scrapListPageData } = useWineScrapListQuery(wishlistPage);
 
   const myReviews = myReviewsPageData?.content ?? [];
@@ -226,7 +226,6 @@ export default function MyPage() {
   const [reviewOverrides, setReviewOverrides] = useState<
     Record<number, Pick<ReviewItem, 'content' | 'rating'>>
   >({});
-  const [deletedReviewIds, setDeletedReviewIds] = useState<number[]>([]);
   const [removedWishlistWineIds, setRemovedWishlistWineIds] = useState<number[]>([]);
   const [removedFriendIds, setRemovedFriendIds] = useState<number[]>([]);
   const [removedPendingRequestIds, setRemovedPendingRequestIds] = useState<number[]>([]);
@@ -287,10 +286,7 @@ export default function MyPage() {
     [myReviews, reviewOverrides],
   );
 
-  const visibleReviews = useMemo(
-    () => mappedReviews.filter((review) => !deletedReviewIds.includes(review.id)),
-    [mappedReviews, deletedReviewIds],
-  );
+  const visibleReviews = mappedReviews;
 
   const editingReview = visibleReviews.find((review) => review.id === editingReviewId) ?? null;
 
@@ -349,12 +345,12 @@ export default function MyPage() {
     0,
     serverWishlistTotalCount - removedWishlistWineIds.length,
   );
-  const currentReviewCount = Math.max(0, serverReviewTotalCount - deletedReviewIds.length);
+  const currentReviewCount = Math.max(0, serverReviewTotalCount);
   const currentFriendCount =
     friendListData !== undefined ? visibleFriends.length : (profile?.friendCount ?? 0);
 
   const wishlistTotalPages = Math.max(1, Math.ceil(currentWishlistCount / PAGE_SIZE));
-  const reviewTotalPages = Math.max(1, Math.ceil(currentReviewCount / PAGE_SIZE));
+  const reviewTotalPages = Math.max(1, myReviewsPageData?.totalPages ?? Math.ceil(currentReviewCount / PAGE_SIZE));
 
   const currentStage = Math.min(Math.floor(currentReviewCount / 5) + 1, 3);
   const progressInStage = currentStage === 3 ? 5 : currentReviewCount % 5;
@@ -384,24 +380,23 @@ export default function MyPage() {
       reviewId: deletingReview.id,
     });
 
-    setDeletedReviewIds((prev) =>
-      prev.includes(deletingReview.id) ? prev : [...prev, deletingReview.id],
-    );
-
     setReviewOverrides((prev) => {
       const next = { ...prev };
       delete next[deletingReview.id];
       return next;
     });
 
-    const nextTotalCount = Math.max(0, currentReviewCount - 1);
-    const nextTotalPages = Math.max(1, Math.ceil(nextTotalCount / PAGE_SIZE));
+    setActiveReviewMenuId(null);
+    setDeletingReviewId(null);
 
-    if (reviewPage >= nextTotalPages && reviewPage > 0) {
-      setReviewPage(reviewPage - 1);
+    const isLastItemOnPage = visibleReviews.length === 1;
+
+    if (isLastItemOnPage && reviewPage > 0) {
+      setReviewPage((prev) => prev - 1);
+      return;
     }
 
-    setDeletingReviewId(null);
+    await refetchMyReviews();
   };
 
   const handleInviteFriend = async (userId: number, nickname: string) => {
@@ -487,7 +482,7 @@ export default function MyPage() {
   }, [tasteReport]);
 
   return (
-    <div className="bg-background min-h-screen pb-24">
+    <div className="bg-background min-h-screen pb-0">
       <header className="bg-background/85 sticky top-0 z-30 flex items-center justify-between px-5 py-5 backdrop-blur-md">
         <h1 className="text-text-main text-2xl font-black">My Page</h1>
         <button
@@ -1080,6 +1075,7 @@ export default function MyPage() {
           }));
 
           closeReviewEditModal();
+          await refetchMyReviews();
         }}
         initialData={
           editingReview

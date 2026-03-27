@@ -58,8 +58,9 @@ def vector_literal(values: list[float]) -> str:
 
 def build_food_query_text(food_text: str) -> str:
     return (
-        f"사용자가 찾는 음식은 {food_text}입니다. "
-        "이 음식과 잘 어울리는 와인을 찾기 위해 바디감, 산미, 탄닌, 당도, 향, 풍미 강도, 음식 페어링 정보를 함께 고려합니다."
+        f"음식 '{food_text}'와 잘 어울리는 와인을 찾기 위한 검색 문장입니다. "
+        "이 음식의 풍미, 질감, 바디감, 산미와의 조화, 일반적인 페어링 특성을 반영해 "
+        "가장 잘 어울리는 와인을 찾을 수 있도록 설명합니다."
     )
 
 
@@ -75,7 +76,7 @@ SELECT
     w.region,
     w.price,
     ROUND((1 - (w.embedding <=> query.embedding))::numeric, 4) AS similarity,
-    LEFT(w.embedding_text_ko, 220) AS preview,
+    LEFT(w.rich_description, 220) AS preview,
     COALESCE(array_agg(DISTINCT f.name) FILTER (WHERE f.name IS NOT NULL), '{{}}') AS food_pairings
 FROM wine w
 CROSS JOIN query
@@ -83,7 +84,7 @@ LEFT JOIN wine_food_pairing wfp ON wfp.wine_id = w.id
 LEFT JOIN food f ON f.id = wfp.food_id
 WHERE w.embedding IS NOT NULL
 GROUP BY
-    w.id, w.name_kr, w.type, w.country, w.region, w.price, w.embedding_text_ko, w.embedding, query.embedding
+    w.id, w.name_kr, w.type, w.country, w.region, w.price, w.rich_description, w.embedding, query.embedding
 ORDER BY w.embedding <=> query.embedding
 LIMIT {limit};
 """

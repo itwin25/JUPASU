@@ -1,0 +1,10 @@
+﻿{
+  "message": "불닭볶음면이랑 어울리는 와인 추천해줘",
+  "selected_wine": null,
+  "selected_menu": null,
+  "user_id": 1,
+  "session_id": "debug-session-card",
+  "history": [],
+  "stream": true,
+  "mentioned_friends": []
+}

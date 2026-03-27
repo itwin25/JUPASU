@@ -23,6 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Slf4j
@@ -44,7 +46,7 @@ public class WineDataInitService {
     @Value("${TARGET_IMAGE_DIR:/app/uploads/images/wines}")
     private String targetImageDir;
 
-    @Value("${DATA_FILE_PATH:/app/data/vivino_ultra_results_kr_food.json}")
+    @Value("${DATA_FILE_PATH:/app/data/vivino_ultra_results_kr_food_dedup.json}")
     private String dataFilePath;
 
     @CacheEvict(value = "wines", allEntries = true, cacheManager = "localCacheManager")
@@ -100,12 +102,6 @@ public class WineDataInitService {
                 int star4 = parseInt(distribution.get("4"));
                 int star5 = parseInt(distribution.get("5"));
 
-                int distributionSum = star1 + star2 + star3 + star4 + star5;
-                if (externalRatingCount > 0 && distributionSum > 0 && distributionSum != externalRatingCount) {
-                    log.warn("⚠️ rating count mismatch - wine: {}, count: {}, distributionSum: {}",
-                            raw.wineName(), externalRatingCount, distributionSum);
-                }
-
                 Object[] sweetnessInfo = WineDataParser.parseTaste(taste.get("sweetness"));
                 Object[] acidityInfo = WineDataParser.parseTaste(taste.get("acidity"));
                 Object[] bodyInfo = WineDataParser.parseTaste(taste.get("boldness"));
@@ -155,6 +151,10 @@ public class WineDataInitService {
                                 .tannin((Float) tanninInfo[0])
                                 .isRealTannin((Boolean) tanninInfo[1])
                                 .build())
+                        .richDescription(raw.richDescription())
+                        .embedding(parseVector(raw.embedding()))
+                        .embeddingModel(raw.embeddingModel())
+                        .embeddingGeneratedAt(parseOffsetDateTime(raw.embeddingGeneratedAt()))
                         .build();
 
                 wine.initializeExternalRatings(
@@ -287,5 +287,29 @@ public class WineDataInitService {
     private Map<String, Object> parseRatingsMap(VivinoRawData raw) {
         if (raw.ratings() == null) return Map.of();
         return (Map<String, Object>) raw.ratings();
+    }
+
+    private OffsetDateTime parseOffsetDateTime(String value) {
+        if (!StringUtils.hasText(value)) return null;
+        try {
+            return OffsetDateTime.parse(value);
+        } catch (Exception e) {
+            log.warn("⚠️ 날짜 파싱 실패: {}", value);
+            return null;
+        }
+    }
+
+    private float[] parseVector(List<Double> values) {
+        if (values == null || values.isEmpty()) return null;
+        try {
+            float[] vector = new float[values.size()];
+            for (int i = 0; i < values.size(); i++) {
+                vector[i] = values.get(i).floatValue();
+            }
+            return vector;
+        } catch (Exception e) {
+            log.warn("⚠️ 벡터 변환 실패: {}", e.getMessage());
+            return null;
+        }
     }
 }

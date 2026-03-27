@@ -10,7 +10,8 @@ export const useOCR = () => {
 
   const executeOCR = useCallback(
     async (
-      source: File | HTMLCanvasElement,
+      source: File | File[] | HTMLCanvasElement | HTMLCanvasElement[],
+      task: 'LABEL_SCAN' | 'MENU_SCAN' = 'LABEL_SCAN'
     ): Promise<{
       success: boolean;
       results: OCRResult[];
@@ -20,23 +21,26 @@ export const useOCR = () => {
       setIsLoading(true);
       setError(null);
       try {
-        console.group('📡 [OCR Analysis] 시작');
-        console.log('데이터 준비 중...');
-
+        console.group(`📡 [OCR Analysis] ${task} 시작`);
+        
         const formData = new FormData();
+        formData.append('task', task);
 
-        if (source instanceof File) {
-          formData.append('image', source);
-          console.log('입력 소스: File (이미지 업로드)');
-        } else {
-          const blob = await new Promise<Blob | null>((resolve) =>
-            source.toBlob(resolve, 'image/jpeg', 0.9),
-          );
-          if (!blob) throw new Error('이미지 변환 실패');
-          formData.append('image', blob, 'scan.jpg');
-          console.log('입력 소스: Canvas (카메라 캡처)');
+        const sources = Array.isArray(source) ? source : [source];
+
+        for (const s of sources) {
+          if (s instanceof File) {
+            formData.append('image', s);
+          } else if (s instanceof HTMLCanvasElement) {
+            const blob = await new Promise<Blob | null>((resolve) =>
+              s.toBlob(resolve, 'image/jpeg', 0.9),
+            );
+            if (!blob) throw new Error('이미지 변환 실패');
+            formData.append('image', blob, 'scan.jpg');
+          }
         }
 
+        console.log(`입력 소스 처리 완료: ${sources.length}개 이미지`);
         console.log('서버 액션 호출 중...');
         const result = await executeOcrAction(formData);
 
@@ -45,14 +49,19 @@ export const useOCR = () => {
         }
 
         console.log('✅ 분석 결과 수신 성공');
+
+        if (result.results && result.results.length > 0) {
+          console.log('📝 [Raw OCR Text Extraction]');
+          console.table(result.results.map(r => ({ text: r.text, score: r.score.toFixed(2) })));
+        }
         
         if (result.provider) {
           console.log(`🤖 [AI Provider]: ${result.provider}`);
         }
 
         if (result.refined) {
-          console.log('✨ [LLM Refined Data]');
-          console.table(result.refined);
+          console.log('✨ [AI Refined Recommendation Data]');
+          console.log(JSON.stringify(result.refined, null, 2));
         }
 
         console.groupEnd();

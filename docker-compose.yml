@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,8 +59,8 @@ services:
       TARGET_IMAGE_DIR: /app/uploads/images/wines
       DATA_FILE_PATH: /app/data/vivino_ultra_results_kr_food.json
     volumes:
-     - ./data:/app/data
-     - ./uploads:/app/uploads
+      - /home/ubuntu/data:/app/data:ro
+      - ./uploads:/app/uploads
     ports:
       - "8080:8080"
     depends_on:
@@ -71,7 +71,7 @@ services:
       # ai:
       #   condition: service_started
 
-  # Frontend: Next.js (React 19)
+      # Frontend: Next.js (React 19)
   frontend:
     build:
       context: ./front

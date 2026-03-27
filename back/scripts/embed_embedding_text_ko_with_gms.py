@@ -52,7 +52,7 @@ def main() -> None:
     load_dotenv_file(ROOT / ".env")
 
     parser = argparse.ArgumentParser(
-        description="Embed wine.embedding_text_ko with GMS and store vectors in PostgreSQL."
+        description="Embed wine.rich_description with GMS and store vectors in PostgreSQL."
     )
     parser.add_argument("--db-host", default="127.0.0.1")
     parser.add_argument("--db-port", type=int, default=15432)
@@ -68,10 +68,10 @@ def main() -> None:
         raise SystemExit("GMS_API_KEY environment variable is required.")
 
     query = """
-        SELECT id, embedding_text_ko
+        SELECT id, rich_description
         FROM wine
-        WHERE embedding_text_ko IS NOT NULL
-          AND embedding_text_ko <> ''
+        WHERE rich_description IS NOT NULL
+          AND rich_description <> ''
           AND embedding IS NULL
         ORDER BY id
     """

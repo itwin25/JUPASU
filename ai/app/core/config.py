@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Remote GPU Server (local 사용 시)
     LLM_API_BASE_URL: str = "http://localhost:8000/v1"
     LLM_MODEL_NAME: str = "selected-model-name-later"
-    BACKEND_API_BASE_URL: str = "http://localhost:8080"
+    BACKEND_API_BASE_URL: str = "http://backend:8080"
     BACKEND_INTERNAL_API_KEY: str | None = None
     FOOD_RECOMMENDATION_EMBEDDING_MODEL: str = "text-embedding-3-small"
     FOOD_RECOMMENDATION_EMBEDDING_URL: str = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/embeddings"
