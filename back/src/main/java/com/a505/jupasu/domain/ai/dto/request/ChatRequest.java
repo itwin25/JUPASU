@@ -2,6 +2,7 @@ package com.a505.jupasu.domain.ai.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
+import java.util.List;
 import java.util.Map;
 
 @Getter
@@ -19,4 +20,7 @@ public class ChatRequest {
 
     @JsonProperty("selected_menu")
     private Map<String, Object> selectedMenu;
+
+    @JsonProperty("mentioned_friends")
+    private List<Map<String, Object>> mentionedFriends;
 }

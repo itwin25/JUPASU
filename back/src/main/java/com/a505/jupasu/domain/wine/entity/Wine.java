@@ -19,6 +19,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Getter
@@ -78,6 +80,7 @@ public class Wine extends BaseEntity {
     @org.hibernate.annotations.ColumnTransformer(write = "?::vector")
     @jakarta.persistence.Convert(converter = com.a505.jupasu.domain.wine.util.VectorConverter.class)
     @Column(columnDefinition = "vector(1536)")
+    @JdbcTypeCode(SqlTypes.OTHER)
     private float[] embedding;
 
     public void initializeExternalRatings(
