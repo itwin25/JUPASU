@@ -1,6 +1,5 @@
 import httpx
 from app.services.rag.embedding_service import fetch_embedding
-from app.db.repositories.chat_wine_repository import find_candidate_wines_by_embedding
 
 # 쿼리 텍스트에서 와인 타입 키워드를 감지
 # DB 타입 값(Enum)과 매핑: RED, WHITE, ROSE, SPARKLING, DESSERT, FORTIFIED
@@ -26,54 +25,52 @@ def detect_wine_type(query: str) -> str | None:
 
 
 # TODO: 실제 Java 백엔드 추천 API 주소로 변경
-BACKEND_RECOMMEND_API_URL = "http://localhost:8080/api/wines/recommend/rag"
+BACKEND_RECOMMEND_API_URL = "http://backend:8080/api/wines/recommend/rag"
 
 def perform_hybrid_recommendation(user_id: str, query: str, friend_ids: list[str] = None) -> list[dict]:
     """
-    1. 유저 질문을 임베딩하여 와인 30개 후보 추출 (정성/맥락 검색)
-    2. 추출된 와인 ID 리스트를 Java 백엔드로 전송해 베이지안 재정렬 요청 (정량 평가)
+    1. 유저 질문을 임베딩함
+    2. 생성된 벡터와 필터 정보를 Java 백엔드로 전송하여 pgvector 검색 및 Re-ranking 요청
     3. 최종 Top 와인 반환
     """
-    # 1. 텍스트 임베딩
+    # 1. 텍스트 임베딩 생성 (AI 서버의 고유 역할)
     print("⏳ [1단계] GMS 임베딩 API 통신 요청 중...")
     embedding = fetch_embedding(text=query)
     print("✅ [1단계] 임베딩 완료!")
     
-    # 2. pgvector 검색 (타입 키워드 감지 후 필터 적용)
-    print("⏳ [2단계] PostgreSQL DB pgvector 검색 연산 중...")
+    # 2. 와인 타입 감지
     detected_type = detect_wine_type(query)
-    if detected_type:
-        print(f"  🍷 와인 타입 감지: {detected_type} — 해당 타입으로만 검색합니다.")
-    candidate_wines = find_candidate_wines_by_embedding(
-        query_embedding=embedding, limit=30, wine_type=detected_type
-    )
-    candidate_ids = [wine["wine_id"] for wine in candidate_wines]
-    print(f"✅ [2단계] DB 검색 완료! (찾은 와인 개수: {len(candidate_wines)})")
     
-    if not candidate_ids:
-        return []
-    # 3. Java 백엔드 Re-ranking 호출
-    print("⏳ [3단계] Java 백엔드 Re-ranking 통신 요청 중...")
+    # 3. Java 백엔드 호출 (벡터 검색 및 Re-ranking 위임)
+    print("⏳ [2단계] Java 백엔드(pgvector 검색 + Re-ranking) 통신 요청 중...")
+    
+    # 벡터를 JSON 직렬화 가능한 리스트나 문자열로 변환
+    # Spring의 pgvector 쿼리 형식이 "[0.1, 0.2, ...]" 형태를 기대하므로 리스트 그대로 전송
     payload = {
         "userId": user_id,
         "friendIds": friend_ids or [],
-        "candidateWineIds": candidate_ids
+        "queryVector": str(embedding), # 리스트를 "[...]" 형태의 문자열로 변환
+        "wineType": detected_type
     }
     
     try:
         with httpx.Client() as client:
-            response = client.post(BACKEND_RECOMMEND_API_URL, json=payload, timeout=10.0)
+            response = client.post(BACKEND_RECOMMEND_API_URL, json=payload, timeout=15.0)
             response.raise_for_status()
-            print("✅ [3단계] Java 백엔드 응답 완료!")
-            backend_result = response.json().get("data", {}).get("general", [])
+            print("✅ [2단계] Java 백엔드 응답 완료!")
             
-            if backend_result:
-                return backend_result
+            # WineQuickRecommendResponse.SituationResult 구조에서 와인 목록 추출
+            # 백엔드 ApiResponse.success 데이터 구조에 맞게 파싱
+            data = response.json().get("data", {})
             
-            # 백엔드가 빈 리스트를 반환한 경우 (취향 데이터 부족 등) pgvector 결과로 폴백
-            print("⚠️ 백엔드 결과가 비어있어 pgvector 유사도 상위 결과로 대체합니다.")
-            return candidate_wines[:5]
+            # SituationResult 리스트에서 와인들 추출 (현재는 첫 번째 결과만 사용하거나 전체 병합)
+            situations = data.get("situations", [])
+            all_wines = []
+            for sit in situations:
+                all_wines.extend(sit.get("wines", []))
+                
+            return all_wines
             
     except Exception as e:
         print(f"⚠️ 백엔드 통신 에러 발생: {e}")
-        return candidate_wines[:5]
+        return []

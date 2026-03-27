@@ -14,9 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -38,27 +36,20 @@ public class AiService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * [채팅] 실시간 소믈리에 대화 (멀티턴 지원 및 스트리밍 보장)
-     */
     public Flux<String> chat(ChatRequest request, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         String sessionId = request.getSessionId();
         if (sessionId == null || sessionId.trim().isEmpty()) {
-            sessionId = "session-" + user.getId(); // 기본 세션 ID 생성
+            sessionId = "session-" + user.getId();
         }
 
-        // 1. 현재 사용자 메시지를 먼저 DB에 저장 (맥락에 포함시키기 위함)
         if (request.getMessage() != null && !request.getMessage().trim().isEmpty()) {
             chatMessageRepository.save(new ChatMessage(sessionId, user, "user", request.getMessage()));
         }
 
-        // 2. 현재 메시지를 포함하여 DB에서 최근 대화 내역 조회
         List<ChatMessage> historyEntities = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-        
-        // 3. AI 서버 규격에 맞게 히스토리 변환
         List<Map<String, String>> history = historyEntities.stream()
                 .map(msg -> {
                     Map<String, String> map = new HashMap<>();
@@ -68,19 +59,20 @@ public class AiService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. AI 서버 호출 페이로드 구성
         Map<String, Object> payload = new HashMap<>();
         payload.put("message", request.getMessage());
-        payload.put("history", history); // 이제 현재 메시지가 포함된 이력이 전달됨
-        payload.put("session_id", sessionId); // 세션 ID 추가
+        payload.put("history", history);
+        payload.put("session_id", sessionId);
         payload.put("selected_wine", request.getSelectedWine() != null ? request.getSelectedWine() : null);
         payload.put("selected_menu", request.getSelectedMenu() != null ? request.getSelectedMenu() : null);
         payload.put("user_id", user.getId());
         payload.put("stream", true);
-        payload.put("mentioned_friends", List.of());
+        payload.put("mentioned_friends", request.getMentionedFriends() != null ? request.getMentionedFriends() : List.of());
 
         StringBuilder fullTextForStorage = new StringBuilder();
-        final String finalSessionId = sessionId; // 람다용 상수
+        StringBuilder cardJsonForStorage = new StringBuilder();
+        StringBuilder actionsJsonForStorage = new StringBuilder();
+        String finalSessionId = sessionId;
 
         return webClient.post()
                 .uri("/v1/chat")
@@ -93,45 +85,60 @@ public class AiService {
                     if (rawChunk == null || rawChunk.trim().isEmpty() || rawChunk.contains("[DONE]")) {
                         return Flux.empty();
                     }
-                    
-                    try {
-                        return Flux.fromArray(rawChunk.split("\n"))
-                                .map(String::trim)
-                                .filter(line -> !line.isEmpty() && !line.startsWith("event:"))
-                                .map(line -> {
-                                    try {
-                                        String jsonData = line;
-                                        if (line.startsWith("data:")) {
-                                            jsonData = line.substring(5).trim();
-                                        }
-                                        
-                                        if (jsonData.equals("[DONE]")) return line;
 
-                                        JsonNode root = objectMapper.readTree(jsonData);
-                                        String content = root.path("content").asText("");
-                                        if (!content.isEmpty()) {
-                                            fullTextForStorage.append(content);
-                                        }
-                                    } catch (Exception e) {
-                                        log.warn("📦 [Parsing Error] Line: {}, Error: {}", line, e.getMessage());
+                    return Flux.fromArray(rawChunk.split("\n"))
+                            .map(String::trim)
+                            .filter(line -> !line.isEmpty() && !line.startsWith("event:"))
+                            .map(line -> {
+                                try {
+                                    String jsonData = line;
+                                    if (line.startsWith("data:")) {
+                                        jsonData = line.substring(5).trim();
                                     }
-                                    return line;
-                                });
-                    } catch (Exception e) {
-                        return Flux.empty();
-                    }
+
+                                    if ("[DONE]".equals(jsonData)) {
+                                        return line;
+                                    }
+
+                                    JsonNode root = objectMapper.readTree(jsonData);
+                                    String content = root.path("content").asText("");
+                                    if (!content.isEmpty()) {
+                                        fullTextForStorage.append(content);
+                                    }
+
+                                    JsonNode cardNode = root.get("card");
+                                    if (cardNode != null && !cardNode.isNull()) {
+                                        cardJsonForStorage.setLength(0);
+                                        cardJsonForStorage.append(cardNode.toString());
+                                    }
+
+                                    JsonNode actionsNode = root.get("actions");
+                                    if (actionsNode != null && actionsNode.isArray() && actionsNode.size() > 0) {
+                                        actionsJsonForStorage.setLength(0);
+                                        actionsJsonForStorage.append(actionsNode.toString());
+                                    }
+                                } catch (Exception exception) {
+                                    log.warn("AI stream parsing failed. line={}, error={}", line, exception.getMessage());
+                                }
+                                return line;
+                            });
                 })
                 .doOnComplete(() -> {
                     if (fullTextForStorage.length() > 0) {
-                        // 5. AI 응답 저장 시 sessionId 포함
-                        chatMessageRepository.save(new ChatMessage(finalSessionId, user, "assistant", fullTextForStorage.toString()));
+                        chatMessageRepository.save(
+                                ChatMessage.builder()
+                                        .sessionId(finalSessionId)
+                                        .user(user)
+                                        .role("assistant")
+                                        .content(fullTextForStorage.toString())
+                                        .cardJson(cardJsonForStorage.length() > 0 ? cardJsonForStorage.toString() : null)
+                                        .actionsJson(actionsJsonForStorage.length() > 0 ? actionsJsonForStorage.toString() : null)
+                                        .build()
+                        );
                     }
                 });
     }
 
-    /**
-     * [정제] OCR 텍스트 정제 통합
-     */
     public RefineResponse refine(RefineRequest request, String email) {
         if (request.getTextContent() == null || request.getTextContent().trim().isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
@@ -150,22 +157,33 @@ public class AiService {
                 .bodyToMono(RefineResponse.class)
                 .block();
 
-        log.info("🤖 [AI Server Response] Status: {}, Data: {}", 
+        log.info(
+                "AI refine response status={}, data={}",
                 response != null ? response.getStatus() : "null",
-                response != null ? response.getData() : "null");
+                response != null ? response.getData() : "null"
+        );
 
         return response;
     }
 
-    /**
-     * 채팅 내역 조회
-     */
     @Transactional(readOnly = true)
     public List<ChatResponse> getChatHistory(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return chatMessageRepository.findByUserOrderByCreatedAtAsc(user)
                 .stream()
+                .map(ChatResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatResponse> getChatHistoryBySessionId(String email, String sessionId) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
+                .stream()
+                .filter(message -> message.getUser().getId().equals(user.getId()))
                 .map(ChatResponse::from)
                 .collect(Collectors.toList());
     }

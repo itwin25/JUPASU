@@ -126,7 +126,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-24 relative">
+    <div className="min-h-screen bg-background flex flex-col relative">
       <header className="px-6 pt-10 pb-4 space-y-4">
         <div>
           <h1 className="text-2xl font-black text-text-main italic tracking-tight uppercase">EXPLORE</h1>

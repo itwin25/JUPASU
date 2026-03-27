@@ -13,15 +13,20 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import java.time.OffsetDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Getter
 @Builder
+@DynamicUpdate
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Wine extends BaseEntity {
@@ -68,7 +73,17 @@ public class Wine extends BaseEntity {
     private String imageUrl;
 
     @Column(columnDefinition = "TEXT")
-    private String embeddingTextKo;
+    private String richDescription;
+
+    private String embeddingModel;
+
+    private OffsetDateTime embeddingGeneratedAt;
+
+    @org.hibernate.annotations.ColumnTransformer(write = "?::vector")
+    @jakarta.persistence.Convert(converter = com.a505.jupasu.domain.wine.util.VectorConverter.class)
+    @Column(columnDefinition = "vector(1536)")
+    @JdbcTypeCode(SqlTypes.OTHER)
+    private float[] embedding;
 
     public void initializeExternalRatings(
             double externalAverageRating,
