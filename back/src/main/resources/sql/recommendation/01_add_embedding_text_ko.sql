@@ -1,5 +1,5 @@
 ALTER TABLE wine
-ADD COLUMN IF NOT EXISTS embedding_text_ko TEXT;
+ADD COLUMN IF NOT EXISTS rich_description TEXT;
 
-COMMENT ON COLUMN wine.embedding_text_ko IS
-'음식 기반 와인 추천 검색을 위한 한국어 임베딩 원문';
+COMMENT ON COLUMN wine.rich_description IS
+'음식 기반 추천과 임베딩에 사용하는 와인 설명 텍스트';

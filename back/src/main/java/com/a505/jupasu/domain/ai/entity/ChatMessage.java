@@ -44,6 +44,12 @@ public class ChatMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "card_json", columnDefinition = "TEXT")
+    private String cardJson;
+
+    @Column(name = "actions_json", columnDefinition = "TEXT")
+    private String actionsJson;
+
     // 메시지 생성 시각
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -54,11 +60,24 @@ public class ChatMessage {
         this.createdAt = LocalDateTime.now();
     }
 
-    @Builder
     public ChatMessage(String sessionId, User user, String role, String content) {
+        this(sessionId, user, role, content, null, null);
+    }
+
+    @Builder
+    public ChatMessage(
+            String sessionId,
+            User user,
+            String role,
+            String content,
+            String cardJson,
+            String actionsJson
+    ) {
         this.sessionId = sessionId;
         this.user = user;
         this.role = role;
         this.content = content;
+        this.cardJson = cardJson;
+        this.actionsJson = actionsJson;
     }
 }

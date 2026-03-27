@@ -1,12 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Send, ChevronLeft, Heart, RotateCcw, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Send, ChevronLeft, ChevronRight, Heart, RotateCcw, X } from 'lucide-react';
 import { useChat } from '@/features/chat/hooks/use-chat';
 import MenuScannerModal from '@/features/scan/components/MenuScannerModal';
+import { useWineScrapMutation } from '@/features/wine/hooks/useWineListQuery';
+
+const formatPrice = (price?: number | null) => {
+  if (!price || price <= 0) {
+    return '가격 정보 확인 필요';
+  }
+
+  return `₩${price.toLocaleString('ko-KR')}`;
+};
 
 export default function ChatPage() {
   const router = useRouter();
@@ -20,26 +29,47 @@ export default function ChatPage() {
     enterMenuMode,
     exitMenuMode,
   } = useChat();
+  
+  const { mutateAsync: toggleScrap, isPending: isScrapPending } = useWineScrapMutation();
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [isMenuScanOpen, setIsMenuScanOpen] = useState(false);
+  const [scrappedWineIds, setScrappedWineIds] = useState<number[]>([]);
 
-  // 마지막 봇 메시지 찾기 (스트리밍 중인 메시지 포함)
-  const latestBotMessage = useMemo(() => {
-    return [...messages].reverse().find((msg) => msg.type === 'bot');
-  }, [messages]);
+  const latestBotMessage = useMemo(
+    () => [...messages].reverse().find((msg) => msg.type === 'bot'),
+    [messages],
+  );
 
-  // 최근 사용자 메시지 3개 (UI용)
-  const userMessages = useMemo(() => {
-    return messages.filter((msg) => msg.type === 'user').slice(-3);
-  }, [messages]);
+  const userMessages = useMemo(
+    () => messages.filter((msg) => msg.type === 'user').slice(-3),
+    [messages],
+  );
+
+  const currentWineId = latestBotMessage?.card?.wine_id;
+  const isScrapped =
+    typeof currentWineId === 'number' ? scrappedWineIds.includes(currentWineId) : false;
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
-
     sendMessage(inputValue.trim());
     setInputValue('');
     setShowMenu(false);
+  };
+
+  const handleToggleScrap = async () => {
+    if (!currentWineId || isScrapPending) return;
+
+    try {
+      await toggleScrap(currentWineId);
+      setScrappedWineIds((prev) =>
+        prev.includes(currentWineId)
+          ? prev.filter((wineId) => wineId !== currentWineId)
+          : [...prev, currentWineId],
+      );
+    } catch (error) {
+      console.error('Failed to toggle wishlist:', error);
+    }
   };
 
   const handleMenuScanComplete = (data: { wineNames?: string[]; foodNames?: string[] }) => {
@@ -77,14 +107,14 @@ export default function ChatPage() {
             onClick={startNewChat}
             className="flex items-center gap-1.5 rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
           >
-            <RotateCcw size={16} />새 채팅
+            <RotateCcw size={16} />새 대화
           </button>
 
           <Link
             href="/chat/history"
             className="rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
           >
-            기록
+            전체 대화 보기
           </Link>
         </header>
 
@@ -98,10 +128,12 @@ export default function ChatPage() {
 
               <p className="text-text-main text-[0.94rem] leading-6 font-medium whitespace-pre-line">
                 {latestBotMessage?.text ||
-                  (isLoading ? '소믈리에가 생각 중입니다...' : '어떤 와인을 추천해드릴까요?')}
+                  (isLoading
+                    ? '소믈리에가 답변을 준비하고 있어요...'
+                    : '소믈리에에게 물어보세요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.')}
               </p>
 
-              {/* 추천 와인 카드 리스트 */}
+              {/* 추천 와인 카드 리스트 (기존 recommendations 형태) */}
               {latestBotMessage?.recommendations && latestBotMessage.recommendations.length > 0 && (
                 <div className="mt-4 space-y-3">
                   {latestBotMessage.recommendations.map((rec, index) => (
@@ -147,33 +179,73 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {latestBotMessage?.options && latestBotMessage.options.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {latestBotMessage.options.map((option) => (
-                    <button
-                      key={option}
-                      className="text-text-main/60 rounded-full bg-[#F7F4EF] px-4 py-2 text-[0.74rem] font-bold transition-colors hover:bg-[#F0EAE0]"
-                      onClick={() => setInputValue(option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* 추천 와인 카드 (새로운 card 형태) */}
+              {latestBotMessage?.card && (
+                <>
+                  <Link
+                    href={`/wine/${latestBotMessage.card.wine_id}`}
+                    className="relative mt-4 block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4 pr-10 transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(155,106,66,0.12)]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="ml-[-0.15rem] flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] bg-white p-2 shadow-sm">
+                        <Image
+                          src={latestBotMessage.card.image_url || '/default_wine.png'}
+                          alt={latestBotMessage.card.name_kr}
+                          width={64}
+                          height={64}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
 
-              {/* 액션 버튼들 */}
-              {latestBotMessage?.actions && latestBotMessage.actions.length > 0 && (
-                <div className="mt-3 flex flex-col gap-2">
-                  {latestBotMessage.actions.map((action, idx) => (
-                    <button
-                      key={idx}
-                      className="text-text-main/52 flex items-center gap-1.5 text-[0.74rem] font-semibold"
-                    >
-                      <Heart size={13} className="fill-[#D16B74] text-[#D16B74]" />
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="text-text-main truncate text-[1rem] font-black">
+                              {latestBotMessage.card.name_kr}
+                            </h3>
+                            <p className="text-text-main/55 text-[0.72rem] font-semibold">
+                              {latestBotMessage.card.subtitle || '추천 와인'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-start gap-2">
+                            {typeof latestBotMessage.card.match_percent === 'number' && (
+                              <span className="relative top-[-0.15rem] shrink-0 rounded-full bg-[#C78354] px-3 py-1.5 text-[0.72rem] font-black text-white">
+                                {latestBotMessage.card.match_percent}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <p
+                          className={`mt-2 font-black text-[#B36262] ${
+                            !latestBotMessage.card.price || latestBotMessage.card.price <= 0
+                              ? 'text-[0.84rem]'
+                              : 'text-[1rem]'
+                          }`}
+                        >
+                          {formatPrice(latestBotMessage.card.price)}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight
+                      size={18}
+                      className="absolute top-1/2 right-4 -translate-y-1/2 text-[#9B6A42]"
+                    />
+                  </Link>
+
+                  <button
+                    onClick={handleToggleScrap}
+                    disabled={isScrapPending}
+                    className="text-text-main/70 mt-4 inline-flex items-center gap-2 text-[0.86rem] font-semibold disabled:opacity-50"
+                  >
+                    <Heart
+                      size={18}
+                      className={isScrapped ? 'fill-[#D16B74] text-[#D16B74]' : 'text-[#D16B74]'}
+                    />
+                    위시리스트에 추가하기
+                  </button>
+                </>
               )}
 
               {/* 메뉴판 페어링 카드 */}
@@ -184,7 +256,6 @@ export default function ChatPage() {
                       key={pairing.pairingNumber}
                       className="relative space-y-3 rounded-2xl border-2 border-[#E8D5B7] bg-gradient-to-br from-[#FFF9EB] to-[#FFE8CC] p-4"
                     >
-                      {/* 음식-와인 헤더 */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <div className="text-text-main/60 mb-1 text-[0.75rem] font-semibold">
@@ -204,7 +275,6 @@ export default function ChatPage() {
                         </div>
                       </div>
 
-                      {/* 추천 이유 */}
                       <div className="border-t border-[#E8D5B7]/40 pt-2">
                         <div className="text-text-main/60 mb-2 text-[0.75rem] font-semibold">
                           💭 추천 이유

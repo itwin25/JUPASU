@@ -46,8 +46,13 @@ public class AiController {
      */
     @GetMapping("/chat/history")
     public ApiResponse<List<ChatResponse>> getChatHistory(
-            @AuthenticationPrincipal UserDetails userDetails
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "session_id", required = false) String sessionId
     ) {
+        if (sessionId != null && !sessionId.isBlank()) {
+            return ApiResponse.success(aiService.getChatHistoryBySessionId(userDetails.getUsername(), sessionId));
+        }
+
         return ApiResponse.success(aiService.getChatHistory(userDetails.getUsername()));
     }
 

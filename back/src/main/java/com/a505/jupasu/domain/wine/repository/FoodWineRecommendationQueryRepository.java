@@ -30,7 +30,7 @@ public class FoodWineRecommendationQueryRepository {
                     w.acidity,
                     w.tannin,
                     w.sweetness,
-                    w.embedding_text_ko,
+                    w.rich_description,
                     COALESCE(string_agg(DISTINCT f.name, ','), '') AS food_pairings,
                     1 - (w.embedding <=> CAST(:queryVector AS vector)) AS food_similarity
                 FROM wine w
@@ -40,7 +40,7 @@ public class FoodWineRecommendationQueryRepository {
                 GROUP BY
                     w.id, w.name_kr, w.name_en, w.type, w.country, w.region,
                     w.price, w.image_url, w.body, w.acidity, w.tannin, w.sweetness,
-                    w.embedding_text_ko, w.embedding
+                    w.rich_description, w.embedding
                 ORDER BY w.embedding <=> CAST(:queryVector AS vector)
                 LIMIT :limit
                 """);
@@ -72,7 +72,7 @@ public class FoodWineRecommendationQueryRepository {
                 .acidity(asDouble(row[9]))
                 .tannin(asDouble(row[10]))
                 .sweetness(asDouble(row[11]))
-                .embeddingTextKo(asNullableString(row[12]))
+                .richDescription(asNullableString(row[12]))
                 .foodPairings(parseFoodPairings(foodPairingsText))
                 .foodSimilarity(asDouble(row[14]))
                 .build();
