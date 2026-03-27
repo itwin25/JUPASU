@@ -1,5 +1,6 @@
 package com.a505.jupasu.global.config;
 
+import jakarta.servlet.DispatcherType;
 import com.a505.jupasu.global.security.jwt.JwtAuthenticationFilter;
 import java.util.Arrays;
 import java.util.List;
@@ -45,6 +46,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll() // SSE 완료 처리를 위해 ASYNC 허용
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/wines/recommendations/food/internal",
