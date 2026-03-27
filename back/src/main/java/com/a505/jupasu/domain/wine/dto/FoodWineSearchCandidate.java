@@ -18,7 +18,7 @@ public record FoodWineSearchCandidate(
         Double acidity,
         Double tannin,
         Double sweetness,
-        String embeddingTextKo,
+        String richDescription,
         List<String> foodPairings,
         Double foodSimilarity
 ) {
