@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,16 +10,10 @@ import httpx
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MINI_PROJECT_SRC = ROOT / "wine-pgvector-mini" / "src"
-DEFAULT_INPUT_JSON = Path("C:/Users/SSAFY/Downloads/vivino_ultra_results_kr_food.json")
+DEFAULT_INPUT_JSON = ROOT / "data" / "vivino_ultra_results_kr_food_dedup.json"
 DEFAULT_OUTPUT_SQL = ROOT / "back" / "src" / "main" / "resources" / "sql" / "recommendation" / "04_backfill_embedding_vectors.sql"
 DEFAULT_MODEL = "text-embedding-3-small"
 DEFAULT_BASE_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/embeddings"
-
-if str(MINI_PROJECT_SRC) not in sys.path:
-    sys.path.insert(0, str(MINI_PROJECT_SRC))
-
-from wine_pgvector_mini.transformer import build_embedding_text_ko  # noqa: E402
 
 
 def load_dotenv_file(path: Path) -> None:
@@ -132,7 +125,9 @@ def main() -> None:
 
     with httpx.Client() as client:
         for index, wine in enumerate(wines, start=1):
-            text = build_embedding_text_ko(wine)
+            text = (wine.get("rich_description") or "").strip()
+            if not text:
+                continue
             embedding = fetch_embedding(client, api_key, args.model, text)
             vector = vector_literal(embedding)
             statement = build_update_statement(wine, args.model, generated_at, vector)

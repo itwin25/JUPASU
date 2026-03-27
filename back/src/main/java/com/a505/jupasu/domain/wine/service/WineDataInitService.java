@@ -46,7 +46,7 @@ public class WineDataInitService {
     @Value("${TARGET_IMAGE_DIR:/app/uploads/images/wines}")
     private String targetImageDir;
 
-    @Value("${DATA_FILE_PATH:/app/data/vivino_ultra_results_kr_food.json}")
+    @Value("${DATA_FILE_PATH:/app/data/vivino_ultra_results_kr_food_dedup.json}")
     private String dataFilePath;
 
     @CacheEvict(value = "wines", allEntries = true, cacheManager = "localCacheManager")

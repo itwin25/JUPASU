@@ -3,18 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MINI_PROJECT_SRC = ROOT / "wine-pgvector-mini" / "src"
-DEFAULT_INPUT_JSON = Path("C:/Users/SSAFY/Downloads/vivino_ultra_results_kr_food.json")
-DEFAULT_OUTPUT_SQL = ROOT / "back" / "src" / "main" / "resources" / "sql" / "recommendation" / "02_backfill_embedding_text_ko.sql"
-
-if str(MINI_PROJECT_SRC) not in sys.path:
-    sys.path.insert(0, str(MINI_PROJECT_SRC))
-
-from wine_pgvector_mini.transformer import build_embedding_text_ko  # noqa: E402
+DEFAULT_INPUT_JSON = ROOT / "data" / "vivino_ultra_results_kr_food_dedup.json"
+DEFAULT_OUTPUT_SQL = ROOT / "back" / "src" / "main" / "resources" / "sql" / "recommendation" / "02_backfill_rich_description.sql"
 
 
 def sql_escape(value: str) -> str:
@@ -40,18 +33,20 @@ def build_update_statement(wine: dict) -> str | None:
     if not where_clause:
         return None
 
-    embedding_text_ko = build_embedding_text_ko(wine)
+    rich_description = (wine.get("rich_description") or "").strip()
+    if not rich_description:
+        return None
 
     return (
         "UPDATE wine "
-        f"SET embedding_text_ko = '{sql_escape(embedding_text_ko)}' "
-        f"WHERE ({where_clause}) AND (embedding_text_ko IS NULL OR embedding_text_ko = '');"
+        f"SET rich_description = '{sql_escape(rich_description)}' "
+        f"WHERE ({where_clause}) AND (rich_description IS NULL OR rich_description = '');"
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generate SQL to backfill wine.embedding_text_ko from the final Vivino JSON data."
+        description="Generate SQL to backfill wine.rich_description from the final Vivino JSON data."
     )
     parser.add_argument(
         "input_json",

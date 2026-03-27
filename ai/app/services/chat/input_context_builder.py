@@ -153,7 +153,15 @@ def build_chat_input_context(
         friend_names_raw.extend(_extract_from_keys(friend, ("nickname", "name", "username")))
     friend_names = _unique_preserve_order(friend_names_raw)
 
-    food_text = ", ".join(menu_foods) if menu_foods else _extract_food_text(normalized_input)
+    # 음식 텍스트 구성 및 요약 (가독성 향상)
+    if menu_foods:
+        if len(menu_foods) > 3:
+            display_foods = ", ".join(menu_foods[:3]) + f" 외 {len(menu_foods)-3}가지 메뉴"
+        else:
+            display_foods = ", ".join(menu_foods)
+        food_text = display_foods
+    else:
+        food_text = _extract_food_text(normalized_input)
 
     summary_lines = [
         f"- 사용자 원문: {normalized_input or '없음'}",

@@ -107,6 +107,7 @@ async def chat(request: CustomChatRequest):
             yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
             
             has_sent_content = False
+            final_recommendation = None
 
             # v2 대신 v1을 사용하여 더 원시적인 이벤트를 캡처합니다. (짤림 방지)
             async for event in sommelier_agent.astream_events(initial_state, version="v1"):
@@ -120,6 +121,11 @@ async def chat(request: CustomChatRequest):
                     if content is not None:
                         has_sent_content = True
                         yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
+
+                elif kind == "on_chain_end" and event.get("name") == "prepare_input_context":
+                    output = event.get("data", {}).get("output", {})
+                    if output:
+                        final_recommendation = output.get("food_wine_recommendation")
 
                 elif kind == "on_chain_end" and event.get("name") == "chat":
                     output = event.get("data", {}).get("output", {})
@@ -139,6 +145,16 @@ async def chat(request: CustomChatRequest):
                         wine_card = output.get("wine_card")
                         if wine_card and not wine_cards:
                             yield f"data: {json.dumps({'cards': [wine_card], 'actions': []}, ensure_ascii=False)}\n\n"
+
+            card = build_recommendation_card(final_recommendation)
+            actions = build_recommendation_actions(final_recommendation)
+            if card or actions:
+                payload = {
+                    "provider": settings.LLM_PROVIDER,
+                    "card": card.model_dump() if card else None,
+                    "actions": [action.model_dump() for action in actions],
+                }
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
             yield "data: [DONE]\n\n"
 

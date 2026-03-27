@@ -9,7 +9,7 @@ CREATE TEMP TABLE staging_wine_raw (
 
 INSERT INTO staging_wine_raw (ord, payload)
 SELECT ordinality::bigint, item
-FROM jsonb_array_elements(pg_read_file('/tmp/vivino_ultra_results_kr_food.json')::jsonb) WITH ORDINALITY AS src(item, ordinality);
+FROM jsonb_array_elements(pg_read_file('/tmp/vivino_ultra_results_kr_food_dedup.json')::jsonb) WITH ORDINALITY AS src(item, ordinality);
 
 INSERT INTO wine (
     created_at,
@@ -42,7 +42,11 @@ INSERT INTO wine (
     is_real_tannin,
     sweetness,
     tannin,
-    type
+    type,
+    rich_description,
+    embedding_model,
+    embedding_generated_at,
+    embedding
 )
 SELECT
     NOW(),
@@ -148,6 +152,24 @@ SELECT
         WHEN UPPER(COALESCE(payload ->> 'wine_type', '')) LIKE '%PORT%' THEN 'DESSERT'
         WHEN UPPER(COALESCE(payload ->> 'wine_type', '')) LIKE '%FORTIFIED%' THEN 'FORTIFIED'
         ELSE 'RED'
+    END,
+    NULLIF(payload ->> 'rich_description', ''),
+    NULLIF(payload ->> 'embedding_model', ''),
+    CASE
+        WHEN COALESCE(payload ->> 'embedding_generated_at', '') = '' THEN NULL
+        ELSE (payload ->> 'embedding_generated_at')::TIMESTAMPTZ
+    END,
+    CASE
+        WHEN jsonb_typeof(payload -> 'embedding') = 'string'
+             AND COALESCE(BTRIM(payload ->> 'embedding'), '') <> ''
+            THEN (payload ->> 'embedding')::vector
+        WHEN jsonb_typeof(payload -> 'embedding') = 'array'
+             AND jsonb_array_length(payload -> 'embedding') > 0
+            THEN (
+                SELECT ('[' || string_agg(value, ',') || ']')::vector
+                FROM jsonb_array_elements_text(payload -> 'embedding') AS emb(value)
+            )
+        ELSE NULL
     END
 FROM staging_wine_raw
 ORDER BY ord;
