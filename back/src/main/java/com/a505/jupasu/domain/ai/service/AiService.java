@@ -67,7 +67,7 @@ public class AiService {
         payload.put("selected_menu", request.getSelectedMenu() != null ? request.getSelectedMenu() : null);
         payload.put("user_id", user.getId());
         payload.put("stream", true);
-        payload.put("mentioned_friends", List.of());
+        payload.put("mentioned_friends", request.getMentionedFriends() != null ? request.getMentionedFriends() : List.of());
 
         StringBuilder fullTextForStorage = new StringBuilder();
         StringBuilder cardJsonForStorage = new StringBuilder();
