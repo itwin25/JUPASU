@@ -27,7 +27,7 @@ function preprocess(imageData: Uint8ClampedArray, width: number, height: number)
 /**
  * 2. CTC Greedy Decoder (인식 결과 -> 텍스트)
  */
-function decode(logits: Float32Array, shape: number[]): { text: string; score: number } {
+function decode(logits: Float32Array, shape: readonly number[]): { text: string; score: number } {
   const [batch, steps, charCount] = shape;
   let text = '';
   let totalScore = 0;
@@ -57,16 +57,41 @@ function decode(logits: Float32Array, shape: number[]): { text: string; score: n
 }
 
 /**
- * 3. 단순화된 DB Post-processing (Heatmap -> Boxes)
- * (실제 OpenCV의 findContours 대신 픽셀 클러스터링 기반 단순 구현)
+ * 3. DB Post-processing (Heatmap -> Boxes)
+ * 브라우저 환경에서 OpenCV 없이 작동하는 경량화된 영역 검출 로직
  */
 function getBoxesFromHeatmap(heatmap: Float32Array, width: number, height: number, threshold = 0.3) {
-  // 실제 서비스 환경에서는 연결 요소 분석(Connected Components)이나 
-  // 경계선 추출 알고리즘이 필요합니다. 
-  // 여기서는 성능과 코드 크기를 위해 전체 영역에서 유의미한 텍스트 덩어리를 찾는 구조를 제안합니다.
+  // PaddleOCR Detection 모델 출력은 (1, 1, H, W) 형태의 히트맵입니다.
+  // 1. 단순화: 히트맵에서 임계값 이상인 영역의 바운딩 박스를 계산합니다.
+  let minX = width, minY = height, maxX = 0, maxY = 0;
+  let found = false;
+
+  // 히트맵 해상도는 입력 이미지와 동일하거나 특정 비율(예: 1/4)일 수 있습니다.
+  // 여기서는 1:1 대응으로 가정하고 루프를 돕니다.
+  for (let i = 0; i < heatmap.length; i++) {
+    if (heatmap[i] > threshold) {
+      const x = i % width;
+      const y = Math.floor(i / width);
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = maxY = y;
+      found = true;
+    }
+  }
+
+  // 2. 결과 반환: 영역을 찾았다면 해당 박스 반환, 없으면 빈 배열
+  // (실제 PaddleOCR처럼 여러 개의 박스를 분리하려면 클러스터링 알고리즘이 필요합니다.)
+  if (!found) return [];
   
-  // TODO: 브라우저용 경량화된 findContours 로직 추가 이식 가능
-  return [{ x: 0, y: 0, w: width, h: height }]; // 현재는 전체 영역 반환 (테스트용)
+  // 패딩 추가 (인식률 향상)
+  const padding = 5;
+  return [{
+    x: Math.max(0, minX - padding),
+    y: Math.max(0, minY - padding),
+    w: Math.min(width, (maxX - minX) + padding * 2),
+    h: Math.min(height, (maxY - minY) + padding * 2)
+  }];
 }
 
 self.onmessage = async (e: MessageEvent) => {
@@ -78,7 +103,7 @@ self.onmessage = async (e: MessageEvent) => {
       
       const sessionOptions: ort.InferenceSession.SessionOptions = {
         executionProviders: ['wasm'],
-        graphOptimizationLevel: 'all',
+        graphOptimizationLevel: 'basic',
       };
 
       console.log('📦 [Worker] 모델 및 딕셔너리 로딩...');

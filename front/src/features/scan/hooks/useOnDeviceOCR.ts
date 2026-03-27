@@ -36,12 +36,13 @@ export const useOnDeviceOCR = () => {
     worker.addEventListener('message', handleMessage);
 
     // 모델 초기화 요청
+    const origin = window.location.origin;
     worker.postMessage({
       type: 'INIT',
       payload: {
-        detModelUrl: '/models/mobile/det_mobile.onnx',
-        recModelUrl: '/models/mobile/rec_mobile_ko.onnx',
-        dictUrl: '/models/dicts/ko_dict.txt'
+        detModelUrl: `${origin}/models/mobile/det_mobile.onnx`,
+        recModelUrl: `${origin}/models/mobile/rec_mobile_ko.onnx`,
+        dictUrl: `${origin}/models/dicts/ko_dict.txt`
       }
     });
 

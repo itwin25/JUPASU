@@ -3,10 +3,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Camera, ChevronLeft, Star, X } from 'lucide-react';
+import { Camera, ChevronLeft, Star, X, Zap, Search, Image as ImageIcon } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
+import { useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceOCR';
 import { OCRResult } from '@/features/scan/types';
 import { searchApi } from '@/features/scan/api/search.api';
 import { HybridSearchResponse } from '@/features/scan/types/search.types';
@@ -47,6 +48,7 @@ export default function ScanPage() {
     wineName: '',
     vintage: '',
   });
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // 디버깅: 데이터 변경 감시
   useEffect(() => {
@@ -57,16 +59,18 @@ export default function ScanPage() {
   }, [status, ocrResults, imageInfo]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 서버 OCR을 사용하도록 훅에서 추출
-  const { executeOCR, error: modelError } = useOCR();
+  
+  // 🚀 OCR 훅들 초기화
+  const { executeOCR, error: serverError, isLoading: isServerLoading } = useOCR();
+  const { recognize: scanLocally, isReady: localReady, isProcessing: isLocalLoading } = useOnDeviceOCR();
 
-  // 이미지 분석 및 데이터 매핑 (서버 연산 사용)
-  const handleImageAnalysis = useCallback(
+  const isAnalyzing = isServerLoading || isLocalLoading;
+
+  // 🚀 서버 사이드 분석 실행
+  const handleServerAnalysis = useCallback(
     async (imageFile: File) => {
       setStatus('scanning');
-
       try {
-        // 1. 이미지 로드 및 프리뷰 생성
         const reader = new FileReader();
         const imageLoadPromise = new Promise<void>((resolve) => {
           reader.onload = (e) => {
@@ -75,19 +79,14 @@ export default function ScanPage() {
           };
           reader.readAsDataURL(imageFile);
         });
-
         await imageLoadPromise;
 
-        // 2. 서버 OCR 실행 (useOCR 훅 사용)
         const result = await executeOCR(imageFile);
-
         console.log('✅ 서버 분석 결과:', result);
 
-        // 3. 데이터 저장 및 매핑
         if (result.success) {
           setOcrResults(result.results || []);
           setImageInfo(result.imageInfo || null);
-
           if (result.refined) {
             setScanData({
               winery: result.refined.winery || '',
@@ -95,22 +94,72 @@ export default function ScanPage() {
               vintage: result.refined.vintage || '',
             });
           }
+          setStatus('confirming');
+        } else {
+          throw new Error(result.error || '분석 실패');
         }
-
-        setStatus('confirming');
       } catch (err) {
-        console.error('OCR Error:', err);
-        alert('이미지 분석에 실패했습니다. 다시 시도해주세요.');
+        console.error('Server OCR Error:', err);
+        alert('서버 분석에 실패했습니다. 다시 시도해주세요.');
         setStatus('idle');
       }
     },
     [executeOCR],
   );
 
+  // 🚀 온디바이스(로컬) 분석 실행
+  const handleLocalAnalysis = useCallback(
+    async (imageFile: File) => {
+      setStatus('scanning');
+      try {
+        const objectUrl = URL.createObjectURL(imageFile);
+        const img = new window.Image();
+        
+        const imageLoadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = objectUrl;
+        });
+
+        const loadedImg = await imageLoadPromise;
+        setCapturedImage(objectUrl);
+
+        // 캔버스에 이미지 그리기
+        const canvas = document.createElement('canvas');
+        canvas.width = loadedImg.naturalWidth;
+        canvas.height = loadedImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(loadedImg, 0, 0);
+
+        // 온디바이스 OCR 실행
+        const result = await scanLocally(canvas);
+        console.log('✅ 온디바이스 분석 결과:', result);
+
+        if (result.success && result.refined) {
+          setOcrResults([]); // 로컬은 현재 raw result 생략
+          setImageInfo({ width: canvas.width, height: canvas.height });
+          setScanData({
+            winery: result.refined.winery || '',
+            wineName: result.refined.wineName || '',
+            vintage: result.refined.vintage || '',
+          });
+          setStatus('confirming');
+        } else {
+          throw new Error(result.error || '로컬 분석 실패');
+        }
+      } catch (err) {
+        console.error('Local OCR Error:', err);
+        alert('로컬 분석에 실패했습니다. 정밀 스캔을 이용해 보세요.');
+        setStatus('idle');
+      }
+    },
+    [scanLocally],
+  );
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      handleImageAnalysis(file);
+      setPendingFile(file);
     }
   };
 
@@ -144,12 +193,12 @@ export default function ScanPage() {
     }
   };
 
-  if (modelError) {
+  if (serverError && status === 'scanning') {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
         <div className="space-y-4">
           <p className="font-bold text-red-500">OCR 서비스 연결 실패</p>
-          <p className="text-text-main/60 text-sm">{modelError}</p>
+          <p className="text-text-main/60 text-sm">{serverError}</p>
           <Button onClick={() => window.location.reload()}>새로고침</Button>
         </div>
       </div>
@@ -169,7 +218,7 @@ export default function ScanPage() {
       {/* Header */}
       {status !== 'idle' && status !== 'scanning' && (
         <header className="bg-background sticky top-0 z-20 flex items-center justify-between px-6 py-4">
-          <button onClick={() => setStatus('idle')} className="-ml-2 p-2">
+          <button onClick={() => { setStatus('idle'); setPendingFile(null); }} className="-ml-2 p-2">
             {status === 'result' ? <X /> : <ChevronLeft />}
           </button>
           <h1 className="text-text-main text-lg font-bold">
@@ -201,14 +250,49 @@ export default function ScanPage() {
             </div>
 
             <div className="mt-6 space-y-6">
-              <Button
-                onClick={triggerUpload}
-                size="full"
-                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
-              >
-                <Camera size={24} />
-                와인 라벨 스캔하기
-              </Button>
+              {!pendingFile ? (
+                <Button
+                  onClick={triggerUpload}
+                  size="full"
+                  className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
+                >
+                  <Camera size={24} />
+                  와인 라벨 촬영하기
+                </Button>
+              ) : (
+                <div className="animate-in zoom-in-95 fade-in space-y-3 duration-300">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      onClick={() => handleLocalAnalysis(pendingFile)}
+                      disabled={!localReady}
+                      className="h-24 flex-col gap-1 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg"
+                    >
+                      <Zap size={24} fill="currentColor" />
+                      <div className="flex flex-col items-center">
+                        <span className="text-base font-bold">빠른 스캔</span>
+                        <span className="text-[10px] opacity-80">온디바이스 분석</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleServerAnalysis(pendingFile)}
+                      className="h-24 flex-col gap-1 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg"
+                    >
+                      <Search size={24} />
+                      <div className="flex flex-col items-center">
+                        <span className="text-base font-bold">정밀 스캔</span>
+                        <span className="text-[10px] opacity-80">서버 정밀 분석</span>
+                      </div>
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPendingFile(null)}
+                    className="text-text-main/40 w-full text-sm font-bold"
+                  >
+                    사진 다시 선택하기
+                  </Button>
+                </div>
+              )}
 
               <div>
                 <div className="text-text-main mb-3 flex items-center gap-2 text-base font-black italic">
