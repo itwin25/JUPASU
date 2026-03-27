@@ -40,7 +40,8 @@ export const useOnDeviceOCR = () => {
       type: 'INIT',
       payload: {
         detModelUrl: '/models/mobile/det_mobile.onnx',
-        recModelUrl: '/models/mobile/rec_mobile_ko.onnx'
+        recModelUrl: '/models/mobile/rec_mobile_ko.onnx',
+        dictUrl: '/models/dicts/ko_dict.txt'
       }
     });
 
