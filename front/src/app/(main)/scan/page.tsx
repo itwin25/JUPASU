@@ -3,10 +3,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Camera, ChevronLeft, Star, X } from 'lucide-react';
+import { Camera, ChevronLeft, Star, X, Zap, Search, Image as ImageIcon } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
+import { useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceOCR';
 import { OCRResult } from '@/features/scan/types';
 import { searchApi } from '@/features/scan/api/search.api';
 import { HybridSearchResponse } from '@/features/scan/types/search.types';
@@ -37,6 +38,7 @@ type ScanStatus = 'idle' | 'scanning' | 'confirming' | 'result';
 export default function ScanPage() {
   const router = useRouter();
   const [status, setStatus] = useState<ScanStatus>('idle');
+  const [scanMode, setScanMode] = useState<'fast' | 'precision' | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [ocrResults, setOcrResults] = useState<OCRResult[]>([]);
   const [imageInfo, setImageInfo] = useState<{ width: number; height: number } | null>(null);
@@ -57,16 +59,18 @@ export default function ScanPage() {
   }, [status, ocrResults, imageInfo]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 서버 OCR을 사용하도록 훅에서 추출
-  const { executeOCR, error: modelError } = useOCR();
+  
+  // 🚀 OCR 훅들 초기화
+  const { executeOCR, error: serverError, isLoading: isServerLoading } = useOCR();
+  const { recognize: scanLocally, isReady: localReady, isProcessing: isLocalLoading } = useOnDeviceOCR();
 
-  // 이미지 분석 및 데이터 매핑 (서버 연산 사용)
-  const handleImageAnalysis = useCallback(
+  const isAnalyzing = isServerLoading || isLocalLoading;
+
+  // 🚀 서버 사이드 분석 실행
+  const handleServerAnalysis = useCallback(
     async (imageFile: File) => {
       setStatus('scanning');
-
       try {
-        // 1. 이미지 로드 및 프리뷰 생성
         const reader = new FileReader();
         const imageLoadPromise = new Promise<void>((resolve) => {
           reader.onload = (e) => {
@@ -75,19 +79,14 @@ export default function ScanPage() {
           };
           reader.readAsDataURL(imageFile);
         });
-
         await imageLoadPromise;
 
-        // 2. 서버 OCR 실행 (useOCR 훅 사용)
         const result = await executeOCR(imageFile);
-
         console.log('✅ 서버 분석 결과:', result);
 
-        // 3. 데이터 저장 및 매핑
         if (result.success) {
           setOcrResults(result.results || []);
           setImageInfo(result.imageInfo || null);
-
           if (result.refined) {
             setScanData({
               winery: result.refined.winery || '',
@@ -95,26 +94,96 @@ export default function ScanPage() {
               vintage: result.refined.vintage || '',
             });
           }
+          setStatus('confirming');
+        } else {
+          throw new Error('분석 실패');
         }
-
-        setStatus('confirming');
       } catch (err) {
-        console.error('OCR Error:', err);
-        alert('이미지 분석에 실패했습니다. 다시 시도해주세요.');
+        console.error('Server OCR Error:', err);
+        alert('서버 분석에 실패했습니다. 다시 시도해주세요.');
         setStatus('idle');
       }
     },
     [executeOCR],
   );
 
+  // 🚀 온디바이스(로컬) 분석 실행
+  const handleLocalAnalysis = useCallback(
+    async (imageFile: File) => {
+      setStatus('scanning');
+      try {
+        // 1. 이미지 로드 및 프리뷰 설정 (서버 로직과 동일하게 FileReader 사용)
+        const reader = new FileReader();
+        const imageLoadPromise = new Promise<string>((resolve) => {
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(imageFile);
+        });
+        const dataUrl = await imageLoadPromise;
+        setCapturedImage(dataUrl);
+
+        // 2. 캔버스 준비 (OCR 엔진용)
+        const img = new window.Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = dataUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0);
+
+        // 3. 온디바이스 OCR 실행
+        const result = await scanLocally(canvas);
+        console.log('✅ 온디바이스 분석 결과:', result);
+
+        if (result.success && result.refined) {
+          const refined = result.refined;
+          const displayResults: OCRResult[] = [];
+          
+          // 서버 액션(ocr.action.ts)과 동일한 필드 접근
+          const winery = refined.winery || '';
+          const wineName = refined.wineName || '';
+          const vintage = refined.vintage || '';
+
+          if (winery) displayResults.push({ text: winery, score: 0.9, box: [] });
+          if (wineName) displayResults.push({ text: wineName, score: 0.9, box: [] });
+          
+          setOcrResults(displayResults);
+          setImageInfo({ width: canvas.width, height: canvas.height });
+          setScanData({
+            winery,
+            wineName,
+            vintage,
+          });
+          setStatus('confirming');
+        } else {
+          throw new Error('로컬 분석 실패');
+        }
+      } catch (err) {
+        console.error('Local OCR Error:', err);
+        alert('로컬 분석에 실패했습니다. 정밀 스캔을 이용해 보세요.');
+        setStatus('idle');
+      }
+    },
+    [scanLocally],
+  );
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      handleImageAnalysis(file);
+    if (file && scanMode) {
+      if (scanMode === 'fast') {
+        handleLocalAnalysis(file);
+      } else {
+        handleServerAnalysis(file);
+      }
     }
   };
 
-  const triggerUpload = () => {
+  const triggerUpload = (mode: 'fast' | 'precision') => {
+    setScanMode(mode);
     fileInputRef.current?.click();
   };
 
@@ -144,12 +213,12 @@ export default function ScanPage() {
     }
   };
 
-  if (modelError) {
+  if (serverError && status === 'scanning') {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center">
         <div className="space-y-4">
           <p className="font-bold text-red-500">OCR 서비스 연결 실패</p>
-          <p className="text-text-main/60 text-sm">{modelError}</p>
+          <p className="text-text-main/60 text-sm">{serverError}</p>
           <Button onClick={() => window.location.reload()}>새로고침</Button>
         </div>
       </div>
@@ -169,7 +238,7 @@ export default function ScanPage() {
       {/* Header */}
       {status !== 'idle' && status !== 'scanning' && (
         <header className="bg-background sticky top-0 z-20 flex items-center justify-between px-6 py-4">
-          <button onClick={() => setStatus('idle')} className="-ml-2 p-2">
+          <button onClick={() => { setStatus('idle'); setScanMode(null); }} className="-ml-2 p-2">
             {status === 'result' ? <X /> : <ChevronLeft />}
           </button>
           <h1 className="text-text-main text-lg font-bold">
@@ -201,14 +270,23 @@ export default function ScanPage() {
             </div>
 
             <div className="mt-6 space-y-6">
-              <Button
-                onClick={triggerUpload}
-                size="full"
-                className="h-16 gap-3 rounded-3xl text-lg shadow-xl"
-              >
-                <Camera size={24} />
-                와인 라벨 스캔하기
-              </Button>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  onClick={() => triggerUpload('fast')}
+                  disabled={!localReady}
+                  className="h-16 gap-2 rounded-3xl text-base shadow-xl"
+                >
+                  <Zap size={20} fill="currentColor" />
+                  빠른 촬영
+                </Button>
+                <Button
+                  onClick={() => triggerUpload('precision')}
+                  className="h-16 gap-2 rounded-3xl text-base shadow-xl"
+                >
+                  <Search size={20} />
+                  정밀 촬영
+                </Button>
+              </div>
 
               <div>
                 <div className="text-text-main mb-3 flex items-center gap-2 text-base font-black italic">
@@ -354,7 +432,7 @@ export default function ScanPage() {
                 </div>
               )}
               <button
-                onClick={triggerUpload}
+                onClick={() => triggerUpload(scanMode || 'precision')}
                 className="border-primary-100 absolute right-4 bottom-4 rounded-2xl border bg-white/80 px-5 py-2.5 text-sm font-bold text-[#B36262] shadow-sm backdrop-blur-sm"
               >
                 다시 찍기

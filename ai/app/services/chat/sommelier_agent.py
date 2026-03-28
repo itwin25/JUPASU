@@ -507,24 +507,28 @@ async def chat_node(state: AgentState):
 
     chain = prompt | llm
 
-    full_content = ""
-    async for chunk in chain.astream(
+    # 1. LLM 호출 (ainvoke를 사용하여 최종 결과 생성)
+    # 노드 내부에서 스트리밍을 직접 소비하면 외부 스트리밍 이벤트 전파가 끊기므로 최종 결과만 구성합니다.
+    response = await chain.ainvoke(
         {
             "input": state["raw_input"],
             "wine_context": wine_context,
             "context": input_context_summary,
         }
-    ):
-        full_content += chunk.content
+    )
+    full_content = response.content
 
     recommendations = []
     if wine_meta:
         wine_id, wine_name, wine_image, match_score, _wine_style = wine_meta
+        # 답변 텍스트에서 추천 사유 추출 로직 (기존 유지)
         paragraphs = [paragraph.strip() for paragraph in full_content.split("\n\n") if paragraph.strip()]
         desc_raw = paragraphs[1] if len(paragraphs) > 1 else paragraphs[0] if paragraphs else full_content
+        
         clean = re.sub(r"[*#_`~>\-]{1,3}", "", desc_raw)
         clean = re.sub(r"[^\w\s가-힣,!?%()~]", "", clean)
         clean = re.sub(r"\s+", " ", clean).strip()
+        
         sentence_match = re.search(r"[^.!?]*[요다]\s*[.!]", clean)
         reason_text = sentence_match.group(0).strip() if sentence_match else clean[:80].rstrip()
 
