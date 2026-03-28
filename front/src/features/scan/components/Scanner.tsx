@@ -88,10 +88,17 @@ export default function Scanner() {
         console.log('✅ [Main] 온디바이스 OCR 응답:', result);
 
         if (result.success && result.refined) {
-          // 온디바이스 결과는 정제된 데이터를 위주로 표시하거나 
-          // 필요한 경우 raw 결과(allResults)를 추가 연동할 수 있음
-          // 현재는 스켈레톤 단계이므로 빈 결과 또는 더미 표시
-          setResults([]); 
+          const refined = result.refined as any;
+          // 온디바이스 결과 텍스트를 화면에 표시
+          const winery = refined.data?.winery || refined.winery;
+          const wineName = refined.data?.wineName || refined.wineName;
+
+          if (wineName || winery) {
+            const displayResults: OCRResult[] = [];
+            if (winery) displayResults.push({ text: winery, score: 0.9, box: [] });
+            if (wineName) displayResults.push({ text: wineName, score: 0.9, box: [] });
+            setResults(displayResults);
+          }
         }
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
@@ -245,20 +252,20 @@ export default function Scanner() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="primary"
-                className="h-20 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-lg font-bold shadow-lg"
+                className="h-16 rounded-2xl text-base font-bold shadow-lg"
                 onClick={captureAndScanLocal}
                 disabled={isAnyProcessing || !localReady}
               >
-                <Zap className="mr-2 fill-current" size={24} />
+                <Zap className="mr-2 fill-current" size={20} />
                 빠른 스캔
               </Button>
               <Button
                 variant="primary"
-                className="h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg font-bold shadow-lg"
+                className="h-16 rounded-2xl text-base font-bold shadow-lg"
                 onClick={captureAndScanServer}
                 disabled={isAnyProcessing}
               >
-                <Search className="mr-2" size={24} />
+                <Search className="mr-2" size={20} />
                 정밀 스캔
               </Button>
             </div>
