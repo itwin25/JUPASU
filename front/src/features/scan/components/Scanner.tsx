@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Camera, RefreshCw, CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, Image as ImageIcon, Zap, Search } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import { useOCR } from '../hooks/useOCR';
+import { useOnDeviceOCR } from '../hooks/useOnDeviceOCR';
 import { OCRResult } from '../types';
 
 export default function Scanner() {
@@ -25,16 +26,20 @@ export default function Scanner() {
   }, [capturedImage]);
 
   const { executeOCR, error: ocrError, isLoading: isOcrLoading } = useOCR();
+  const { recognize: scanLocally, isReady: localReady, isProcessing: isLocalProcessing } = useOnDeviceOCR();
 
-  // 🚀 OCR 처리 로직
-  const processOCR = useCallback(
+  // 🚀 공통 카메라 중지 로직
+  const stopCamera = useCallback(() => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+    }
+  }, [stream]);
+
+  // 🚀 서버 사이드 OCR 처리 로직
+  const processServerOCR = useCallback(
     async (imageSource: HTMLCanvasElement | HTMLImageElement) => {
-      // 카메라 스트림 즉시 종료
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-        setStream(null);
-      }
-
+      stopCamera();
       setIsCapturing(true);
       try {
         let canvas: HTMLCanvasElement;
@@ -47,49 +52,102 @@ export default function Scanner() {
           canvas.getContext('2d')?.drawImage(imageSource, 0, 0);
         }
 
-        // 🚀 서버 사이드 분석 호출
         const result = await executeOCR(canvas);
         console.log('✅ [Main] 서버 OCR 응답:', result);
 
         setResults(result.results || []);
-
-        // 캡처한 이미지를 프리뷰로 설정
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedImage(dataUrl);
       } catch (err) {
-        console.error('OCR failed:', err);
-        alert('텍스트 분석 중 오류가 발생했습니다.');
+        console.error('Server OCR failed:', err);
+        alert('서버 분석 중 오류가 발생했습니다.');
       } finally {
         setIsCapturing(false);
       }
     },
-    [executeOCR, stream],
+    [executeOCR, stopCamera],
   );
 
-  const captureAndScan = useCallback(async () => {
+  // 🚀 온디바이스(로컬) OCR 처리 로직
+  const processLocalOCR = useCallback(
+    async (imageSource: HTMLCanvasElement | HTMLImageElement) => {
+      stopCamera();
+      setIsCapturing(true);
+      try {
+        let canvas: HTMLCanvasElement;
+        if (imageSource instanceof HTMLCanvasElement) {
+          canvas = imageSource;
+        } else {
+          canvas = document.createElement('canvas');
+          canvas.width = imageSource.naturalWidth;
+          canvas.height = imageSource.naturalHeight;
+          canvas.getContext('2d')?.drawImage(imageSource, 0, 0);
+        }
+
+        const result = await scanLocally(canvas);
+        console.log('✅ [Main] 온디바이스 OCR 응답:', result);
+
+        if (result.success && result.refined) {
+          const refined = result.refined as any;
+          // 온디바이스 결과 텍스트를 화면에 표시
+          const winery = refined.data?.winery || refined.winery;
+          const wineName = refined.data?.wineName || refined.wineName;
+
+          if (wineName || winery) {
+            const displayResults: OCRResult[] = [];
+            if (winery) displayResults.push({ text: winery, score: 0.9, box: [] });
+            if (wineName) displayResults.push({ text: wineName, score: 0.9, box: [] });
+            setResults(displayResults);
+          }
+        }
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedImage(dataUrl);
+      } catch (err) {
+        console.error('Local OCR failed:', err);
+        alert('로컬 분석 중 오류가 발생했습니다.');
+      } finally {
+        setIsCapturing(false);
+      }
+    },
+    [scanLocally, stopCamera],
+  );
+
+  const captureAndScanServer = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
-
     const video = videoRef.current;
-    if (video.videoWidth === 0 || video.videoHeight === 0) {
-      alert('카메라가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      return;
-    }
-
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
     if (context) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
       try {
-        await processOCR(canvas);
+        await processServerOCR(canvas);
       } finally {
         canvas.width = 0;
         canvas.height = 0;
       }
     }
-  }, [processOCR]);
+  }, [processServerOCR]);
+
+  const captureAndScanLocal = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    if (context) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        await processLocalOCR(canvas);
+      } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    }
+  }, [processLocalOCR]);
 
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,14 +157,15 @@ export default function Scanner() {
       const objectUrl = URL.createObjectURL(file);
       const img = new window.Image();
       img.onload = () => {
-        processOCR(img);
+        // 파일 업로드는 기본적으로 정밀 스캔(서버)으로 처리
+        processServerOCR(img);
         URL.revokeObjectURL(objectUrl);
         img.onload = null;
         img.src = '';
       };
       img.src = objectUrl;
     },
-    [processOCR],
+    [processServerOCR],
   );
 
   const startCamera = useCallback(async () => {
@@ -152,6 +211,8 @@ export default function Scanner() {
     startCamera();
   }, [startCamera]);
 
+  const isAnyProcessing = isCapturing || isOcrLoading || isLocalProcessing;
+
   return (
     <div className="flex w-full flex-col space-y-6">
       <div className="border-primary-100 relative aspect-square w-full overflow-hidden rounded-[2rem] border-2 bg-black shadow-inner">
@@ -166,40 +227,9 @@ export default function Scanner() {
         ) : (
           <div className="relative h-full w-full">
             <img src={capturedImage} alt="Captured" className="h-full w-full object-contain" />
-
-            {/* 🚀 CSS 기반 OCR 결과 박스 Overlay */}
-            <div className="absolute inset-0">
-              <div className="relative h-full w-full">
-                {results.map((res, idx) => {
-                  if (!res.box) return null;
-
-                  // 박스 좌표 계산 (서버에서 받은 좌표 [[x,y], ...])
-                  let xMin = 10000,
-                    yMin = 10000,
-                    xMax = 0,
-                    yMax = 0;
-
-                  if (Array.isArray(res.box) && Array.isArray(res.box[0])) {
-                    (res.box as number[][]).forEach((pt) => {
-                      xMin = Math.min(xMin, pt[0]);
-                      yMin = Math.min(yMin, pt[1]);
-                      xMax = Math.max(xMax, pt[0]);
-                      yMax = Math.max(yMax, pt[1]);
-                    });
-                  }
-
-                  // ⚠️ 좌표를 %로 표시하기 위해서는 원본 이미지 사이즈 대비 비율이 필요함
-                  // 현재 서버 OCR에서 리사이징을 하므로 좌표 보정이 복잡할 수 있음.
-                  // 우선은 원본 이미지 비율대로 표시한다고 가정.
-
-                  // 임시: 박스 그리기를 비활성화하거나 정교화 작업 필요
-                  return null;
-                })}
-              </div>
-            </div>
           </div>
         )}
-        {(isCapturing || isOcrLoading) && (
+        {isAnyProcessing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center space-y-2 bg-black/40 text-white">
             <RefreshCw className="animate-spin" size={40} />
             <p className="font-bold">분석 중...</p>
@@ -207,7 +237,6 @@ export default function Scanner() {
         )}
       </div>
 
-      {/* 캔버스 및 파일 입력 (숨김) */}
       <canvas ref={canvasRef} className="hidden" />
       <input
         type="file"
@@ -219,23 +248,35 @@ export default function Scanner() {
 
       <div className="flex flex-col space-y-4">
         {!capturedImage ? (
-          <div className="grid grid-cols-4 gap-3">
-            <Button
-              variant="primary"
-              className="col-span-3 h-16 rounded-2xl text-lg shadow-lg"
-              onClick={captureAndScan}
-              disabled={isCapturing || isOcrLoading}
-            >
-              <Camera className="mr-2" />
-              촬영 및 분석
-            </Button>
+          <div className="flex flex-col space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="primary"
+                className="h-16 rounded-2xl text-base font-bold shadow-lg"
+                onClick={captureAndScanLocal}
+                disabled={isAnyProcessing || !localReady}
+              >
+                <Zap className="mr-2 fill-current" size={20} />
+                빠른 스캔
+              </Button>
+              <Button
+                variant="primary"
+                className="h-16 rounded-2xl text-base font-bold shadow-lg"
+                onClick={captureAndScanServer}
+                disabled={isAnyProcessing}
+              >
+                <Search className="mr-2" size={20} />
+                정밀 스캔
+              </Button>
+            </div>
             <Button
               variant="outline"
-              className="border-primary-200 text-primary-700 col-span-1 h-16 rounded-2xl bg-white shadow-md"
+              className="border-primary-200 text-primary-700 h-14 rounded-2xl bg-white shadow-md"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isCapturing || isOcrLoading}
+              disabled={isAnyProcessing}
             >
-              <ImageIcon size={28} />
+              <ImageIcon className="mr-2" size={20} />
+              앨범에서 불러오기
             </Button>
           </div>
         ) : (
