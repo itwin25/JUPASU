@@ -22,6 +22,8 @@ import {
 } from '@/features/review/hooks/useWineReviewsQuery';
 
 const DEFAULT_WINE_IMAGE_URL = '/default_wine.png';
+const DEMO_VINEYARDS_WINE_ID = 7139;
+const DEMO_VINEYARDS_IMAGE_URL = '/vineyards.png';
 
 type ReviewItem = {
   id: number;
@@ -98,16 +100,17 @@ const getCountryFlagUrl = (countryName: string | undefined | null) => {
     code = 'us';
   else if (name.includes('칠레') || name.includes('chile') || name === 'cl') code = 'cl';
   else if (name.includes('호주') || name.includes('australia') || name === 'au') code = 'au';
-  else if (name.includes('아르헨티나') || name.includes('argentina') || name === 'ar')
-    code = 'ar';
+  else if (name.includes('아르헨티나') || name.includes('argentina') || name === 'ar') code = 'ar';
   else if (name.includes('독일') || name.includes('germany') || name === 'de') code = 'de';
-  else if (name.includes('뉴질랜드') || name.includes('new zealand') || name === 'nz')
-    code = 'nz';
-  else if (name.includes('포르투갈') || name.includes('portugal') || name === 'pt')
-    code = 'pt';
-  else if (name.includes('남아공') || name.includes('south africa') || name === 'za')
-    code = 'za';
-  else if (name.includes('한국') || name.includes('korea') || name.includes('대한민국') || name === 'kr')
+  else if (name.includes('뉴질랜드') || name.includes('new zealand') || name === 'nz') code = 'nz';
+  else if (name.includes('포르투갈') || name.includes('portugal') || name === 'pt') code = 'pt';
+  else if (name.includes('남아공') || name.includes('south africa') || name === 'za') code = 'za';
+  else if (
+    name.includes('한국') ||
+    name.includes('korea') ||
+    name.includes('대한민국') ||
+    name === 'kr'
+  )
     code = 'kr';
 
   return code ? `https://flagcdn.com/w40/${code}.png` : null;
@@ -146,6 +149,13 @@ const formatDateStr = (dateVal: unknown) => {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}.${mm}.${dd}`;
+};
+
+// 와인 이미지 URL 결정 로직
+const resolveWineImageUrl = (wineId: number, imageUrl?: string | null) => {
+  if (wineId === DEMO_VINEYARDS_WINE_ID) return DEMO_VINEYARDS_IMAGE_URL;
+  if (imageUrl && imageUrl !== '/default_wine.png') return imageUrl;
+  return DEFAULT_WINE_IMAGE_URL;
 };
 
 export default function WineDetailPage({
@@ -242,9 +252,7 @@ export default function WineDetailPage({
 
   const isScraped = useMemo(
     () =>
-      scrapItems.some(
-        (item) => item.wineId === numericWineId || item.scrapId === numericWineId,
-      ),
+      scrapItems.some((item) => item.wineId === numericWineId || item.scrapId === numericWineId),
     [scrapItems, numericWineId],
   );
 
@@ -296,7 +304,7 @@ export default function WineDetailPage({
               typeof wine.price === 'number' && wine.price > 0 ? wine.price.toLocaleString() : '-',
           }))
         : [],
-      imageUrl: wineDetail.imageUrl,
+      imageUrl: resolveWineImageUrl(wineDetail.wineId, wineDetail.imageUrl),
       userPreference: wineDetail.userPreference
         ? {
             tannin: wineDetail.userPreference.tannin || 0,
@@ -331,14 +339,23 @@ export default function WineDetailPage({
         null;
 
       const reviewNickname = normalizeText(
-        r.userNickname ?? r.nickname ?? r.user?.nickname ?? r.user?.userNickname ?? r.member?.nickname ?? '',
+        r.userNickname ??
+          r.nickname ??
+          r.user?.nickname ??
+          r.user?.userNickname ??
+          r.member?.nickname ??
+          '',
       );
 
       const isOwnerById =
-        reviewUserId !== null && currentUser.id !== null && Number(reviewUserId) === Number(currentUser.id);
+        reviewUserId !== null &&
+        currentUser.id !== null &&
+        Number(reviewUserId) === Number(currentUser.id);
 
       const isOwnerByNickname =
-        Boolean(currentUser.nickname) && Boolean(reviewNickname) && currentUser.nickname === reviewNickname;
+        Boolean(currentUser.nickname) &&
+        Boolean(reviewNickname) &&
+        currentUser.nickname === reviewNickname;
 
       const isOwner = Boolean(r.isOwner) || isOwnerById || isOwnerByNickname;
 
@@ -507,7 +524,7 @@ export default function WineDetailPage({
 
   if (isWineLoading || !wineInfo) {
     return (
-      <div className="bg-background min-h-screen pb-0 flex items-center justify-center font-bold text-text-main/40">
+      <div className="bg-background text-text-main/40 flex min-h-screen items-center justify-center pb-0 font-bold">
         와인 정보를 불러오는 중입니다...
       </div>
     );
@@ -560,7 +577,7 @@ export default function WineDetailPage({
                       : DEFAULT_WINE_IMAGE_URL
                   }
                   alt={wineInfo.name}
-                  className="w-full h-full object-contain p-4 drop-shadow-md"
+                  className="h-full w-full object-contain p-4 drop-shadow-md"
                   onError={(e) => {
                     e.currentTarget.src = DEFAULT_WINE_IMAGE_URL;
                     e.currentTarget.onerror = null;
@@ -578,7 +595,7 @@ export default function WineDetailPage({
                   <p className="text-[0.7rem] font-black tracking-[0.14em] text-[#C96D72] uppercase">
                     {wineInfo.category}
                   </p>
-                  <h1 className="text-text-main break-words text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em]">
+                  <h1 className="text-text-main text-[1.4rem] leading-[1.12] font-black tracking-[-0.035em] break-words">
                     {wineInfo.name}
                   </h1>
                 </div>
@@ -587,7 +604,7 @@ export default function WineDetailPage({
                     <img
                       src={wineInfo.flagUrl}
                       alt={wineInfo.country}
-                      className="h-4 rounded-[2px] shadow-sm inline-block"
+                      className="inline-block h-4 rounded-[2px] shadow-sm"
                     />
                   ) : (
                     <span className="text-[1.1rem]">🍷</span>
@@ -626,7 +643,9 @@ export default function WineDetailPage({
                   onClick={() => setActiveTab('info')}
                   className={cn(
                     'rounded-[1rem] py-2.5 text-[0.88rem] font-black transition-all',
-                    activeTab === 'info' ? 'text-text-main bg-white shadow-sm' : 'text-text-main/42',
+                    activeTab === 'info'
+                      ? 'text-text-main bg-white shadow-sm'
+                      : 'text-text-main/42',
                   )}
                 >
                   상세 정보
@@ -656,29 +675,29 @@ export default function WineDetailPage({
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between relative">
+                <div className="relative flex items-center justify-between">
                   <h3 className="text-text-main text-[1.05rem] font-black">맛 프로필</h3>
 
                   <button
                     onClick={() => setShowTasteTooltip(!showTasteTooltip)}
-                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white hover:bg-[#b55b60] transition-colors focus:outline-none"
+                    className="flex h-5 w-5 items-center justify-center rounded-full bg-[#C96D72] text-[0.68rem] font-black text-white transition-colors hover:bg-[#b55b60] focus:outline-none"
                     aria-label="맛 프로필 설명 보기"
                   >
                     ?
                   </button>
 
                   {showTasteTooltip && (
-                    <div className="absolute right-0 top-7 z-50 w-[15rem] rounded-[1rem] border border-primary-100 bg-white p-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                    <div className="border-primary-100 animate-in fade-in zoom-in-95 absolute top-7 right-0 z-50 w-[15rem] rounded-[1rem] border bg-white p-4 shadow-xl duration-200">
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[0.8rem] font-black text-text-main">지표 설명</span>
+                        <span className="text-text-main text-[0.8rem] font-black">지표 설명</span>
                         <button
                           onClick={() => setShowTasteTooltip(false)}
-                          className="p-1 text-text-main/40 hover:text-text-main"
+                          className="text-text-main/40 hover:text-text-main p-1"
                         >
                           <X size={14} />
                         </button>
                       </div>
-                      <div className="space-y-2 text-[0.75rem] font-medium text-text-main/80">
+                      <div className="text-text-main/80 space-y-2 text-[0.75rem] font-medium">
                         <p>
                           <span className="font-bold text-[#C96D72]">BODY (바디):</span> 와인이
                           입안에서 느껴지는 무게감이나 점성입니다.
@@ -696,7 +715,7 @@ export default function WineDetailPage({
                           껍질과 씨에서 나오는 떫은맛과 쌉쌀함입니다.
                         </p>
                       </div>
-                      <div className="absolute -top-2 right-2 h-4 w-4 rotate-45 border-l border-t border-primary-100 bg-white" />
+                      <div className="border-primary-100 absolute -top-2 right-2 h-4 w-4 rotate-45 border-t border-l bg-white" />
                     </div>
                   )}
                 </div>
@@ -755,11 +774,11 @@ export default function WineDetailPage({
                   {wineInfo.userPreference && (
                     <div className="flex items-center gap-2 pr-1">
                       <div className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#D9AD70]" />
+                        <div className="h-2.5 w-2.5 rounded-full bg-[#D9AD70]" />
                         <span className="text-text-main/50 text-[0.68rem] font-bold">내 취향</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full bg-[#C96D72]" />
+                        <div className="h-2.5 w-2.5 rounded-full bg-[#C96D72]" />
                         <span className="text-text-main/50 text-[0.68rem] font-bold">와인</span>
                       </div>
                     </div>
@@ -1064,7 +1083,7 @@ export default function WineDetailPage({
                     </div>
                   ))
                 ) : (
-                  <div className="py-10 text-center text-text-main/40 font-bold text-sm">
+                  <div className="text-text-main/40 py-10 text-center text-sm font-bold">
                     최근에 작성된 리뷰가 없습니다.
                   </div>
                 )}
