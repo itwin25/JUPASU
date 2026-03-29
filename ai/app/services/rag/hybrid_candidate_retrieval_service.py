@@ -68,8 +68,16 @@ def _request_backend_rerank(user_id: str, friend_ids: list[str] | None, candidat
             response = client.post(BACKEND_RECOMMEND_API_URL, json=payload, timeout=10.0)
             response.raise_for_status()
             print("✅ [통신] Java 백엔드 응답 완료!")
-            result = response.json().get("data", {}).get("general", [])
-            return result if result else []
+            data = response.json().get("data", {})
+            
+            # 백엔드 상황에 따라 리스트가 담긴 키가 다를 수 있음 (유연한 대응)
+            result = data.get("personalized") or data.get("general") or data.get("recommendations") or []
+            
+            # 만약 data 자체가 리스트인 경우에 대한 대응
+            if not result and isinstance(data, list):
+                result = data
+                
+            return result
     except Exception as exc:
         print(f"⚠️ 백엔드 통신 에러 발생: {exc}")
         return []

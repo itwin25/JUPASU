@@ -693,34 +693,60 @@ public class WineRecommendationCalculator {
     }
 
 /**
- * AI 엔진이 1차 필터링한 30개의 후보(Candidate) 와인들 내에서만
- * 사용자(+친구) 취향을 블렌딩하여 가우시안/베이지안 Re-ranking을 수행합니다.
+ * AI 엔진이 1차 필터링한 후보 와인들 내에서 재정렬을 수행하거나,
+ * 후보가 없는 경우(예: 친구만 언급) 전체 DB에서 취향 기반으로 추천을 수행합니다.
  */
 public WineQuickRecommendResponse ragReRank(User mainUser, List<User> friends, List<Long> candidateIds) {
     // 1. 본인 취향 프로필
     Preference mainPref = preferenceRepository.findByUserId(mainUser.getId()).orElse(null);
     List<Review> mainReviews = reviewRepository.findAllByUserWithWine(mainUser);
     CalibratedProfile mainProfile = calibrate(mainPref, mainReviews);
-    // 2. 친구들 취향 프로필 수집
-    List<CalibratedProfile> allProfiles = new ArrayList<>();
-    allProfiles.add(mainProfile);
+
+    // 2. 모든 구성원의 취향 수집 (본인 + 친구들)
+    List<Preference> allPreferences = new ArrayList<>();
+    if (mainPref != null) allPreferences.add(mainPref);
     for (User friend : friends) {
-        Preference friendPref = preferenceRepository.findByUserId(friend.getId()).orElse(null);
-        List<Review> friendReviews = reviewRepository.findAllByUserWithWine(friend);
-        allProfiles.add(calibrate(friendPref, friendReviews));
+        preferenceRepository.findByUserId(friend.getId()).ifPresent(allPreferences::add);
     }
-    // 3. 취향 프로필 단순 평균 블렌딩 (NaN 차원은 제외)
-    CalibratedProfile blended = blendProfiles(allProfiles);
-    // 4. 후보 와인만 조회하여 점수 계산
-    List<Wine> candidateWines = wineRepository.findAllByIdIn(candidateIds);
+
+    // 3. 리스크 회피 로직이 적용된 가상 프로필(Group Context) 생성
+    Map<String, Object> groupCtx = calculateGroupContext(allPreferences);
+    Map<String, Double> targetMap = (Map<String, Double>) groupCtx.get("target_profile");
+
+    // 가상 프로필 수치 적용 (0.4f 곱하여 0~2 스케일로 변환)
+    CalibratedProfile blended = new CalibratedProfile(
+        targetMap.getOrDefault("sweet", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("acid", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("body", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("tannin", 3.0).floatValue() * 0.4f,
+        SIGMA_BASE, SIGMA_BASE, SIGMA_BASE, SIGMA_BASE
+    );
+
+    // 4. 추천 대상 와인 목록 확보
+    List<Wine> targetWines;
+    if (candidateIds != null && !candidateIds.isEmpty()) {
+        targetWines = wineRepository.findAllByIdIn(candidateIds);
+    } else {
+        // 후보가 없으면 전체 와인 중 상위 일부를 샘플링하거나 전체 조회 (성능 고려 필요 시 샘플링)
+        targetWines = wineQueryService.getAllWines();
+    }
+
     PriorityQueue<WineScore> minHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
-    for (Wine wine : candidateWines) {
-        // relaxValidation=true: isReal 무시, 있는 데이터 그대로 사용
+    for (Wine wine : targetWines) {
+        // relaxValidation=true: 데이터 누락 와인도 점수 계산
         int match = score(wine, null, mainPref, blended, true);
-        if (match == Integer.MIN_VALUE) match = 0; // 안전망
-        addToHeap(minHeap, new WineScore(match, wine), 1);
+        if (match == Integer.MIN_VALUE) continue;
+        addToHeap(minHeap, new WineScore(match, wine), 3); // 상위 3개까지 수집
     }
-    return WineQuickRecommendResponse.of(heapToList(minHeap, null), List.of());
+
+    List<WineRecommendationItem> result = heapToList(minHeap, null);
+    
+    // [최종 안전장치] 만약 결과가 여전히 비어있다면, 전체 DB에서 무작위 상위 와인 1개라도 강제 반환
+    if (result.isEmpty() && targetWines != null && !targetWines.isEmpty()) {
+        result = List.of(WineRecommendationItem.of(targetWines.get(0), 85, (DrinkingSituation) null, List.of()));
+    }
+    
+    return WineQuickRecommendResponse.of(result, List.of());
 }
 /** 여러 취향 프로필의 단순 평균을 구한다 (NaN 무시) */
 private CalibratedProfile blendProfiles(List<CalibratedProfile> profiles) {
