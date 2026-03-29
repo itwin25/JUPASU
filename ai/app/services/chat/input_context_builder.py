@@ -147,14 +147,28 @@ def build_chat_input_context(
 
     selected_wine_name = _extract_selected_wine_name(selected_wine)
 
-    friend_names_raw: list[str] = []
+    friend_info_lines: list[str] = []
     for friend in mentioned_friends or []:
-        friend_names_raw.extend(
-            _extract_from_keys(friend, ("nickname", "name", "username"))
-        )
-    friend_names = _unique_preserve_order(friend_names_raw)
+        # 닉네임 추출
+        name_list = _extract_from_keys(friend, ("nickname", "name", "username"))
+        name_str = name_list[0] if name_list else "이름 모름"
+        
+        # [수정] 백엔드 AiService.java에서 'preference' 키로 데이터를 보냄
+        pref = friend.get("preference")
+        if isinstance(pref, dict) and pref:
+            # 수치 데이터가 존재하면 상세 요약 추가
+            s = pref.get('sweetness', '-')
+            a = pref.get('acidity', '-')
+            b = pref.get('body', '-')
+            t = pref.get('tannin', '-')
+            pref_desc = f"(취향수치 - 당도:{s}, 산도:{a}, 바디:{b}, 탄닌:{t})"
+            friend_info_lines.append(f"{name_str} {pref_desc}")
+        else:
+            friend_info_lines.append(name_str)
+    
+    friend_names = _unique_preserve_order(friend_info_lines)
 
-    # 음식 요약 텍스트 (RAG 검색용 - 모든 음식 소스 통합)
+    # ... (음식 요약 로직 생략 없이 동일 유지)
     all_foods = _unique_preserve_order(tagged_foods + menu_foods)
     if all_foods:
         if len(all_foods) > 3:
@@ -169,7 +183,7 @@ def build_chat_input_context(
         f"- 태그된 음식: {', '.join(tagged_foods) if tagged_foods else '없음'}",
         f"- 스캔된 메뉴판 음식: {', '.join(menu_foods) if menu_foods else '없음'}",
         f"- 메뉴판 와인: {', '.join(menu_wines) if menu_wines else '없음'}",
-        f"- 언급된 친구: {', '.join(friend_names) if friend_names else '없음'}",
+        f"- 언급된 친구 및 취향: {', '.join(friend_names) if friend_names else '없음'}",
     ]
 
     return {
