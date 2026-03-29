@@ -176,7 +176,7 @@ export default function MenuScannerModal({
       onAnalysisComplete(DEMO_MENU_SCAN_RESULT);
       onClose();
 
-      // 실제 OCR/백엔드 연동 로직 복구 시 아래 블록으로 되돌리면 됩니다.
+      // OCR/백엔드 연동 로직
       // const result = await executeOCR(images, 'MENU_SCAN');
       // if (result.success && result.refined) {
       //   onAnalysisComplete(result.refined);

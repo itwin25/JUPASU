@@ -254,8 +254,7 @@ export const useChat = () => {
       const isDemoMenuRecommendation =
         text === DEMO_MENU_SCAN_TRIGGER && Boolean(selectedMenu || effectiveSelectedMenu);
 
-      // 시연 종료 후 실제 메뉴판 추천을 다시 연결하려면 이 데모 분기를 제거하면
-      // 아래의 chatApi.sendChatStream(...) 경로로 그대로 복구됩니다.
+      // 메뉴판 추천 데모
       if (isDemoMenuRecommendation) {
         setMessages((prev) => [
           ...prev,
