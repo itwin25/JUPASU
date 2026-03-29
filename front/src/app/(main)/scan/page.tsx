@@ -7,7 +7,7 @@ import { Camera, ChevronLeft, Star, X, Zap, Search, Image as ImageIcon } from 'l
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
-import { useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceOCR';
+import { useOnDeviceGPUOCR as useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceGPUOCR';
 import { OCRResult } from '@/features/scan/types';
 import { searchApi } from '@/features/scan/api/search.api';
 import { HybridSearchResponse } from '@/features/scan/types/search.types';
@@ -59,10 +59,14 @@ export default function ScanPage() {
   }, [status, ocrResults, imageInfo]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // 🚀 OCR 훅들 초기화
   const { executeOCR, error: serverError, isLoading: isServerLoading } = useOCR();
-  const { recognize: scanLocally, isReady: localReady, isProcessing: isLocalLoading } = useOnDeviceOCR();
+  const {
+    recognize: scanLocally,
+    isReady: localReady,
+    isProcessing: isLocalLoading,
+  } = useOnDeviceOCR();
 
   const isAnalyzing = isServerLoading || isLocalLoading;
 
@@ -142,7 +146,7 @@ export default function ScanPage() {
         if (result.success && result.refined) {
           const refined = result.refined;
           const displayResults: OCRResult[] = [];
-          
+
           // 서버 액션(ocr.action.ts)과 동일한 필드 접근
           const winery = refined.winery || '';
           const wineName = refined.wineName || '';
@@ -150,7 +154,7 @@ export default function ScanPage() {
 
           if (winery) displayResults.push({ text: winery, score: 0.9, box: [] });
           if (wineName) displayResults.push({ text: wineName, score: 0.9, box: [] });
-          
+
           setOcrResults(displayResults);
           setImageInfo({ width: canvas.width, height: canvas.height });
           setScanData({
@@ -226,7 +230,7 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="bg-background no-scrollbar flex min-h-screen flex-col -mb-[calc(var(--bottom-nav-height)+var(--safe-bottom)+1rem)]">
+    <div className="bg-background no-scrollbar -mb-[calc(var(--bottom-nav-height)+var(--safe-bottom)+1rem)] flex min-h-screen flex-col">
       <input
         type="file"
         ref={fileInputRef}
@@ -238,7 +242,13 @@ export default function ScanPage() {
       {/* Header */}
       {status !== 'idle' && status !== 'scanning' && (
         <header className="bg-background sticky top-0 z-20 flex items-center justify-between px-6 py-4">
-          <button onClick={() => { setStatus('idle'); setScanMode(null); }} className="-ml-2 p-2">
+          <button
+            onClick={() => {
+              setStatus('idle');
+              setScanMode(null);
+            }}
+            className="-ml-2 p-2"
+          >
             {status === 'result' ? <X /> : <ChevronLeft />}
           </button>
           <h1 className="text-text-main text-lg font-bold">
@@ -248,7 +258,7 @@ export default function ScanPage() {
         </header>
       )}
 
-      <main className="no-scrollbar flex flex-1 flex-col overflow-y-auto px-6 bottom-nav-safe">
+      <main className="no-scrollbar bottom-nav-safe flex flex-1 flex-col overflow-y-auto px-6">
         {status === 'idle' && (
           <div className="flex flex-col pt-16 pb-4">
             <header className="mb-4">
@@ -305,7 +315,7 @@ export default function ScanPage() {
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFE5E5] text-sm font-black text-[#B36262]">
                         {tip.n}
                       </span>
-                      <span className="text-text-main/60 break-keep-all text-[13px] font-bold leading-tight">
+                      <span className="text-text-main/60 break-keep-all text-[13px] leading-tight font-bold">
                         {tip.t}
                       </span>
                     </div>

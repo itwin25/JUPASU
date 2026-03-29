@@ -6,8 +6,11 @@ import com.a505.jupasu.domain.ai.dto.response.ChatResponse;
 import com.a505.jupasu.domain.ai.dto.response.RefineResponse;
 import com.a505.jupasu.domain.ai.entity.ChatMessage;
 import com.a505.jupasu.domain.ai.repository.ChatMessageRepository;
+import com.a505.jupasu.domain.preference.entity.Preference;
+import com.a505.jupasu.domain.preference.repository.PreferenceRepository;
 import com.a505.jupasu.domain.user.entity.User;
 import com.a505.jupasu.domain.user.repository.UserRepository;
+import com.a505.jupasu.domain.wine.util.WineRecommendationCalculator;
 import com.a505.jupasu.global.exception.CustomException;
 import com.a505.jupasu.global.exception.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -20,9 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,6 +35,8 @@ public class AiService {
     private final WebClient webClient;
     private final ChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
+    private final PreferenceRepository preferenceRepository;
+    private final WineRecommendationCalculator wineRecommendationCalculator;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Flux<String> chat(ChatRequest request, String email) {
@@ -59,15 +62,54 @@ public class AiService {
                 })
                 .collect(Collectors.toList());
 
+        // --- 친구 및 그룹 취향 통합 로직 ---
+        List<Map<String, Object>> friendsWithPrefs = new ArrayList<>();
+        List<Preference> allPreferences = new ArrayList<>();
+        
+        // 1. 본인 취향 추가
+        preferenceRepository.findByUserId(user.getId()).ifPresent(allPreferences::add);
+
+        // 2. 언급된 친구들 취향 조회 및 데이터 구성
+        if (request.getMentionedFriends() != null) {
+            for (Map<String, Object> friendMap : request.getMentionedFriends()) {
+                try {
+                    Object idObj = friendMap.get("id");
+                    if (idObj == null) continue;
+                    Long friendId = Long.valueOf(idObj.toString());
+                    
+                    Map<String, Object> friendData = new HashMap<>(friendMap);
+                    preferenceRepository.findByUserId(friendId).ifPresent(p -> {
+                        allPreferences.add(p);
+                        // 개별 친구 취향 데이터 담기 (AI의 답변 생성용)
+                        Map<String, Object> pMap = new HashMap<>();
+                        pMap.put("sweetness", p.getSweetness());
+                        pMap.put("acidity", p.getAcidity());
+                        pMap.put("body", p.getBody());
+                        pMap.put("tannin", p.getTannin());
+                        friendData.put("preference", pMap);
+                    });
+                    friendsWithPrefs.add(friendData);
+                } catch (Exception e) {
+                    log.warn("친구 취향 조회 중 오류 발생: {}", e.getMessage());
+                }
+            }
+        }
+
+        // 3. 그룹 통합 컨텍스트 계산 (리스크 회피 로직 포함)
+        Map<String, Object> groupContext = wineRecommendationCalculator.calculateGroupContext(allPreferences);
+
         Map<String, Object> payload = new HashMap<>();
         payload.put("message", request.getMessage());
         payload.put("history", history);
         payload.put("session_id", sessionId);
-        payload.put("selected_wine", request.getSelectedWine() != null ? request.getSelectedWine() : null);
-        payload.put("selected_menu", request.getSelectedMenu() != null ? request.getSelectedMenu() : null);
+        payload.put("selected_wine", request.getSelectedWine());
+        payload.put("selected_menu", request.getSelectedMenu());
         payload.put("user_id", user.getId());
+        payload.put("user_nickname", user.getNickname()); // 추가: 사용자 본인 닉네임
         payload.put("stream", true);
-        payload.put("mentioned_friends", request.getMentionedFriends() != null ? request.getMentionedFriends() : List.of());
+        payload.put("mentioned_friends", friendsWithPrefs);
+        payload.put("group_context", groupContext);
+
 
         StringBuilder fullTextForStorage = new StringBuilder();
         StringBuilder cardJsonForStorage = new StringBuilder();
@@ -75,7 +117,7 @@ public class AiService {
         String finalSessionId = sessionId;
 
         return webClient.post()
-                .uri("/v1/chat")
+                .uri("/v1/chat/stream")
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(payload)

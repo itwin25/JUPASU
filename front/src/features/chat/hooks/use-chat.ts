@@ -13,6 +13,7 @@ export interface WineCardData {
   price?: number;
   match_percent?: number;
   image_url?: string;
+  detail_url?: string;
 }
 
 export interface MenuRecommendation {
@@ -25,6 +26,7 @@ export interface MenuRecommendation {
 export interface SelectedMenuContext {
   wineNames?: string[];
   foodNames?: string[];
+  taggedFoods?: string[];
 }
 
 export interface MentionedFriend {
@@ -39,14 +41,12 @@ export interface ChatMessage {
   displayText?: string;
   card?: ChatCard | null;
   actions?: ChatAction[];
-  recommendations?: WineCardData[]; // 리스트형 추천
-  menuPairings?: MenuRecommendation[]; // 메뉴판 페어링
+  recommendations?: WineCardData[];
+  menuPairings?: MenuRecommendation[];
 }
 
-/** 세션 ID 생성 유틸리티 */
 const createSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-/** 기존 세션 ID를 가져오거나 새로 생성 */
 const getOrCreateSessionId = () => {
   if (typeof window === 'undefined') return createSessionId();
   const stored = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -56,7 +56,6 @@ const getOrCreateSessionId = () => {
   return next;
 };
 
-/** 메뉴판 페어링 인트로 랜덤 생성 */
 const PAIRING_INTROS = [
   (name: string) =>
     `${name}님의 취향에 맞는 멋진 페어링을 찾았습니다!\n깊이 있는 풍미를 즐기시는 분께 특별히 추천드립니다.`,
@@ -80,7 +79,6 @@ function stripMarkdown(text: string): string {
   return text.replace(/\*+/g, '').trim();
 }
 
-/** AI 응답에서 메뉴판 페어링 정보 파싱 */
 function parseMenuPairings(responseText: string): MenuRecommendation[] {
   const recommendations: MenuRecommendation[] = [];
   const sections = responseText.split(/(?=\d+\.\s*\**\s*메뉴판\s*음식)/);
@@ -133,7 +131,6 @@ export const useChat = () => {
   const [selectedMenuContext, setSelectedMenuContext] = useState<SelectedMenuContext | null>(null);
   const [activeMode, setActiveMode] = useState<'general' | 'menu'>('general');
 
-  /** 히스토리 데이터를 메시지 객체로 변환 */
   const mapHistoryToMessages = useCallback(
     (history: ChatMessageResponse[]): ChatMessage[] => {
       return history.map((msg) => {
@@ -187,18 +184,25 @@ export const useChat = () => {
     fetchHistory();
   }, [mapHistoryToMessages]);
 
-  /** 스트림 데이터를 메시지에 적용 */
   const applyStreamChunk = useCallback((botMessageId: number, chunk: ChatStreamChunk) => {
     setMessages((prev) =>
       prev.map((msg) => {
         if (msg.id !== botMessageId) return msg;
+
         const nextText = chunk.content ?? chunk.answer;
+
+        // 서버에서 정규화된 필드명(name_kr, match_percent)을 그대로 반영
+        const nextCard = chunk.card !== undefined ? chunk.card : msg.card;
+        const nextRecommendations = chunk.cards
+          ? (chunk.cards as WineCardData[])
+          : msg.recommendations;
+
         return {
           ...msg,
           text: nextText ? msg.text + nextText : msg.text,
-          card: chunk.card !== undefined ? chunk.card : msg.card,
+          card: nextCard,
           actions: chunk.actions ?? msg.actions ?? [],
-          recommendations: (chunk.cards as WineCardData[]) ?? msg.recommendations,
+          recommendations: nextRecommendations,
         };
       }),
     );
@@ -216,12 +220,15 @@ export const useChat = () => {
       const activeSessionId = sessionId || getOrCreateSessionId();
       if (!sessionId) setSessionId(activeSessionId);
 
-      // 메뉴 모드 컨텍스트 결정
       const effectiveSelectedMenu =
         selectedMenu ?? (activeMode === 'menu' ? (selectedMenuContext ?? undefined) : undefined);
+
+      const isActualMenuScan = selectedMenu && (selectedMenu.foodNames || selectedMenu.wineNames);
       if (selectedMenu) {
         setSelectedMenuContext(selectedMenu);
-        setActiveMode('menu');
+        if (isActualMenuScan) {
+          setActiveMode('menu');
+        }
       }
 
       const userMessage: ChatMessage = {
@@ -258,7 +265,6 @@ export const useChat = () => {
           mentionedFriends,
         );
 
-        // 스트리밍 완료 후 메뉴판 페어링 추가 분석
         if (fullBotText.includes('메뉴판 음식') || fullBotText.includes('메뉴판음식')) {
           const pairings = parseMenuPairings(fullBotText);
           if (pairings.length > 0) {
@@ -309,12 +315,18 @@ export const useChat = () => {
     setActiveMode('general');
   }, []);
 
+  const hasActualMenuContext = Boolean(
+    selectedMenuContext &&
+    ((selectedMenuContext.foodNames && selectedMenuContext.foodNames.length > 0) ||
+      (selectedMenuContext.wineNames && selectedMenuContext.wineNames.length > 0)),
+  );
+
   return {
     messages,
     isLoading,
     isInitializing,
     activeMode,
-    hasMenuContext: Boolean(selectedMenuContext),
+    hasMenuContext: hasActualMenuContext,
     enterMenuMode,
     exitMenuMode,
     sendMessage,

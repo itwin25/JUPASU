@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { Camera, RefreshCw, CheckCircle2, Image as ImageIcon, Zap, Search } from 'lucide-react';
 import Button from '@/components/ui/button/Button';
 import { useOCR } from '../hooks/useOCR';
-import { useOnDeviceOCR } from '../hooks/useOnDeviceOCR';
+import { useOnDeviceGPUOCR as useOnDeviceOCR } from '../hooks/useOnDeviceGPUOCR';
 import { OCRResult } from '../types';
 
 export default function Scanner() {
@@ -26,7 +26,11 @@ export default function Scanner() {
   }, [capturedImage]);
 
   const { executeOCR, error: ocrError, isLoading: isOcrLoading } = useOCR();
-  const { recognize: scanLocally, isReady: localReady, isProcessing: isLocalProcessing } = useOnDeviceOCR();
+  const {
+    recognize: scanLocally,
+    isReady: localReady,
+    isProcessing: isLocalProcessing,
+  } = useOnDeviceOCR();
 
   // 🚀 공통 카메라 중지 로직
   const stopCamera = useCallback(() => {
@@ -87,8 +91,17 @@ export default function Scanner() {
         const result = await scanLocally(canvas);
         console.log('✅ [Main] 온디바이스 OCR 응답:', result);
 
+        interface RefinedOCRData {
+          winery?: string;
+          wineName?: string;
+          data?: {
+            winery?: string;
+            wineName?: string;
+          };
+        }
+
         if (result.success && result.refined) {
-          const refined = result.refined as any;
+          const refined = result.refined as RefinedOCRData;
           // 온디바이스 결과 텍스트를 화면에 표시
           const winery = refined.data?.winery || refined.winery;
           const wineName = refined.data?.wineName || refined.wineName;
