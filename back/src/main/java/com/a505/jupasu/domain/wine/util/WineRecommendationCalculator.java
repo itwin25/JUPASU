@@ -746,5 +746,83 @@ private CalibratedProfile blendProfiles(List<CalibratedProfile> profiles) {
     );
 }
 
-    record WineScore(int match, Wine wine) {}
+/**
+ * [그룹 취향 결합 로직]
+ * 여러 명의 취향 데이터를 분석하여 리스크를 회피하고 공통점을 추출한 그룹 컨텍스트를 생성합니다.
+ */
+public Map<String, Object> calculateGroupContext(List<Preference> preferences) {
+    if (preferences == null || preferences.isEmpty()) return Map.of();
+
+    List<String> constraints = new ArrayList<>();
+    Map<String, Double> targetProfile = new HashMap<>();
+
+    // 1. 각 속성별 통계 추출 및 제약 사항 도출
+    analyzeAttribute("sweetness", preferences, constraints, targetProfile, "sweet", "당도");
+    analyzeAttribute("acidity", preferences, constraints, targetProfile, "acid", "산도");
+    analyzeAttribute("body", preferences, constraints, targetProfile, "body", "바디감");
+    analyzeAttribute("tannin", preferences, constraints, targetProfile, "tannin", "탄닌");
+    Map<String, Object> result = new HashMap<>();
+    result.put("target_profile", targetProfile);
+    result.put("constraints", constraints);
+
+    // 2. 간단한 요약 텍스트 생성
+    String summary = generateGroupSummary(constraints);
+    result.put("summary", summary);
+
+    return result;
 }
+
+private void analyzeAttribute(String fieldName, List<Preference> prefs, List<String> constraints, 
+                             Map<String, Double> target, String key, String label) {
+    List<Integer> values = prefs.stream()
+            .map(p -> {
+                if (fieldName.equals("sweetness")) return p.getSweetness();
+                if (fieldName.equals("acidity")) return p.getAcidity();
+                if (fieldName.equals("body")) return p.getBody();
+                if (fieldName.equals("tannin")) return p.getTannin();
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .toList();
+
+    if (values.isEmpty()) return;
+
+    int min = Collections.min(values);
+    int max = Collections.max(values);
+    double avg = values.stream().mapToInt(Integer::intValue).average().orElse(3.0);
+
+    // 리스크 회피 로직: 한 명이라도 1점(극불호)이면 목표 수치를 낮추고 제약 추가
+    if (min <= 1) {
+        constraints.add("avoid_high_" + fieldName);
+        avg = Math.min(avg, 2.5); // 평균치를 강제로 낮춤 (불호 반영)
+    }
+
+    // 취향 충돌 감지
+    if (max - min >= 3) {
+        constraints.add(fieldName + "_preference_conflict");
+    }
+
+    // 공통 선호 감지
+    if (avg >= 4.0) {
+        constraints.add("unanimous_high_" + fieldName);
+    }
+
+    target.put(key, avg);
+}
+
+private String generateGroupSummary(List<String> constraints) {
+    if (constraints.isEmpty()) return "멤버들의 취향이 대체로 조화롭습니다.";
+
+    StringBuilder sb = new StringBuilder();
+    if (constraints.stream().anyMatch(c -> c.startsWith("avoid_"))) {
+        sb.append("특정 맛에 민감한 멤버가 있어 리스크를 최소화했습니다. ");
+    }
+    if (constraints.stream().anyMatch(c -> c.endsWith("_conflict"))) {
+        sb.append("멤버 간 취향 차이가 있는 부분은 중간 지점을 고려했습니다.");
+    }
+    return sb.toString().trim();
+}
+
+record WineScore(int match, Wine wine) {}
+}
+
