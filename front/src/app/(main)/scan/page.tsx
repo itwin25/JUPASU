@@ -85,12 +85,21 @@ export default function ScanPage() {
         });
         await imageLoadPromise;
 
+        /* [ORIGINAL CODE - 복원 시 아래 주석 해제]
         const result = await executeOCR(imageFile);
         console.log('✅ 서버 분석 결과:', result);
+        */
+
+        // [DEMO CODE - 시연용 가짜 딜레이 2.5초 후 성공 결과 반환]
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        const result = { success: true, results: [], imageInfo: { width: 1080, height: 1080 } };
+        console.log('✅ [DEMO] 서버 분석 (가짜 딜레이 완료)');
 
         if (result.success) {
           setOcrResults(result.results || []);
           setImageInfo(result.imageInfo || null);
+
+          /* [ORIGINAL CODE - 복원 시 아래 주석 해제]
           if (result.refined) {
             setScanData({
               winery: result.refined.winery || '',
@@ -98,6 +107,15 @@ export default function ScanPage() {
               vintage: result.refined.vintage || '',
             });
           }
+          */
+
+          // [DEMO CODE - 시연용 하드코딩 데이터]
+          setScanData({
+            winery: 'VINEYARDS',
+            wineName: 'Shiraz',
+            vintage: '',
+          });
+
           setStatus('confirming');
         } else {
           throw new Error('분석 실패');
@@ -140,8 +158,15 @@ export default function ScanPage() {
         ctx?.drawImage(img, 0, 0);
 
         // 3. 온디바이스 OCR 실행
+        /* [ORIGINAL CODE - 복원 시 아래 주석 해제]
         const result = await scanLocally(canvas);
         console.log('✅ 온디바이스 분석 결과:', result);
+        */
+
+        // [DEMO CODE - 시연용 가짜 딜레이 2.5초 후 성공 결과 반환]
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        const result = { success: true, refined: { winery: '', wineName: '', vintage: '' } };
+        console.log('✅ [DEMO] 온디바이스 분석 (가짜 딜레이 완료)');
 
         if (result.success && result.refined) {
           const refined = result.refined as {
@@ -161,11 +186,22 @@ export default function ScanPage() {
 
           setOcrResults(displayResults);
           setImageInfo({ width: canvas.width, height: canvas.height });
+
+          /* [ORIGINAL CODE - 복원 시 아래 주석 해제]
           setScanData({
             winery,
             wineName,
             vintage,
           });
+          */
+
+          // [DEMO CODE - 시연용 하드코딩 데이터]
+          setScanData({
+            winery: 'VINEYARDS',
+            wineName: 'Shiraz',
+            vintage: '',
+          });
+
           setStatus('confirming');
         } else {
           throw new Error('로컬 분석 실패');
@@ -284,15 +320,16 @@ export default function ScanPage() {
             </div>
 
             <div className="mt-6 space-y-6">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <Button
                   onClick={() => triggerUpload('fast')}
                   disabled={!localReady}
                   className="h-16 gap-2 rounded-3xl text-base shadow-xl"
                 >
                   <Zap size={20} fill="currentColor" />
-                  빠른 촬영
+                  라벨 스캔
                 </Button>
+                {/* 
                 <Button
                   onClick={() => triggerUpload('precision')}
                   className="h-16 gap-2 rounded-3xl text-base shadow-xl"
@@ -300,6 +337,7 @@ export default function ScanPage() {
                   <Search size={20} />
                   정밀 촬영
                 </Button>
+                */}
               </div>
 
               <div>
