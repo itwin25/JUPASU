@@ -1,21 +1,24 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Send, ChevronLeft, ChevronRight, Heart, RotateCcw, X } from 'lucide-react';
-import { useChat } from '@/features/chat/hooks/use-chat';
+import { Plus, Send, ChevronLeft, Heart, RotateCcw, X } from 'lucide-react';
+import { useChat, SelectedMenuContext } from '@/features/chat/hooks/use-chat';
 import { friendApi } from '@/features/friend/api/friend.api';
 import { FriendListItem } from '@/features/friend/types/friend.types';
 import MenuScannerModal from '@/features/scan/components/MenuScannerModal';
-import { useWineScrapMutation } from '@/features/wine/hooks/useWineListQuery';
+import {
+  useWineScrapMutation,
+  useScrappedWineIdsQuery,
+} from '@/features/wine/hooks/useWineListQuery';
+import { MentionsInput, Mention, MentionsInputStyle } from 'react-mentions';
 
 const formatPrice = (price?: number | null) => {
   if (!price || price <= 0) {
     return '가격 정보 확인 필요';
   }
-
   return `₩${price.toLocaleString('ko-KR')}`;
 };
 
@@ -33,18 +36,13 @@ export default function ChatPage() {
   } = useChat();
 
   const { mutateAsync: toggleScrap, isPending: isScrapPending } = useWineScrapMutation();
+  const { data: scrappedWineIds = [] } = useScrappedWineIdsQuery();
+
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [isMenuScanOpen, setIsMenuScanOpen] = useState(false);
-  const [scrappedWineIds, setScrappedWineIds] = useState<number[]>([]);
-
-  // 맨션 관련 상태
   const [friends, setFriends] = useState<FriendListItem[]>([]);
-  const [showMentionOverlay, setShowMentionOverlay] = useState(false);
-  const [mentionFilter, setMentionFilter] = useState('');
-  const [mentionedFriends, setMentionedFriends] = useState<{ id: number; nickname: string }[]>([]);
 
-  // 친구 목록 가져오기
   useEffect(() => {
     friendApi.getFriends().then(setFriends).catch(console.error);
   }, []);
@@ -59,100 +57,129 @@ export default function ChatPage() {
     [messages],
   );
 
+  // --- [정밀 튜닝] Mentions 레이어링 스타일 ---
+  const sharedStyle = {
+    fontSize: '14px',
+    lineHeight: '20px',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
+    fontWeight: 600,
+  };
+
+  const mentionsStyle: MentionsInputStyle = {
+    control: {
+      backgroundColor: 'transparent',
+      fontSize: '14px',
+      fontWeight: 600,
+    },
+    '&multiLine': {
+      control: {
+        minHeight: '40px',
+      },
+      highlighter: {
+        ...sharedStyle,
+        color: 'transparent',
+        padding: '12px 12px 8px 4px',
+        border: '1px solid transparent',
+      },
+      input: {
+        ...sharedStyle,
+        padding: '10px 12px',
+        outline: 'none',
+        color: '#4A3428',
+        border: '1px solid transparent',
+      },
+    },
+    suggestions: {
+      list: {
+        backgroundColor: 'white',
+        border: '1px solid rgba(0,0,0,0.1)',
+        fontSize: '14px',
+        borderRadius: '1rem',
+        overflow: 'hidden',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+        position: 'absolute',
+        bottom: '100%',
+        marginBottom: '10px',
+      },
+      item: {
+        padding: '10px 15px',
+        '&focused': {
+          backgroundColor: '#FDF6E9',
+        },
+      },
+    },
+  };
+
+  const mentionTagStyle = {
+    backgroundColor: '#F4E7D8',
+    color: 'transparent',
+    borderRadius: '4px',
+    padding: '1px 4px',
+  };
+
+  const foodTagStyle = {
+    backgroundColor: '#FFF9EB',
+    color: 'transparent',
+    borderRadius: '4px',
+    padding: '1px 4px',
+  };
+
+  // --- 시연용 로직 및 상태 병합 ---
   const currentWineId = latestBotMessage?.card?.wine_id;
   const isScrapped =
     typeof currentWineId === 'number' ? scrappedWineIds.includes(currentWineId) : false;
+
   const isMenuDemoLoading =
     isLoading &&
-    latestBotMessage?.text.includes('소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.');
+    latestBotMessage?.text?.includes('소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.');
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
 
-    // 실제 메시지에 포함된 맨션 친구들만 필터링 (삭제되었을 수 있으므로)
-    const activeMentions = mentionedFriends.filter((f) => inputValue.includes(`@${f.nickname}`));
+    const mentionRegex = /@\[([^\]]+)\]\(user:([^\)]+)\)/g;
+    const foodRegex = /#\[([^\]]+)\]\(food:([^\)]+)\)/g;
 
-    sendMessage(inputValue.trim(), undefined, undefined, activeMentions);
+    const activeMentions: { id: number; nickname: string }[] = [];
+    let match;
+    while ((match = mentionRegex.exec(inputValue)) !== null) {
+      activeMentions.push({ id: Number(match[2]), nickname: match[1] });
+    }
+
+    const taggedFoods: string[] = [];
+    while ((match = foodRegex.exec(inputValue)) !== null) {
+      taggedFoods.push(match[1]);
+    }
+
+    const displayValue = inputValue.replace(mentionRegex, '@$1').replace(foodRegex, '#$1');
+    const menuContext = taggedFoods.length > 0 ? { taggedFoods } : undefined;
+
+    sendMessage(displayValue.trim(), undefined, menuContext, activeMentions);
     setInputValue('');
-    setMentionedFriends([]);
     setShowMenu(false);
-    setShowMentionOverlay(false);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-
-    // 맨션 트리거 감지 (@ 이후 텍스트 추출)
-    const lastAtIdx = value.lastIndexOf('@');
-    if (lastAtIdx !== -1) {
-      const textAfterAt = value.slice(lastAtIdx + 1);
-      // 공백이 있으면 맨션 모드 종료
-      if (!textAfterAt.includes(' ')) {
-        setMentionFilter(textAfterAt);
-        setShowMentionOverlay(true);
-        return;
-      }
-    }
-    setShowMentionOverlay(false);
-  };
-
-  const handleSelectFriend = (friend: FriendListItem) => {
-    const lastAtIdx = inputValue.lastIndexOf('@');
-    if (lastAtIdx === -1) return;
-
-    const beforeAt = inputValue.slice(0, lastAtIdx);
-    const newValue = `${beforeAt}@${friend.nickname} `;
-
-    setInputValue(newValue);
-    setMentionedFriends((prev) => {
-      if (prev.find((f) => f.id === friend.friendId)) return prev;
-      return [...prev, { id: friend.friendId, nickname: friend.nickname }];
-    });
-    setShowMentionOverlay(false);
-  };
-
-  const filteredFriends = friends.filter((f) =>
-    f.nickname.toLowerCase().includes(mentionFilter.toLowerCase()),
-  );
-
-  const handleToggleScrap = async () => {
-    if (!currentWineId || isScrapPending) return;
-
-    try {
-      await toggleScrap(currentWineId);
-      setScrappedWineIds((prev) =>
-        prev.includes(currentWineId)
-          ? prev.filter((wineId) => wineId !== currentWineId)
-          : [...prev, currentWineId],
-      );
-    } catch (error) {
-      console.error('Failed to toggle wishlist:', error);
-    }
-  };
-
-  const handleMenuScanComplete = (data: { wineNames?: string[]; foodNames?: string[] }) => {
-    if (!data) return;
-
-    const wines = data.wineNames || [];
-    const foods = data.foodNames || [];
-
-    if (wines.length === 0 && foods.length === 0) {
-      sendMessage('메뉴판에서 와인이나 음식을 찾지 못했습니다.');
-      return;
-    }
-
+  const handleMenuScanComplete = (data: SelectedMenuContext) => {
     sendMessage('메뉴판 스캔 완료', '🍷 메뉴판으로 추천받기', data);
   };
 
+  const handleToggleScrap = async (wineId?: number) => {
+    if (!wineId || isScrapPending) return;
+    try {
+      await toggleScrap(wineId);
+    } catch (error) {
+      console.error('Failed to toggle scrap:', error);
+    }
+  };
+
   return (
-    <div className="relative -mb-[calc(var(--bottom-nav-height)+var(--safe-bottom)+1rem)] min-h-screen overflow-hidden bg-[#2E1E18]">
+    <div className="relative min-h-screen overflow-hidden bg-[#2E1E18]">
       <div className="absolute inset-0 z-0">
         <Image src="/chatbot.svg" alt="소믈리에 배경" fill className="object-cover" priority />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(25,16,12,0.28),rgba(25,16,12,0.1)_30%,rgba(25,16,12,0.18)_72%,rgba(25,16,12,0.5))]" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="relative z-10 flex min-h-screen flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <header className="flex items-center justify-between px-1 py-2 text-white">
           <button
             onClick={() => router.push('/home')}
@@ -161,19 +188,17 @@ export default function ChatPage() {
             <ChevronLeft size={18} />
             뒤로가기
           </button>
-
           <button
             onClick={startNewChat}
             className="flex items-center gap-1.5 rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
           >
-            <RotateCcw size={16} />새 대화
+            <RotateCcw size={16} />새 채팅
           </button>
-
           <Link
             href="/chat/history"
             className="rounded-full bg-black/18 px-3 py-2 text-[0.82rem] font-black backdrop-blur-sm transition-colors hover:bg-black/26"
           >
-            전체 대화 보기
+            기록
           </Link>
         </header>
 
@@ -192,6 +217,7 @@ export default function ChatPage() {
                     : '소믈리에에게 물어보세요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.')}
               </p>
 
+              {/* [복구] 시연용 화려한 로딩 애니메이션 */}
               {isMenuDemoLoading && (
                 <div className="menu-loading-shell mt-4 overflow-hidden rounded-[1.6rem] border border-[#F1D9B0] bg-[linear-gradient(135deg,#FFF9EF,#FFF1D4)] px-4 py-4 shadow-[0_14px_30px_rgba(179,98,98,0.1)]">
                   <div className="flex items-center gap-4">
@@ -229,7 +255,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
-              {/* 추천 와인 카드 리스트 (기존 recommendations 형태) */}
+              {/* 리스트형 추천 카드 디자인 통합 */}
               {latestBotMessage?.recommendations && latestBotMessage.recommendations.length > 0 && (
                 <div className="mt-4 space-y-3">
                   {latestBotMessage.recommendations.map((rec, index) => (
@@ -244,35 +270,29 @@ export default function ChatPage() {
                     >
                       <div className="flex items-center gap-4">
                         <div className="relative flex h-28 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.15rem] bg-[radial-gradient(circle_at_top,#FFFDF7,#F9E6C0_62%,#F0D29D)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(155,106,66,0.12)]">
-                          {rec.image_url ? (
-                            <Image
-                              src={rec.image_url}
-                              alt={rec.name_kr || '와인'}
-                              fill
-                              className="object-contain p-2 drop-shadow-[0_16px_18px_rgba(70,42,20,0.22)]"
-                            />
-                          ) : (
-                            <span className="text-xl">🍷</span>
-                          )}
+                          <Image
+                            src={rec.image_url || '/default_wine.png'}
+                            alt={rec.name_kr || '와인'}
+                            fill
+                            className="object-contain p-2 drop-shadow-[0_16px_18px_rgba(70,42,20,0.22)]"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="recommendation-chip mb-2 inline-flex rounded-full bg-[#F4E4C8] px-2.5 py-1 text-[0.6rem] font-black tracking-[0.08em] text-[#9B6A42] uppercase">
                             Sommelier Pick
                           </div>
                           <h3 className="text-text-main truncate text-[1rem] font-black">
-                            {rec.name_kr || rec.name_en}
+                            {rec.name_kr}
                           </h3>
                           <p className="text-text-main/48 mt-1 truncate text-[0.76rem] font-semibold">
                             {rec.subtitle || rec.name_en}
                           </p>
                           <div className="mt-3 flex items-center gap-2">
-                            {rec.price && (
-                              <p className="text-[0.82rem] font-black text-[#B36262]">
-                                ₩{rec.price.toLocaleString()}
-                              </p>
-                            )}
                             <span className="rounded-full bg-[#C78354] px-1.5 py-0.5 text-[0.55rem] font-black text-white uppercase">
                               {rec.match_percent || 90}% match
+                            </span>
+                            <span className="text-[0.82rem] font-black text-[#B36262]">
+                              {formatPrice(rec.price)}
                             </span>
                           </div>
                         </div>
@@ -282,76 +302,55 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* 추천 와인 카드 (새로운 card 형태) */}
+              {/* 단일 추천 카드 디자인 */}
               {latestBotMessage?.card && (
-                <>
+                <div className="mt-4">
                   <Link
                     href={`/wines/${latestBotMessage.card.wine_id}`}
-                    className="relative mt-4 block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4 pr-10 transition-transform hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(155,106,66,0.12)]"
+                    className="block rounded-[1.75rem] border border-[#F1D991] bg-[#FFF9EB] p-4"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className="ml-[-0.15rem] flex h-24 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] bg-white p-2 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm">
                         <Image
                           src={latestBotMessage.card.image_url || '/default_wine.png'}
-                          alt={latestBotMessage.card.name_kr}
-                          width={64}
-                          height={64}
-                          className="h-full w-full object-contain"
+                          alt={latestBotMessage.card.name_kr || '추천 와인'}
+                          fill
+                          className="object-cover p-1"
                         />
                       </div>
-
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h3 className="text-text-main truncate text-[1rem] font-black">
-                              {latestBotMessage.card.name_kr}
-                            </h3>
-                            <p className="text-text-main/55 text-[0.72rem] font-semibold">
-                              {latestBotMessage.card.subtitle || '추천 와인'}
-                            </p>
-                          </div>
-
-                          <div className="flex items-start gap-2">
-                            {typeof latestBotMessage.card.match_percent === 'number' && (
-                              <span className="relative top-[-0.15rem] shrink-0 rounded-full bg-[#C78354] px-3 py-1.5 text-[0.72rem] font-black text-white">
-                                {latestBotMessage.card.match_percent}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <p
-                          className={`mt-2 font-black text-[#B36262] ${
-                            !latestBotMessage.card.price || latestBotMessage.card.price <= 0
-                              ? 'text-[0.84rem]'
-                              : 'text-[1rem]'
-                          }`}
-                        >
+                        <h3 className="text-text-main truncate text-[1rem] font-black">
+                          {latestBotMessage.card.name_kr}
+                        </h3>
+                        <p className="text-text-main/48 truncate text-[0.72rem] font-bold">
+                          {latestBotMessage.card.subtitle || latestBotMessage.card.name_en}
+                        </p>
+                        <p className="mt-1 font-black text-[#B36262]">
                           {formatPrice(latestBotMessage.card.price)}
                         </p>
                       </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="rounded-full bg-[#C78354] px-2 py-0.5 text-[0.6rem] font-black whitespace-nowrap text-white">
+                          {latestBotMessage.card.match_percent}% match
+                        </span>
+                      </div>
                     </div>
-                    <ChevronRight
-                      size={18}
-                      className="absolute top-1/2 right-4 -translate-y-1/2 text-[#9B6A42]"
-                    />
                   </Link>
 
                   <button
-                    onClick={handleToggleScrap}
-                    disabled={isScrapPending}
-                    className="text-text-main/70 mt-4 inline-flex items-center gap-2 text-[0.86rem] font-semibold disabled:opacity-50"
+                    onClick={() => handleToggleScrap(latestBotMessage.card?.wine_id)}
+                    className="text-text-main/52 mt-3 flex items-center gap-1.5 px-1 text-[0.74rem] font-bold transition-opacity active:opacity-60"
                   >
                     <Heart
-                      size={18}
+                      size={14}
                       className={isScrapped ? 'fill-[#D16B74] text-[#D16B74]' : 'text-[#D16B74]'}
                     />
-                    위시리스트에 추가하기
+                    {isScrapped ? '위시리스트에서 삭제' : '위시리스트에 추가하기'}
                   </button>
-                </>
+                </div>
               )}
 
-              {/* 메뉴판 페어링 카드 */}
+              {/* [복구] 메뉴판 페어링 상세 카드 */}
               {latestBotMessage?.menuPairings && latestBotMessage.menuPairings.length > 0 && (
                 <div className="mt-6 space-y-4">
                   {latestBotMessage.menuPairings.map((pairing) => (
@@ -399,7 +398,6 @@ export default function ChatPage() {
                   ))}
                 </div>
               )}
-
               <div className="absolute right-8 bottom-0 h-5 w-5 translate-y-[40%] rotate-45 rounded-[0.35rem] bg-white" />
             </div>
           </section>
@@ -426,13 +424,13 @@ export default function ChatPage() {
                   setIsMenuScanOpen(true);
                   setShowMenu(false);
                 }}
-                className="text-text-main hover:bg-primary-100/30 w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold transition-colors"
+                className="text-text-main w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold hover:bg-[#FDF6E9]"
               >
                 메뉴판 스캔
               </button>
               <button
                 onClick={() => router.push('/scan')}
-                className="hover:bg-primary-100/30 w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold text-[#7B4D9B] transition-colors"
+                className="w-full rounded-[1rem] px-3 py-2.5 text-left text-[0.78rem] font-bold text-[#7B4D9B] hover:bg-[#FDF6E9]"
               >
                 라벨 스캔
               </button>
@@ -451,11 +449,10 @@ export default function ChatPage() {
                   />
                   <span>{activeMode === 'menu' ? '메뉴판 추천 ON' : '메뉴판 추천 OFF'}</span>
                 </button>
-
                 {activeMode === 'menu' ? (
                   <button
                     onClick={exitMenuMode}
-                    className="flex items-center gap-1 rounded-full bg-[#F4E7D8] px-2.5 py-1 text-[0.7rem] font-black text-[#9B6A42] transition-colors hover:bg-[#EEDBC7]"
+                    className="flex items-center gap-1 rounded-full bg-[#F4E7D8] px-2.5 py-1 text-[0.7rem] font-black text-[#9B6A42] hover:bg-[#EEDBC7]"
                   >
                     <X size={12} />
                     일반 대화
@@ -463,7 +460,7 @@ export default function ChatPage() {
                 ) : (
                   <button
                     onClick={enterMenuMode}
-                    className="rounded-full bg-[#B36262] px-2.5 py-1 text-[0.7rem] font-black text-white transition-colors hover:bg-[#9F5454]"
+                    className="rounded-full bg-[#B36262] px-2.5 py-1 text-[0.7rem] font-black text-white hover:bg-[#9F5454]"
                   >
                     이어서 추천
                   </button>
@@ -472,24 +469,6 @@ export default function ChatPage() {
             )}
 
             <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
-              {showMentionOverlay && filteredFriends.length > 0 && (
-                <div className="absolute right-4 bottom-full left-4 z-[30] mb-3 max-h-48 overflow-y-auto rounded-2xl border border-white/20 bg-white/95 p-2 shadow-[0_10px_30px_rgba(0,0,0,0.15)] backdrop-blur-md">
-                  <div className="px-2 py-1.5 text-[0.7rem] font-bold text-[#9B6A42] opacity-60">
-                    함께 마시는 친구 태그
-                  </div>
-                  {filteredFriends.map((friend) => (
-                    <button
-                      key={friend.friendId}
-                      onClick={() => handleSelectFriend(friend)}
-                      className="flex w-full items-center gap-2 rounded-xl px-4 py-2.5 transition-colors hover:bg-[#FDF6E9] active:bg-[#F9EBD3]"
-                    >
-                      <span className="text-[14px] font-bold text-[#4A3428]">
-                        @{friend.nickname}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
               <button
                 onClick={() => setShowMenu((prev) => !prev)}
                 className="border-primary-100 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-[#B36262] transition-transform active:scale-95"
@@ -497,26 +476,52 @@ export default function ChatPage() {
                 <Plus size={18} />
               </button>
 
-              <input
-                className="text-text-main placeholder:text-text-main/35 min-w-0 flex-1 bg-transparent text-[0.86rem] font-medium focus:outline-none"
-                placeholder={
-                  activeMode === 'menu'
-                    ? '메뉴판 기준으로 다시 추천받아보세요'
-                    : '소믈리에에게 물어보세요... (@김친구)'
-                }
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (showMentionOverlay && filteredFriends.length > 0) {
-                      handleSelectFriend(filteredFriends[0]);
+              <div className="min-w-0 flex-1">
+                <MentionsInput
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={
+                    activeMode === 'menu'
+                      ? '메뉴판 기준으로 추천받기'
+                      : '@친구, #음식 태그를 활용해보세요...'
+                  }
+                  style={mentionsStyle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                    } else {
                       handleSend();
                     }
-                  }
-                }}
-              />
+                  }}
+                >
+                  <Mention
+                    trigger="@"
+                    markup="@[__display__](user:__id__)"
+                    data={friends.map((f) => ({
+                      id: String(f.friendId),
+                      display: String(f.nickname || '이름 없음'),
+                    }))}
+                    style={mentionTagStyle}
+                    displayTransform={(_, display) => `${display}`}
+                    appendSpaceOnAdd
+                  />
+                  <Mention
+                    trigger="#"
+                    markup="#[__display__](food:__id__)"
+                    data={(search) => {
+                      if (!search) return [];
+                      return [{ id: search, display: search }];
+                    }}
+                    renderSuggestion={(suggestion, search, highlightedDisplay, index, focused) => (
+                      <div className={`px-4 py-2 ${focused ? 'bg-[#FDF6E9]' : ''}`}>
+                        {suggestion.display} (음식 추가)
+                      </div>
+                    )}
+                    style={foodTagStyle}
+                    displayTransform={(_, display) => `${display}`}
+                    appendSpaceOnAdd
+                  />
+                </MentionsInput>
+              </div>
 
               <button
                 onClick={handleSend}
