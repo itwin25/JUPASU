@@ -34,15 +34,15 @@ class ChatActionData(BaseModel):
 
 class WineRecommendation(BaseModel):
     wine_id: int
-    name_kr: str  # name -> name_kr로 복구
-    name_en: Optional[str] = None  # 추가
+    name_kr: str
+    name_en: Optional[str] = None
     subtitle: Optional[str] = None
     price: Optional[int] = None
-    match_percent: int  # match_score -> match_percent로 복구
+    match_percent: int
     image_url: Optional[str] = None
-    detail_url: Optional[str] = None  # 추가
+    detail_url: Optional[str] = None
     reason: str
-    actions: List[ChatActionData] = Field(default=[])  # 추가
+    actions: List[ChatActionData] = Field(default=[])
 
 
 class FinalSommelierResponse(BaseModel):
@@ -175,11 +175,14 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     user_nickname = state.get("user_nickname", "손님")
     food_text = input_context.get("food_text", "")
 
-    # --- 시나리오 1: 메뉴판 스캔 모드 (전문가 화법) ---
+    # --- 시나리오 1: 메뉴판 스캔 모드 (애니메이션 트리거 문구 포함) ---
     menu_foods = input_context.get("menu_foods") or []
     menu_wines = input_context.get("menu_wines") or []
 
     if menu_foods and should_handle_menu_pairing_request(state["raw_input"], menu_foods):
+        # [애니메이션 트리거] 프론트엔드가 로딩 UI를 띄우기 위해 기대하는 문구
+        loading_trigger_text = "소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다."
+        
         prev = extract_previous_menu_pairings(state.get("history"))
         target = resolve_menu_target_foods(state["raw_input"], menu_foods, prev)
         pairings = await request_menu_pairing_recommendations(
@@ -192,15 +195,18 @@ async def chat_node(state: AgentState, config: RunnableConfig):
         )
         if pairings:
             first = pairings[0]
-            sys = f"당신은 식당의 소믈리에입니다. 주인공 '{user_nickname}'님의 메뉴판을 분석했습니다. 딱딱한 양식 대신 다정하게 말을 거세요."
+            sys = f"""당신은 식당의 소믈리에입니다. 현재 손님의 이름은 '{user_nickname}'입니다.
+딱딱한 양식 대신 다정하게 말을 거세요. 반드시 답변의 첫 시작을 "{user_nickname}님"으로 명확하게 부르며 시작하세요."""
             prompt = ChatPromptTemplate.from_messages([
                 ("system", sys),
-                ("user", f"음식 '{first['foodName']}'에 어울리는 메뉴판 내 와인 '{first['recommendation']['recommendedWine']['nameKr']}'을(를) 찾았습니다. 추천 이유: {first['recommendation'].get('reason','')}. 이를 바탕으로 100자 내외로 멋진 추천 멘트를 써줘.")
+                ("user", f"음식 '{first['foodName']}'에 어울리는 메뉴판 내 와인 '{first['recommendation']['recommendedWine']['nameKr']}'을(를) 찾았습니다. 추천 이유: {first['recommendation'].get('reason','')}.\n\n이 정보를 바탕으로 100자 내외의 멋진 소믈리에 추천 멘트를 작성해주세요.")
             ])
             res = await (prompt | llm).ainvoke({}, config=config)
             
+            # 최종 답변 앞에 트리거 문구를 숨겨진 형태로라도 추가하여 애니메이션을 켬
+            final_message = f"{loading_trigger_text}\n\n{res.content}"
+            
             w = first.get("recommendation", {}).get("recommendedWine", {})
-            # 풍성한 데이터로 복구하여 생성
             recs = [WineRecommendation(
                 wine_id=w.get("wineId", 0),
                 name_kr=w.get("nameKr", "와인"),
@@ -211,9 +217,9 @@ async def chat_node(state: AgentState, config: RunnableConfig):
                 image_url=w.get("imageUrl"),
                 detail_url=f"/wines/{w.get('wineId')}" if w.get("wineId") else None,
                 reason="메뉴판에서 찾은 최고의 조합입니다.",
-                actions=[ChatActionData(type="wishlist", label="위시리스트", wine_id=w.get("wineId"))]
+                actions=[ChatActionData(type="wishlist", label="위시리스트에 추가하기", wine_id=w.get("wineId"))]
             )]
-            return {"final_output": FinalSommelierResponse(main_message=res.content, recommendations=recs)}
+            return {"final_output": FinalSommelierResponse(main_message=final_message, recommendations=recs)}
 
     # --- 시나리오 2 & 3 통합: 자율적인 답변 생성 ---
     recommendation = state.get("food_wine_recommendation")
@@ -221,7 +227,6 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     
     if recommendation:
         w = recommendation.get("recommendedWine", {})
-        # [복구] 백엔드에서 받은 모든 필드 추출
         wine_meta = {
             "id": w.get("wineId", 0),
             "name_kr": w.get("nameKr", "와인"),
@@ -248,7 +253,7 @@ async def chat_node(state: AgentState, config: RunnableConfig):
 
     system_instruction = f"""당신은 다정하고 위트 있는 전문 소믈리에입니다. 
 1. 페르소나: 격식은 차리되 친구처럼 편안하고 전문적인 조언을 건네세요.
-2. 답변 스타일: 고정된 문구를 쓰지 말고 상황에 맞춰 매번 새롭게 말을 거세요.
+2. 답변 스타일: 상황에 맞춰 매번 새롭게 말을 거세요.
 3. 주인공 인지: 대화의 주인공은 '{user_nickname}'님입니다. 반드시 답변의 첫 시작을 "{user_nickname}님"이라고 정확히 부르며 시작하세요.
 4. 그룹 배려: 친구들의 취향({group_context.get('summary','')})을 고려했음을 자연스럽게 녹여내세요.
 5. 분량: 100자 내외로 핵심만 작성하세요."""
@@ -267,7 +272,6 @@ async def chat_node(state: AgentState, config: RunnableConfig):
 
     recs = []
     if wine_meta:
-        # [복구] 확장된 필드들을 사용하여 카드 생성
         recs = [WineRecommendation(
             wine_id=wine_meta["id"],
             name_kr=wine_meta["name_kr"],

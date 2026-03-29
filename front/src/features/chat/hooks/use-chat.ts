@@ -4,6 +4,25 @@ import { useAuthStore } from '@/stores/auth.store';
 import { ChatAction, ChatCard, ChatMessageResponse, ChatStreamChunk } from '../types/chat.types';
 
 const SESSION_STORAGE_KEY = 'chat_session_id';
+const DEMO_MENU_SCAN_TRIGGER = '메뉴판 스캔 완료';
+const DEMO_MENU_LOADING_MESSAGE = '소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.';
+const DEMO_MENU_PAIRING: MenuRecommendation = {
+  pairingNumber: 1,
+  foodName: '우삼겹된장덮밥',
+  wineName: 'VINEYARDS Shiraz',
+  reasons: [
+    '평소 묵직한 바디감과 스파이시한 레드 와인을 즐기시는 취향에 맞춰, 우삼겹된장덮밥과 쉬라즈를 추천해 드립니다.',
+    '쉬라즈는 바디감이 묵직하고 탄닌(떫은맛)이 강하며, 후추 같은 스파이시한 풍미가 특징인 적포도주입니다.',
+    '우삼겹의 풍부한 지방과 고기 향이 와인의 떫은맛을 부드럽게 중화시켜 최적의 균형을 만들어냅니다.',
+    '된장 특유의 짭짤하고 깊은 감칠맛은 쉬라즈 와인이 가진 진한 검은 과실 향을 더욱 돋보이고 풍성하게 만들어 줍니다.',
+  ],
+};
+const DEMO_MENU_WINE_CARD: WineCardData = {
+  name_en: 'VINEYARDS Shiraz',
+  subtitle: 'Shiraz',
+  image_url: '/vineyards.png',
+  match_percent: 82,
+};
 
 export interface WineCardData {
   wine_id?: number;
@@ -239,6 +258,44 @@ export const useChat = () => {
       };
 
       const botMessageId = Date.now() + 1;
+      const isDemoMenuRecommendation =
+        text === DEMO_MENU_SCAN_TRIGGER && Boolean(selectedMenu || effectiveSelectedMenu);
+
+      // 메뉴판 추천 데모
+      if (isDemoMenuRecommendation) {
+        setMessages((prev) => [
+          ...prev,
+          userMessage,
+          {
+            id: botMessageId,
+            type: 'bot',
+            text: DEMO_MENU_LOADING_MESSAGE,
+            card: null,
+            actions: [],
+          },
+        ]);
+        setIsLoading(true);
+
+        await new Promise((resolve) => window.setTimeout(resolve, 8000));
+
+        const introText = getRandomPairingIntro(nickname);
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === botMessageId
+              ? {
+                  ...msg,
+                  text: introText,
+                  recommendations: [DEMO_MENU_WINE_CARD],
+                  menuPairings: [DEMO_MENU_PAIRING],
+                }
+              : msg,
+          ),
+        );
+        setIsLoading(false);
+        return;
+      }
+
       const botPlaceholder: ChatMessage = {
         id: botMessageId,
         type: 'bot',

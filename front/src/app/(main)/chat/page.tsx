@@ -9,7 +9,10 @@ import { useChat, SelectedMenuContext } from '@/features/chat/hooks/use-chat';
 import { friendApi } from '@/features/friend/api/friend.api';
 import { FriendListItem } from '@/features/friend/types/friend.types';
 import MenuScannerModal from '@/features/scan/components/MenuScannerModal';
-import { useWineScrapMutation } from '@/features/wine/hooks/useWineListQuery';
+import {
+  useWineScrapMutation,
+  useScrappedWineIdsQuery,
+} from '@/features/wine/hooks/useWineListQuery';
 import { MentionsInput, Mention, MentionsInputStyle } from 'react-mentions';
 
 const formatPrice = (price?: number | null) => {
@@ -33,6 +36,8 @@ export default function ChatPage() {
   } = useChat();
 
   const { mutateAsync: toggleScrap, isPending: isScrapPending } = useWineScrapMutation();
+  const { data: scrappedWineIds = [] } = useScrappedWineIdsQuery();
+
   const [inputValue, setInputValue] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [isMenuScanOpen, setIsMenuScanOpen] = useState(false);
@@ -52,7 +57,7 @@ export default function ChatPage() {
     [messages],
   );
 
-  // --- [최종 정밀 보정] Mentions 레이어링 수평 정렬 스타일 ---
+  // --- [정밀 튜닝] Mentions 레이어링 스타일 ---
   const sharedStyle = {
     fontSize: '14px',
     lineHeight: '20px',
@@ -119,6 +124,15 @@ export default function ChatPage() {
     borderRadius: '4px',
     padding: '1px 4px',
   };
+
+  // --- 시연용 로직 및 상태 병합 ---
+  const currentWineId = latestBotMessage?.card?.wine_id;
+  const isScrapped =
+    typeof currentWineId === 'number' ? scrappedWineIds.includes(currentWineId) : false;
+
+  const isMenuDemoLoading =
+    isLoading &&
+    latestBotMessage?.text?.includes('소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.');
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
@@ -195,42 +209,89 @@ export default function ChatPage() {
                 <span className="h-2 w-2 rounded-full bg-[#7BB181]" />
                 <span className="text-[0.95rem] font-black text-[#9B6A42]">소믈리에</span>
               </div>
+
               <p className="text-text-main text-[0.94rem] leading-6 font-medium whitespace-pre-line">
-                {latestBotMessage?.text ||
+                {(isMenuDemoLoading ? '' : latestBotMessage?.text) ||
                   (isLoading
                     ? '소믈리에가 답변을 준비하고 있어요...'
                     : '소믈리에에게 물어보세요. 음식이나 메뉴를 알려주시면 어울리는 와인을 추천해드릴게요.')}
               </p>
 
+              {/* [복구] 시연용 화려한 로딩 애니메이션 */}
+              {isMenuDemoLoading && (
+                <div className="menu-loading-shell mt-4 overflow-hidden rounded-[1.6rem] border border-[#F1D9B0] bg-[linear-gradient(135deg,#FFF9EF,#FFF1D4)] px-4 py-4 shadow-[0_14px_30px_rgba(179,98,98,0.1)]">
+                  <div className="flex items-center gap-4">
+                    <div className="loading-radar relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full">
+                      <div className="loading-ring loading-ring-1" />
+                      <div className="loading-ring loading-ring-2" />
+                      <div className="loading-core" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="mb-1 inline-flex items-center gap-2 rounded-full bg-[#B36262] px-2.5 py-1 text-[0.62rem] font-black tracking-[0.12em] text-white uppercase">
+                        <span className="h-1.5 w-1.5 rounded-full bg-white/90" />
+                        AI Sommelier
+                      </div>
+                      <p className="text-[0.82rem] leading-5 font-black tracking-[0.01em] text-[#8F5A34]">
+                        소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2 pl-20">
+                    <span className="loading-pill loading-pill-1" />
+                    <span className="loading-pill loading-pill-2" />
+                    <span className="loading-pill loading-pill-3" />
+                  </div>
+                </div>
+              )}
+
+              {!isMenuDemoLoading &&
+                latestBotMessage?.menuPairings &&
+                latestBotMessage.menuPairings.length > 0 && (
+                  <div className="mt-4 flex justify-center">
+                    <div className="ai-reveal-chip inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#B36262,#D08A54)] px-3.5 py-2 text-[0.68rem] font-black tracking-[0.12em] text-white uppercase shadow-[0_16px_28px_rgba(179,98,98,0.22)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                      AI Pairing Result
+                    </div>
+                  </div>
+                )}
+
+              {/* 리스트형 추천 카드 디자인 통합 */}
               {latestBotMessage?.recommendations && latestBotMessage.recommendations.length > 0 && (
                 <div className="mt-4 space-y-3">
                   {latestBotMessage.recommendations.map((rec, index) => (
                     <div
                       key={rec.wine_id || index}
                       onClick={() => rec.wine_id && router.push(`/wines/${rec.wine_id}`)}
-                      className="cursor-pointer rounded-[1.6rem] border border-[#F1D991] bg-[#FFF9EB] p-3.5 shadow-sm active:scale-[0.98]"
+                      className={`recommendation-sommelier-card rounded-[1.6rem] border border-[#F1D991] bg-[#FFF9EB] p-3.5 transition-shadow ${
+                        rec.wine_id
+                          ? 'cursor-pointer hover:shadow-md active:scale-[0.98]'
+                          : 'cursor-default'
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[1rem] bg-white">
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex h-28 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[1.15rem] bg-[radial-gradient(circle_at_top,#FFFDF7,#F9E6C0_62%,#F0D29D)] shadow-[inset_0_1px_0_rgba(255,255,255,0.8),0_10px_24px_rgba(155,106,66,0.12)]">
                           <Image
                             src={rec.image_url || '/default_wine.png'}
                             alt={rec.name_kr || '와인'}
                             fill
-                            className="object-cover p-1"
+                            className="object-contain p-2 drop-shadow-[0_16px_18px_rgba(70,42,20,0.22)]"
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-text-main truncate text-[0.92rem] font-black">
+                          <div className="recommendation-chip mb-2 inline-flex rounded-full bg-[#F4E4C8] px-2.5 py-1 text-[0.6rem] font-black tracking-[0.08em] text-[#9B6A42] uppercase">
+                            Sommelier Pick
+                          </div>
+                          <h3 className="text-text-main truncate text-[1rem] font-black">
                             {rec.name_kr}
                           </h3>
-                          <p className="text-text-main/48 truncate text-[0.7rem] font-semibold">
+                          <p className="text-text-main/48 mt-1 truncate text-[0.76rem] font-semibold">
                             {rec.subtitle || rec.name_en}
                           </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="rounded-full bg-[#C78354] px-1.5 py-0.5 text-[0.55rem] font-black text-white">
-                              {rec.match_percent}% match
+                          <div className="mt-3 flex items-center gap-2">
+                            <span className="rounded-full bg-[#C78354] px-1.5 py-0.5 text-[0.55rem] font-black text-white uppercase">
+                              {rec.match_percent || 90}% match
                             </span>
-                            <span className="text-[0.8rem] font-black text-[#B36262]">
+                            <span className="text-[0.82rem] font-black text-[#B36262]">
                               {formatPrice(rec.price)}
                             </span>
                           </div>
@@ -241,6 +302,7 @@ export default function ChatPage() {
                 </div>
               )}
 
+              {/* 단일 추천 카드 디자인 */}
               {latestBotMessage?.card && (
                 <div className="mt-4">
                   <Link
@@ -279,9 +341,61 @@ export default function ChatPage() {
                     onClick={() => handleToggleScrap(latestBotMessage.card?.wine_id)}
                     className="text-text-main/52 mt-3 flex items-center gap-1.5 px-1 text-[0.74rem] font-bold transition-opacity active:opacity-60"
                   >
-                    <Heart size={14} className="fill-[#D16B74] text-[#D16B74]" />
-                    위시리스트에 추가하기
+                    <Heart
+                      size={14}
+                      className={isScrapped ? 'fill-[#D16B74] text-[#D16B74]' : 'text-[#D16B74]'}
+                    />
+                    {isScrapped ? '위시리스트에서 삭제' : '위시리스트에 추가하기'}
                   </button>
+                </div>
+              )}
+
+              {/* [복구] 메뉴판 페어링 상세 카드 */}
+              {latestBotMessage?.menuPairings && latestBotMessage.menuPairings.length > 0 && (
+                <div className="mt-6 space-y-4">
+                  {latestBotMessage.menuPairings.map((pairing) => (
+                    <div
+                      key={pairing.pairingNumber}
+                      className="menu-pairing-reveal relative space-y-3 overflow-hidden rounded-2xl border-2 border-[#E8D5B7] bg-gradient-to-br from-[#FFF9EB] to-[#FFE8CC] p-4"
+                    >
+                      <div className="pairing-flare" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-text-main/60 mb-1 text-[0.75rem] font-semibold">
+                            🍽️ 음식
+                          </div>
+                          <div className="text-text-main text-[0.92rem] font-bold break-words">
+                            {pairing.foodName}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-text-main/60 mb-1 text-[0.75rem] font-semibold">
+                            🍷 와인
+                          </div>
+                          <div className="text-[0.92rem] font-bold break-words text-[#8B4513]">
+                            {pairing.wineName}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-[#E8D5B7]/40 pt-2">
+                        <div className="text-text-main/60 mb-2 text-[0.75rem] font-semibold">
+                          💭 추천 이유
+                        </div>
+                        <ul className="space-y-1.5">
+                          {pairing.reasons.map((reason, idx) => (
+                            <li
+                              key={idx}
+                              className="text-text-main/80 flex gap-2 text-[0.82rem] leading-5"
+                            >
+                              <span className="shrink-0 font-bold text-[#B36262]">•</span>
+                              <span className="break-words">{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="absolute right-8 bottom-0 h-5 w-5 translate-y-[40%] rotate-45 rounded-[0.35rem] bg-white" />
@@ -369,7 +483,7 @@ export default function ChatPage() {
                   placeholder={
                     activeMode === 'menu'
                       ? '메뉴판 기준으로 추천받기'
-                      : '소믈리에에게 물어보세요... (@친구, #음식)'
+                      : '@친구, #음식 태그를 활용해보세요...'
                   }
                   style={mentionsStyle}
                   onKeyDown={(e) => {
@@ -425,6 +539,158 @@ export default function ChatPage() {
         onClose={() => setIsMenuScanOpen(false)}
         onAnalysisComplete={handleMenuScanComplete}
       />
+
+      <style jsx>{`
+        @keyframes aiRise {
+          0% {
+            opacity: 0;
+            transform: translateY(22px) scale(0.94);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes aiSweep {
+          0% {
+            opacity: 0;
+            transform: translateX(-140%) rotate(18deg);
+          }
+          30% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(260%) rotate(18deg);
+          }
+        }
+
+        @keyframes aiPulse {
+          0%,
+          100% {
+            transform: scale(1);
+            opacity: 0.5;
+          }
+          50% {
+            transform: scale(1.08);
+            opacity: 0.9;
+          }
+        }
+
+        @keyframes aiChipReveal {
+          0% {
+            opacity: 0;
+            transform: translateY(14px) scale(0.88);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        .ai-reveal-chip {
+          animation: aiChipReveal 560ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+        }
+
+        .recommendation-sommelier-card {
+          position: relative;
+          overflow: hidden;
+          animation: aiRise 700ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+        }
+
+        .recommendation-sommelier-card::before {
+          content: '';
+          position: absolute;
+          inset: -35%;
+          background: radial-gradient(
+            circle at top right,
+            rgba(255, 212, 128, 0.32),
+            transparent 42%
+          );
+          animation: aiPulse 2400ms ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .recommendation-sommelier-card::after {
+          content: '';
+          position: absolute;
+          top: -35%;
+          left: -20%;
+          width: 38%;
+          height: 190%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.86), transparent);
+          transform: rotate(18deg);
+          animation: aiSweep 1600ms ease-out 240ms both;
+          pointer-events: none;
+        }
+
+        .menu-pairing-reveal {
+          position: relative;
+          animation: aiRise 820ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+          animation-delay: 120ms;
+        }
+
+        .pairing-flare {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            120deg,
+            transparent 18%,
+            rgba(255, 255, 255, 0.38) 50%,
+            transparent 82%
+          );
+          transform: translateX(-130%);
+          animation: aiSweep 1800ms ease-out 420ms both;
+          pointer-events: none;
+        }
+
+        .menu-loading-shell {
+          position: relative;
+        }
+
+        .loading-radar {
+          background: radial-gradient(circle, rgba(179, 98, 98, 0.18), rgba(255, 255, 255, 0));
+        }
+
+        .loading-ring {
+          position: absolute;
+          inset: 0;
+          border-radius: 9999px;
+          border: 1.5px solid rgba(179, 98, 98, 0.24);
+          animation: aiPulse 2200ms ease-in-out infinite;
+        }
+
+        .loading-ring-2 {
+          inset: 8px;
+          animation-delay: 220ms;
+        }
+
+        .loading-core {
+          height: 16px;
+          width: 16px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, #b36262, #d08a54);
+          box-shadow: 0 0 18px rgba(179, 98, 98, 0.35);
+        }
+
+        .loading-pill {
+          display: inline-block;
+          height: 0.45rem;
+          width: 2.75rem;
+          border-radius: 9999px;
+          background: linear-gradient(90deg, rgba(179, 98, 98, 0.22), rgba(208, 138, 84, 0.72));
+          animation: aiPulse 1500ms ease-in-out infinite;
+        }
+
+        .loading-pill-2 {
+          animation-delay: 180ms;
+        }
+
+        .loading-pill-3 {
+          animation-delay: 360ms;
+        }
+      `}</style>
     </div>
   );
 }
