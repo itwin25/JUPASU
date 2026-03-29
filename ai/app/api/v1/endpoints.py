@@ -139,13 +139,22 @@ async def chat_endpoint(request: CustomChatRequest):
 @router.post("/chat/stream")
 async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest):
     """
-    SSE 스트리밍을 지원하는 채팅 엔드포인트 (노드별 데이터 수집 강화)
+    SSE 스트리밍을 지원하는 채팅 엔드포인트 (노드별 데이터 수집 강화 및 청크 유실 방지)
     """
     settings = get_settings()
 
     async def stream_generator() -> AsyncGenerator[str, None]:
-        dummy_padding = " " * 2048
+        import asyncio
+
+        # [ULTIMATE HOTFIX] GMS 프록시 및 백엔드 WebFlux 버퍼링 문제 해결을 위한 패딩
+        dummy_padding = " " * 4096
         yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
+        
+        # 첫 번째 방어막 (보이지 않는 공백)
+        yield f"data: {json.dumps({'content': ' ', 'provider': settings.LLM_PROVIDER})}\n\n"
+        
+        # [핵심 보정] 백엔드 WebClient가 방어막 프레임과 진짜 첫 토큰 프레임을 병합하여 파싱하지 않도록 0.5초 대기
+        await asyncio.sleep(0.5)
 
         initial_state = {
             "raw_input": chat_request.message,
@@ -164,9 +173,9 @@ async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest
         captured_wine_cards = None
         has_sent_content = False
 
-        # v1 버전 이벤트를 사용하여 각 노드의 결과물을 정밀하게 캡처
+        # [수정] 이벤트 누락 버그가 없는 최신 v2 버전으로 롤백 및 업그레이드
         async for event in sommelier_agent.astream_events(
-            initial_state, version="v1", config={"configurable": {"thread_id": chat_request.session_id}}
+            initial_state, version="v2", config={"configurable": {"thread_id": chat_request.session_id}}
         ):
             kind = event.get("event")
             name = event.get("name")
@@ -180,7 +189,7 @@ async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest
                     has_sent_content = True
                     yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
 
-            # 2. 노드별 데이터 캡처 (정밀 추천 데이터 등)
+            # 2. 노드별 데이터 캡처
             elif kind == "on_chain_end":
                 output = event.get("data", {}).get("output", {})
                 if name == "prepare_input_context":

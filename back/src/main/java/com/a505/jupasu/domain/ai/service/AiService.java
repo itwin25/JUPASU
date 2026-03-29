@@ -132,16 +132,16 @@ public class AiService {
                             .map(String::trim)
                             .filter(line -> !line.isEmpty() && !line.startsWith("event:"))
                             .map(line -> {
+                                String jsonData = line;
+                                if (line.startsWith("data:")) {
+                                    jsonData = line.substring(5).trim();
+                                }
+
+                                if ("[DONE]".equals(jsonData)) {
+                                    return jsonData;
+                                }
+
                                 try {
-                                    String jsonData = line;
-                                    if (line.startsWith("data:")) {
-                                        jsonData = line.substring(5).trim();
-                                    }
-
-                                    if ("[DONE]".equals(jsonData)) {
-                                        return line;
-                                    }
-
                                     JsonNode root = objectMapper.readTree(jsonData);
                                     String content = root.path("content").asText("");
                                     if (!content.isEmpty()) {
@@ -162,7 +162,7 @@ public class AiService {
                                 } catch (Exception exception) {
                                     log.warn("AI stream parsing failed. line={}, error={}", line, exception.getMessage());
                                 }
-                                return line;
+                                return jsonData;
                             });
                 })
                 .doOnComplete(() -> {

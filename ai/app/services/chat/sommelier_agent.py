@@ -249,7 +249,7 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     system_instruction = f"""당신은 다정하고 위트 있는 전문 소믈리에입니다. 
 1. 페르소나: 격식은 차리되 친구처럼 편안하고 전문적인 조언을 건네세요.
 2. 답변 스타일: 고정된 문구를 쓰지 말고 상황에 맞춰 매번 새롭게 말을 거세요.
-3. 주인공 인지: 대화의 주인은 '{user_nickname}'님입니다.
+3. 주인공 인지: 대화의 주인공은 '{user_nickname}'님입니다. 반드시 답변의 첫 시작을 "{user_nickname}님"이라고 정확히 부르며 시작하세요.
 4. 그룹 배려: 친구들의 취향({group_context.get('summary','')})을 고려했음을 자연스럽게 녹여내세요.
 5. 분량: 100자 내외로 핵심만 작성하세요."""
 
@@ -258,7 +258,7 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_instruction),
-        ("user", f"{user_context}\n\n위 정보를 바탕으로, {user_nickname}님께 자연스러운 추천 멘트를 해줘. 질문: {state['raw_input']}")
+        ("user", f"{user_context}\n\n[사용자 질문]\n{state['raw_input']}\n\n위 정보를 바탕으로 소믈리에로서 완벽한 추천 멘트를 작성해주세요.")
     ])
 
     chain = prompt | llm

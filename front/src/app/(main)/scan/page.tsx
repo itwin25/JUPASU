@@ -7,7 +7,7 @@ import { Camera, ChevronLeft, Star, X, Zap, Search, Image as ImageIcon } from 'l
 import Button from '@/components/ui/button/Button';
 import Input from '@/components/ui/input/Input';
 import { useOCR } from '@/features/scan/hooks/useOCR';
-import { useOnDeviceGPUOCR as useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceGPUOCR';
+import { useOnDeviceOCR } from '@/features/scan/hooks/useOnDeviceOCR';
 import { OCRResult } from '@/features/scan/types';
 import { searchApi } from '@/features/scan/api/search.api';
 import { HybridSearchResponse } from '@/features/scan/types/search.types';
@@ -144,7 +144,11 @@ export default function ScanPage() {
         console.log('✅ 온디바이스 분석 결과:', result);
 
         if (result.success && result.refined) {
-          const refined = result.refined;
+          const refined = result.refined as {
+            winery?: string;
+            wineName?: string;
+            vintage?: string;
+          };
           const displayResults: OCRResult[] = [];
 
           // 서버 액션(ocr.action.ts)과 동일한 필드 접근

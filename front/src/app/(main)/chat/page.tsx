@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Send, ChevronLeft, Heart, RotateCcw, X } from 'lucide-react';
-import { useChat } from '@/features/chat/hooks/use-chat';
+import { useChat, SelectedMenuContext } from '@/features/chat/hooks/use-chat';
 import { friendApi } from '@/features/friend/api/friend.api';
 import { FriendListItem } from '@/features/friend/types/friend.types';
 import MenuScannerModal from '@/features/scan/components/MenuScannerModal';
@@ -74,13 +74,12 @@ export default function ChatPage() {
       highlighter: {
         ...sharedStyle,
         color: 'transparent',
-        // [정밀 보정] Padding-Left를 4px로 줄여 하이라이터를 왼쪽으로 더 당김
         padding: '12px 12px 8px 4px',
         border: '1px solid transparent',
       },
       input: {
         ...sharedStyle,
-        padding: '10px 12px', // 입력창 텍스트 시작점 (12px) 고정
+        padding: '10px 12px',
         outline: 'none',
         color: '#4A3428',
         border: '1px solid transparent',
