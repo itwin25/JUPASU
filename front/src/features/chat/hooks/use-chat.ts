@@ -6,6 +6,7 @@ import { ChatAction, ChatCard, ChatMessageResponse, ChatStreamChunk } from '../t
 const SESSION_STORAGE_KEY = 'chat_session_id';
 const DEMO_MENU_SCAN_TRIGGER = '메뉴판 스캔 완료';
 const DEMO_MENU_LOADING_MESSAGE = '소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.';
+const DEMO_MENU_WINE_ID = 7139;
 const DEMO_MENU_PAIRING: MenuRecommendation = {
   pairingNumber: 1,
   foodName: '우삼겹된장덮밥',
@@ -18,6 +19,8 @@ const DEMO_MENU_PAIRING: MenuRecommendation = {
   ],
 };
 const DEMO_MENU_WINE_CARD: WineCardData = {
+  wine_id: DEMO_MENU_WINE_ID,
+  name_kr: '빈야드 월드 시라즈',
   name_en: 'VINEYARDS Shiraz',
   subtitle: 'Shiraz',
   image_url: '/vineyards.png',
