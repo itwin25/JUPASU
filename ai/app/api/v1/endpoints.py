@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict, Any, List, Optional
@@ -87,9 +88,6 @@ def build_recommendation_actions(wine_id: int | None) -> list[ChatActionData]:
 
 @router.post("/chat", response_model=CustomChatResponse)
 async def chat_endpoint(request: CustomChatRequest):
-    """
-    고도화된 채팅 에이전트 엔드포인트 (단발성 응답)
-    """
     initial_state = {
         "raw_input": request.message,
         "user_id": str(request.user_id),
@@ -108,11 +106,9 @@ async def chat_endpoint(request: CustomChatRequest):
     if not final_output:
         return CustomChatResponse(answer="죄송합니다. 응답을 생성하지 못했습니다.")
 
-    # 1. 정밀 추천 결과 우선 처리
     recommendation = result.get("food_wine_recommendation")
     card = build_recommendation_card(recommendation)
     
-    # 2. 에이전트 생성 결과 처리
     if not card and final_output.recommendations:
         first = final_output.recommendations[0]
         card = ChatCardData(
@@ -139,22 +135,13 @@ async def chat_endpoint(request: CustomChatRequest):
 @router.post("/chat/stream")
 async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest):
     """
-    SSE 스트리밍을 지원하는 채팅 엔드포인트 (노드별 데이터 수집 강화 및 청크 유실 방지)
+    SSE 스트리밍을 지원하는 채팅 엔드포인트
     """
     settings = get_settings()
 
     async def stream_generator() -> AsyncGenerator[str, None]:
-        import asyncio
-
-        # [ULTIMATE HOTFIX] GMS 프록시 및 백엔드 WebFlux 버퍼링 문제 해결을 위한 패딩
-        dummy_padding = " " * 4096
-        yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
-        
-        # 첫 번째 방어막 (보이지 않는 공백)
-        yield f"data: {json.dumps({'content': ' ', 'provider': settings.LLM_PROVIDER})}\n\n"
-        
-        # [핵심 보정] 백엔드 WebClient가 방어막 프레임과 진짜 첫 토큰 프레임을 병합하여 파싱하지 않도록 0.5초 대기
-        await asyncio.sleep(0.5)
+        # [정상화] 인위적인 지연 및 공백 삽입 제거. 오직 연결 확인용 메시지만 전송.
+        yield f"data: {json.dumps({'content': '', 'status': 'connected'}, ensure_ascii=False)}\n\n"
 
         initial_state = {
             "raw_input": chat_request.message,
@@ -167,76 +154,100 @@ async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest
             "messages": [],
         }
 
-        full_answer = ""
         captured_recommendation = None
         captured_final_output = None
         captured_wine_cards = None
-        has_sent_content = False
 
-        # [수정] 이벤트 누락 버그가 없는 최신 v2 버전으로 롤백 및 업그레이드
-        async for event in sommelier_agent.astream_events(
-            initial_state, version="v2", config={"configurable": {"thread_id": chat_request.session_id}}
-        ):
-            kind = event.get("event")
-            name = event.get("name")
+        try:
+            async for event in sommelier_agent.astream_events(
+                initial_state, version="v2", config={"configurable": {"thread_id": chat_request.session_id}}
+            ):
+                kind = event.get("event")
+                name = event.get("name")
+                
+                # [강력 로깅] 모든 이벤트의 정보를 표준 출력으로 강제 출력
+                print(f"📡 [EVENT_TRACE] kind: {kind}, name: {name}")
 
-            # 1. 텍스트 토큰 스트리밍
-            if kind == "on_chat_model_stream":
-                chunk = event["data"]["chunk"]
-                content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                if content:
-                    full_answer += content
-                    has_sent_content = True
-                    yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
+                if kind == "on_chat_model_stream":
+                    content = event["data"]["chunk"].content
+                    if content is not None:
+                        yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
 
-            # 2. 노드별 데이터 캡처
-            elif kind == "on_chain_end":
-                output = event.get("data", {}).get("output", {})
-                if name == "prepare_input_context":
-                    captured_recommendation = output.get("food_wine_recommendation")
-                elif name == "chat":
-                    captured_final_output = output.get("final_output")
-                    captured_wine_cards = output.get("wine_cards")
+                elif kind == "on_chain_end":
+                    output = event.get("data", {}).get("output", {})
+                    print(f"🔍 [CHAIN_END_TRACE] name: {name}, has_output: {output is not None}")
+                    
+                    if name == "prepare_input_context":
+                        captured_recommendation = output.get("food_wine_recommendation")
+                    elif name == "chat":
+                        # 딕셔너리 또는 모델일 수 있으므로 유연하게 처리
+                        captured_final_output = output.get("final_output")
+                        captured_wine_cards = output.get("wine_cards")
+                        print(f"📍 [CAPTURE_TRACE] has_final: {captured_final_output is not None}")
 
-        # 3. 스트리밍 종료 후 수집된 모든 메타데이터 조합 전송
-        card = build_recommendation_card(captured_recommendation)
-        
-        if not card and captured_final_output and captured_final_output.recommendations:
-            first_rec = captured_final_output.recommendations[0]
-            card = ChatCardData(
-                wine_id=first_rec.wine_id,
-                name_kr=first_rec.name_kr,
-                name_en=first_rec.name_en,
-                subtitle=first_rec.subtitle,
-                price=first_rec.price,
-                match_percent=first_rec.match_percent,
-                image_url=first_rec.image_url,
-                detail_url=first_rec.detail_url,
-            )
+            # 최종 메타데이터 전송 직전 상태 확인
+            print(f"🏁 [FINAL_TRACE] captured_final_output type: {type(captured_final_output)}")
+            
+            final_card = build_recommendation_card(captured_recommendation)
+            
+            # captured_final_output에서 recommendations 추출 (객체/딕셔너리 양쪽 대응)
+            recs = None
+            if captured_final_output:
+                if hasattr(captured_final_output, "recommendations"):
+                    recs = captured_final_output.recommendations
+                elif isinstance(captured_final_output, dict):
+                    recs = captured_final_output.get("recommendations")
+            
+            print(f"🏁 [FINAL_TRACE] recommendations count: {len(recs) if recs else 0}")
 
-        actions = build_recommendation_actions(card.wine_id if card else None)
-        
-        cards_data = []
-        if captured_wine_cards:
-            for w in captured_wine_cards:
-                cards_data.append({
-                    "wine_id": w.get("wine_id"),
-                    "name_kr": w.get("name_kr"),
-                    "name_en": w.get("name_en"),
-                    "subtitle": w.get("subtitle"),
-                    "price": w.get("price"),
-                    "match_percent": w.get("match_percent"),
-                    "image_url": w.get("image_url"),
-                    "detail_url": f"/wines/{w.get('wine_id')}" if w.get('wine_id') else None
-                })
+            if not final_card and recs and len(recs) > 0:
+                first_rec = recs[0]
+                # 리스트 아이템이 객체인지 딕셔너리인지 확인
+                if hasattr(first_rec, "wine_id"):
+                    final_card = ChatCardData(
+                        wine_id=first_rec.wine_id,
+                        name_kr=first_rec.name_kr,
+                        name_en=first_rec.name_en,
+                        subtitle=first_rec.subtitle,
+                        price=first_rec.price,
+                        match_percent=first_rec.match_percent,
+                        image_url=first_rec.image_url,
+                        detail_url=first_rec.detail_url,
+                    )
+                elif isinstance(first_rec, dict):
+                    final_card = ChatCardData(
+                        wine_id=first_rec.get("wine_id"),
+                        name_kr=first_rec.get("name_kr"),
+                        name_en=first_rec.get("name_en"),
+                        subtitle=first_rec.get("subtitle"),
+                        price=first_rec.get("price"),
+                        match_percent=first_rec.get("match_percent"),
+                        image_url=first_rec.get("image_url"),
+                        detail_url=first_rec.get("detail_url"),
+                    )
 
-        if card or cards_data or actions:
-            payload = {
-                "card": card.model_dump() if card else None,
-                "cards": cards_data,
-                "actions": [a.model_dump() for a in actions],
-            }
-            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            final_actions = []
+            if final_card:
+                actions = build_recommendation_actions(final_card.wine_id)
+                final_actions = [a.model_dump() for a in actions]
+
+            final_cards = captured_wine_cards if captured_wine_cards else []
+
+            # 카드 정보가 있다면 최종 전송
+            if final_card or final_cards or final_actions:
+                payload = {
+                    "card": final_card.model_dump() if final_card else None,
+                    "cards": final_cards,
+                    "actions": final_actions,
+                }
+                print(f"📤 [YIELD_TRACE] Sending Metadata: {json.dumps(payload, ensure_ascii=False)[:100]}...")
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            else:
+                print("⚠️ [FINAL_TRACE] No metadata to send (final_card is None)")
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
         yield "data: [DONE]\n\n"
 

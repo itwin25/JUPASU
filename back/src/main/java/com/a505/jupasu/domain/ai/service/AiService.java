@@ -17,7 +17,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -62,25 +64,19 @@ public class AiService {
                 })
                 .collect(Collectors.toList());
 
-        // --- 친구 및 그룹 취향 통합 로직 ---
         List<Map<String, Object>> friendsWithPrefs = new ArrayList<>();
         List<Preference> allPreferences = new ArrayList<>();
-        
-        // 1. 본인 취향 추가
         preferenceRepository.findByUserId(user.getId()).ifPresent(allPreferences::add);
 
-        // 2. 언급된 친구들 취향 조회 및 데이터 구성
         if (request.getMentionedFriends() != null) {
             for (Map<String, Object> friendMap : request.getMentionedFriends()) {
                 try {
                     Object idObj = friendMap.get("id");
                     if (idObj == null) continue;
                     Long friendId = Long.valueOf(idObj.toString());
-                    
                     Map<String, Object> friendData = new HashMap<>(friendMap);
                     preferenceRepository.findByUserId(friendId).ifPresent(p -> {
                         allPreferences.add(p);
-                        // 개별 친구 취향 데이터 담기 (AI의 답변 생성용)
                         Map<String, Object> pMap = new HashMap<>();
                         pMap.put("sweetness", p.getSweetness());
                         pMap.put("acidity", p.getAcidity());
@@ -90,12 +86,11 @@ public class AiService {
                     });
                     friendsWithPrefs.add(friendData);
                 } catch (Exception e) {
-                    log.warn("친구 취향 조회 중 오류 발생: {}", e.getMessage());
+                    log.warn("친구 취향 조회 오류: {}", e.getMessage());
                 }
             }
         }
 
-        // 3. 그룹 통합 컨텍스트 계산 (리스크 회피 로직 포함)
         Map<String, Object> groupContext = wineRecommendationCalculator.calculateGroupContext(allPreferences);
 
         Map<String, Object> payload = new HashMap<>();
@@ -105,16 +100,17 @@ public class AiService {
         payload.put("selected_wine", request.getSelectedWine());
         payload.put("selected_menu", request.getSelectedMenu());
         payload.put("user_id", user.getId());
-        payload.put("user_nickname", user.getNickname()); // 추가: 사용자 본인 닉네임
+        payload.put("user_nickname", user.getNickname());
         payload.put("stream", true);
         payload.put("mentioned_friends", friendsWithPrefs);
         payload.put("group_context", groupContext);
-
 
         StringBuilder fullTextForStorage = new StringBuilder();
         StringBuilder cardJsonForStorage = new StringBuilder();
         StringBuilder actionsJsonForStorage = new StringBuilder();
         String finalSessionId = sessionId;
+
+        ParameterizedTypeReference<ServerSentEvent<String>> typeRef = new ParameterizedTypeReference<>() {};
 
         return webClient.post()
                 .uri("/v1/chat/stream")
@@ -122,57 +118,40 @@ public class AiService {
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(payload)
                 .retrieve()
-                .bodyToFlux(String.class)
-                .flatMap(rawChunk -> {
-                    if (rawChunk == null || rawChunk.trim().isEmpty() || rawChunk.contains("[DONE]")) {
-                        return Flux.empty();
+                .bodyToFlux(typeRef)
+                .map(event -> {
+                    String data = event.data();
+                    if (data == null || data.isEmpty()) return "";
+                    if ("[DONE]".equals(data)) return "[DONE]";
+
+                    try {
+                        JsonNode root = objectMapper.readTree(data);
+                        if (root.has("content")) {
+                            fullTextForStorage.append(root.path("content").asText(""));
+                        }
+                        if (root.has("card") && !root.get("card").isNull()) {
+                            cardJsonForStorage.setLength(0);
+                            cardJsonForStorage.append(root.get("card").toString());
+                        }
+                        if (root.has("actions") && root.get("actions").isArray()) {
+                            actionsJsonForStorage.setLength(0);
+                            actionsJsonForStorage.append(root.get("actions").toString());
+                        }
+                    } catch (Exception e) {
+                        log.debug("SSE data parsing skip: {}", data);
                     }
-
-                    return Flux.fromArray(rawChunk.split("\n"))
-                            .map(String::trim)
-                            .filter(line -> !line.isEmpty() && !line.startsWith("event:"))
-                            .map(line -> {
-                                String jsonData = line;
-                                if (line.startsWith("data:")) {
-                                    jsonData = line.substring(5).trim();
-                                }
-
-                                if ("[DONE]".equals(jsonData)) {
-                                    return jsonData;
-                                }
-
-                                try {
-                                    JsonNode root = objectMapper.readTree(jsonData);
-                                    String content = root.path("content").asText("");
-                                    if (!content.isEmpty()) {
-                                        fullTextForStorage.append(content);
-                                    }
-
-                                    JsonNode cardNode = root.get("card");
-                                    if (cardNode != null && !cardNode.isNull()) {
-                                        cardJsonForStorage.setLength(0);
-                                        cardJsonForStorage.append(cardNode.toString());
-                                    }
-
-                                    JsonNode actionsNode = root.get("actions");
-                                    if (actionsNode != null && actionsNode.isArray() && actionsNode.size() > 0) {
-                                        actionsJsonForStorage.setLength(0);
-                                        actionsJsonForStorage.append(actionsNode.toString());
-                                    }
-                                } catch (Exception exception) {
-                                    log.warn("AI stream parsing failed. line={}, error={}", line, exception.getMessage());
-                                }
-                                return jsonData;
-                            });
+                    return data;
                 })
+                .filter(data -> !data.isEmpty())
                 .doOnComplete(() -> {
-                    if (fullTextForStorage.length() > 0) {
+                    String finalContent = fullTextForStorage.toString().trim();
+                    if (finalContent.length() > 0) {
                         chatMessageRepository.save(
                                 ChatMessage.builder()
                                         .sessionId(finalSessionId)
                                         .user(user)
                                         .role("assistant")
-                                        .content(fullTextForStorage.toString())
+                                        .content(finalContent)
                                         .cardJson(cardJsonForStorage.length() > 0 ? cardJsonForStorage.toString() : null)
                                         .actionsJson(actionsJsonForStorage.length() > 0 ? actionsJsonForStorage.toString() : null)
                                         .build()
@@ -185,48 +164,29 @@ public class AiService {
         if (request.getTextContent() == null || request.getTextContent().trim().isEmpty()) {
             throw new CustomException(ErrorCode.INVALID_REQUEST);
         }
-
         Map<String, Object> payload = new HashMap<>();
         payload.put("task", request.getTask());
         payload.put("text_content", request.getTextContent());
         payload.put("user_id", email);
 
-        RefineResponse response = webClient.post()
+        return webClient.post()
                 .uri("/v1/refine")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(payload)
                 .retrieve()
                 .bodyToMono(RefineResponse.class)
                 .block();
-
-        log.info(
-                "AI refine response status={}, data={}",
-                response != null ? response.getStatus() : "null",
-                response != null ? response.getData() : "null"
-        );
-
-        return response;
     }
 
     @Transactional(readOnly = true)
     public List<ChatResponse> getChatHistory(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        return chatMessageRepository.findByUserOrderByCreatedAtAsc(user)
-                .stream()
-                .map(ChatResponse::from)
-                .collect(Collectors.toList());
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return chatMessageRepository.findByUserOrderByCreatedAtAsc(user).stream().map(ChatResponse::from).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ChatResponse> getChatHistoryBySessionId(String email, String sessionId) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-
-        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId)
-                .stream()
-                .filter(message -> message.getUser().getId().equals(user.getId()))
-                .map(ChatResponse::from)
-                .collect(Collectors.toList());
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId).stream().filter(m -> m.getUser().getId().equals(user.getId())).map(ChatResponse::from).collect(Collectors.toList());
     }
 }
