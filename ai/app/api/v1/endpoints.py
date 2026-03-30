@@ -1,6 +1,9 @@
+import asyncio
 import json
+import logging
+from typing import AsyncGenerator, Dict, Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.api.v1.schemas import (
@@ -21,20 +24,22 @@ from app.services.ocr.refiner import ocr_refiner
 from app.services.taste.taste_report_service import generate_taste_report_summary
 
 router = APIRouter(dependencies=[Depends(verify_internal_api_key)])
+logger = logging.getLogger(__name__)
 
+# --- 국가명 한글화 매핑 ---
 COUNTRY_LABELS = {
-    "France": "\ud504\ub791\uc2a4",
-    "Italy": "\uc774\ud0c8\ub9ac\uc544",
-    "Spain": "\uc2a4\ud398\uc778",
-    "United States": "\ubbf8\uad6d",
-    "USA": "\ubbf8\uad6d",
-    "Australia": "\ud638\uc8fc",
-    "New Zealand": "\ub274\uc9c8\ub79c\ub4dc",
-    "Germany": "\ub3c5\uc77c",
-    "Romania": "\ub8e8\ub9c8\ub2c8\uc544",
-    "Argentina": "\uc544\ub974\ud5e8\ud2f0\ub098",
-    "Chile": "\uce60\ub808",
-    "Portugal": "\ud3ec\ub974\ud22c\uac08",
+    "France": "프랑스",
+    "Italy": "이탈리아",
+    "Spain": "스페인",
+    "United States": "미국",
+    "USA": "미국",
+    "Australia": "호주",
+    "New Zealand": "뉴질랜드",
+    "Germany": "독일",
+    "Romania": "루마니아",
+    "Argentina": "아르헨티나",
+    "Chile": "칠레",
+    "Portugal": "포르투갈",
 }
 
 
@@ -64,123 +69,206 @@ def build_recommendation_card(recommendation: dict | None) -> ChatCardData | Non
         price=recommended_wine.get("price"),
         match_percent=recommendation.get("matchPercent"),
         image_url=recommended_wine.get("imageUrl"),
-        detail_url=recommended_wine.get("detailUrl"),
+        detail_url=f"/wines/{recommended_wine.get('wineId')}" if recommended_wine.get("wineId") else None,
     )
 
 
-def build_recommendation_actions(recommendation: dict | None) -> list[ChatActionData]:
-    if not recommendation:
-        return []
-
-    recommended_wine = recommendation.get("recommendedWine") or {}
-    wine_id = recommended_wine.get("wineId")
+def build_recommendation_actions(wine_id: int | None) -> list[ChatActionData]:
     if not wine_id:
         return []
 
     return [
         ChatActionData(
             type="wishlist",
-            label="\uc704\uc2dc\ub9ac\uc2a4\ud2b8\uc5d0 \ucd94\uac00\ud558\uae30",
+            label="위시리스트에 추가하기",
             wine_id=wine_id,
         )
     ]
 
 
 @router.post("/chat", response_model=CustomChatResponse)
-async def chat(request: CustomChatRequest):
+async def chat_endpoint(request: CustomChatRequest):
     initial_state = {
         "raw_input": request.message,
+        "user_id": str(request.user_id),
+        "user_nickname": getattr(request, "user_nickname", "손님"),
+        "mentioned_friends": request.mentioned_friends,
         "selected_wine": request.selected_wine,
         "selected_menu": request.selected_menu,
-        "user_id": request.user_id,
-        "mentioned_friends": request.mentioned_friends,
-        "history": request.history, # 추가: 과거 대화 이력 전달
+        "history": request.history,
+        "messages": [],
     }
 
     settings = get_settings()
+    result = await sommelier_agent.ainvoke(initial_state)
+    final_output = result.get("final_output")
 
-    if request.stream:
-        async def stream_generator():
-            # [ULTIMATE HOTFIX] GMS 프록시의 버퍼링 및 초기 바이트 유실 문제를 해결하기 위해
-            # 약 2KB 크기의 벌크 더미 데이터를 먼저 전송하여 프록시 버퍼를 강제로 밀어냅니다.
-            dummy_padding = " " * 2048
-            yield f"data: {json.dumps({'content': '', 'status': 'ping', 'padding': dummy_padding, 'provider': settings.LLM_PROVIDER})}\n\n"
-            
-            has_sent_content = False
-            final_recommendation = None
+    if not final_output:
+        return CustomChatResponse(answer="죄송합니다. 응답을 생성하지 못했습니다.")
 
-            # v2 대신 v1을 사용하여 더 원시적인 이벤트를 캡처합니다. (짤림 방지)
-            async for event in sommelier_agent.astream_events(initial_state, version="v1"):
+    recommendation = result.get("food_wine_recommendation")
+    card = build_recommendation_card(recommendation)
+    
+    if not card and final_output.recommendations:
+        first = final_output.recommendations[0]
+        card = ChatCardData(
+            wine_id=first.wine_id,
+            name_kr=first.name_kr,
+            name_en=first.name_en,
+            subtitle=first.subtitle,
+            price=first.price,
+            match_percent=first.match_percent,
+            image_url=first.image_url,
+            detail_url=first.detail_url,
+        )
+
+    actions = build_recommendation_actions(card.wine_id if card else None)
+
+    return CustomChatResponse(
+        answer=final_output.main_message,
+        card=card,
+        actions=actions,
+        provider=settings.LLM_PROVIDER,
+    )
+
+
+@router.post("/chat/stream")
+async def chat_stream_endpoint(request: Request, chat_request: CustomChatRequest):
+    """
+    SSE 스트리밍을 지원하는 채팅 엔드포인트
+    """
+    settings = get_settings()
+
+    async def stream_generator() -> AsyncGenerator[str, None]:
+        # [정상화] 인위적인 지연 및 공백 삽입 제거. 오직 연결 확인용 메시지만 전송.
+        yield f"data: {json.dumps({'content': '', 'status': 'connected'}, ensure_ascii=False)}\n\n"
+
+        initial_state = {
+            "raw_input": chat_request.message,
+            "user_id": str(chat_request.user_id),
+            "user_nickname": getattr(chat_request, "user_nickname", "손님"),
+            "mentioned_friends": chat_request.mentioned_friends,
+            "selected_wine": chat_request.selected_wine,
+            "selected_menu": chat_request.selected_menu,
+            "history": chat_request.history,
+            "messages": [],
+        }
+
+        captured_recommendation = None
+        captured_final_output = None
+        captured_wine_cards = None
+
+        try:
+            async for event in sommelier_agent.astream_events(
+                initial_state, version="v2", config={"configurable": {"thread_id": chat_request.session_id}}
+            ):
                 kind = event.get("event")
+                name = event.get("name")
+                
+                # [강력 로깅] 모든 이벤트의 정보를 표준 출력으로 강제 출력
+                print(f"📡 [EVENT_TRACE] kind: {kind}, name: {name}")
 
-                # v1에서는 on_chat_model_stream의 데이터 구조가 약간 다를 수 있으나 
-                # LangChain 추상화 레이어에서 대부분 호환됩니다.
                 if kind == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"]
-                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    content = event["data"]["chunk"].content
                     if content is not None:
-                        has_sent_content = True
                         yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
 
-                elif kind == "on_chain_end" and event.get("name") == "prepare_input_context":
+                elif kind == "on_chain_end":
                     output = event.get("data", {}).get("output", {})
-                    if output:
-                        final_recommendation = output.get("food_wine_recommendation")
+                    print(f"🔍 [CHAIN_END_TRACE] name: {name}, has_output: {output is not None}")
+                    
+                    if name == "prepare_input_context":
+                        captured_recommendation = output.get("food_wine_recommendation")
+                    elif name == "chat":
+                        # 딕셔너리 또는 모델일 수 있으므로 유연하게 처리
+                        captured_final_output = output.get("final_output")
+                        captured_wine_cards = output.get("wine_cards")
+                        print(f"📍 [CAPTURE_TRACE] has_final: {captured_final_output is not None}")
 
-                elif kind == "on_chain_end" and event.get("name") == "chat":
-                    output = event.get("data", {}).get("output", {})
-                    if output:
-                        # LLM 스트리밍이 없었던 경우(메뉴판 스캔 등) 텍스트 fallback 전송
-                        if not has_sent_content:
-                            final_out = output.get("final_output")
-                            if final_out:
-                                content = final_out.main_message if hasattr(final_out, "main_message") else str(final_out)
-                                if content:
-                                    has_sent_content = True
-                                    yield f"data: {json.dumps({'content': content, 'provider': settings.LLM_PROVIDER}, ensure_ascii=False)}\n\n"
-                        # 와인 카드 데이터 전송 (메뉴판 스캔 전용)
-                        wine_cards = output.get("wine_cards")
-                        if wine_cards:
-                            yield f"data: {json.dumps({'cards': wine_cards, 'actions': []}, ensure_ascii=False)}\n\n"
-                        wine_card = output.get("wine_card")
-                        if wine_card and not wine_cards:
-                            yield f"data: {json.dumps({'cards': [wine_card], 'actions': []}, ensure_ascii=False)}\n\n"
+            # 최종 메타데이터 전송 직전 상태 확인
+            print(f"🏁 [FINAL_TRACE] captured_final_output type: {type(captured_final_output)}")
+            
+            final_card = build_recommendation_card(captured_recommendation)
+            
+            # captured_final_output에서 recommendations 추출 (객체/딕셔너리 양쪽 대응)
+            recs = None
+            if captured_final_output:
+                if hasattr(captured_final_output, "recommendations"):
+                    recs = captured_final_output.recommendations
+                elif isinstance(captured_final_output, dict):
+                    recs = captured_final_output.get("recommendations")
+            
+            print(f"🏁 [FINAL_TRACE] recommendations count: {len(recs) if recs else 0}")
 
-            card = build_recommendation_card(final_recommendation)
-            actions = build_recommendation_actions(final_recommendation)
-            if card or actions:
+            if not final_card and recs and len(recs) > 0:
+                first_rec = recs[0]
+                # 리스트 아이템이 객체인지 딕셔너리인지 확인
+                if hasattr(first_rec, "wine_id"):
+                    final_card = ChatCardData(
+                        wine_id=first_rec.wine_id,
+                        name_kr=first_rec.name_kr,
+                        name_en=first_rec.name_en,
+                        subtitle=first_rec.subtitle,
+                        price=first_rec.price,
+                        match_percent=first_rec.match_percent,
+                        image_url=first_rec.image_url,
+                        detail_url=first_rec.detail_url,
+                    )
+                elif isinstance(first_rec, dict):
+                    final_card = ChatCardData(
+                        wine_id=first_rec.get("wine_id"),
+                        name_kr=first_rec.get("name_kr"),
+                        name_en=first_rec.get("name_en"),
+                        subtitle=first_rec.get("subtitle"),
+                        price=first_rec.get("price"),
+                        match_percent=first_rec.get("match_percent"),
+                        image_url=first_rec.get("image_url"),
+                        detail_url=first_rec.get("detail_url"),
+                    )
+
+            final_actions = []
+            if final_card:
+                actions = build_recommendation_actions(final_card.wine_id)
+                final_actions = [a.model_dump() for a in actions]
+
+            final_cards = captured_wine_cards if captured_wine_cards else []
+
+            # 카드 정보가 있다면 최종 전송
+            if final_card or final_cards or final_actions:
                 payload = {
-                    "provider": settings.LLM_PROVIDER,
-                    "card": card.model_dump() if card else None,
-                    "actions": [action.model_dump() for action in actions],
+                    "card": final_card.model_dump() if final_card else None,
+                    "cards": final_cards,
+                    "actions": final_actions,
                 }
+                print(f"📤 [YIELD_TRACE] Sending Metadata: {json.dumps(payload, ensure_ascii=False)[:100]}...")
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            else:
+                print("⚠️ [FINAL_TRACE] No metadata to send (final_card is None)")
 
-            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
-        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        yield "data: [DONE]\n\n"
 
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+
+@router.post("/refine", response_model=RefineResponse)
+async def refine_endpoint(request: RefineRequest):
     try:
-        result = await sommelier_agent.ainvoke(initial_state)
-        final_output = result.get("final_output")
-        recommendation = result.get("food_wine_recommendation")
-        answer = final_output.main_message if final_output else "\ub2f5\ubcc0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc5b4\uc694."
-
-        return {
-            "answer": answer,
-            "status": "success",
-            "provider": settings.LLM_PROVIDER,
-            "card": build_recommendation_card(recommendation),
-            "actions": build_recommendation_actions(recommendation),
-        }
-    except Exception as exception:
-        raise HTTPException(status_code=500, detail=str(exception))
+        is_menu = request.task == SommelierTask.MENU_SCAN
+        refined_data = await ocr_refiner.refine_wine_info(request.text_content, is_menu=is_menu)
+        settings = get_settings()
+        return RefineResponse(
+            status="success", data=refined_data, raw_input=request.text_content, provider=settings.LLM_PROVIDER
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/taste-report/summary", response_model=TasteReportSummaryResponse)
-async def taste_report_summary(request: TasteReportSummaryRequest):
-    """사용자의 맛 프로파일을 받아 AI 취향 요약 텍스트를 생성합니다.
-    TasteReport가 outdated 상태일 때만 Java 백엔드에서 호출합니다."""
+async def taste_report_summary_endpoint(request: TasteReportSummaryRequest):
     try:
         result = await generate_taste_report_summary(
             nickname=request.nickname,
@@ -197,22 +285,5 @@ async def taste_report_summary(request: TasteReportSummaryRequest):
             best_description=result["bestDescription"],
             worst_description=result["worstDescription"],
         )
-    except Exception as exception:
-        raise HTTPException(status_code=500, detail=str(exception))
-
-
-@router.post("/refine", response_model=RefineResponse)
-async def refine(request: RefineRequest):
-    try:
-        is_menu = request.task == SommelierTask.MENU_SCAN
-        result_data = await ocr_refiner.refine_wine_info(request.text_content, is_menu=is_menu)
-
-        settings = get_settings()
-        return {
-            "status": "success",
-            "data": result_data,
-            "raw_input": request.text_content,
-            "provider": settings.LLM_PROVIDER,
-        }
-    except Exception as exception:
-        raise HTTPException(status_code=500, detail=str(exception))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

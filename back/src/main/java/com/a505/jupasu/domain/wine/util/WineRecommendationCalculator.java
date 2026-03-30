@@ -693,34 +693,60 @@ public class WineRecommendationCalculator {
     }
 
 /**
- * AI 엔진이 1차 필터링한 30개의 후보(Candidate) 와인들 내에서만
- * 사용자(+친구) 취향을 블렌딩하여 가우시안/베이지안 Re-ranking을 수행합니다.
+ * AI 엔진이 1차 필터링한 후보 와인들 내에서 재정렬을 수행하거나,
+ * 후보가 없는 경우(예: 친구만 언급) 전체 DB에서 취향 기반으로 추천을 수행합니다.
  */
 public WineQuickRecommendResponse ragReRank(User mainUser, List<User> friends, List<Long> candidateIds) {
     // 1. 본인 취향 프로필
     Preference mainPref = preferenceRepository.findByUserId(mainUser.getId()).orElse(null);
     List<Review> mainReviews = reviewRepository.findAllByUserWithWine(mainUser);
     CalibratedProfile mainProfile = calibrate(mainPref, mainReviews);
-    // 2. 친구들 취향 프로필 수집
-    List<CalibratedProfile> allProfiles = new ArrayList<>();
-    allProfiles.add(mainProfile);
+
+    // 2. 모든 구성원의 취향 수집 (본인 + 친구들)
+    List<Preference> allPreferences = new ArrayList<>();
+    if (mainPref != null) allPreferences.add(mainPref);
     for (User friend : friends) {
-        Preference friendPref = preferenceRepository.findByUserId(friend.getId()).orElse(null);
-        List<Review> friendReviews = reviewRepository.findAllByUserWithWine(friend);
-        allProfiles.add(calibrate(friendPref, friendReviews));
+        preferenceRepository.findByUserId(friend.getId()).ifPresent(allPreferences::add);
     }
-    // 3. 취향 프로필 단순 평균 블렌딩 (NaN 차원은 제외)
-    CalibratedProfile blended = blendProfiles(allProfiles);
-    // 4. 후보 와인만 조회하여 점수 계산
-    List<Wine> candidateWines = wineRepository.findAllByIdIn(candidateIds);
+
+    // 3. 리스크 회피 로직이 적용된 가상 프로필(Group Context) 생성
+    Map<String, Object> groupCtx = calculateGroupContext(allPreferences);
+    Map<String, Double> targetMap = (Map<String, Double>) groupCtx.get("target_profile");
+
+    // 가상 프로필 수치 적용 (0.4f 곱하여 0~2 스케일로 변환)
+    CalibratedProfile blended = new CalibratedProfile(
+        targetMap.getOrDefault("sweet", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("acid", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("body", 3.0).floatValue() * 0.4f,
+        targetMap.getOrDefault("tannin", 3.0).floatValue() * 0.4f,
+        SIGMA_BASE, SIGMA_BASE, SIGMA_BASE, SIGMA_BASE
+    );
+
+    // 4. 추천 대상 와인 목록 확보
+    List<Wine> targetWines;
+    if (candidateIds != null && !candidateIds.isEmpty()) {
+        targetWines = wineRepository.findAllByIdIn(candidateIds);
+    } else {
+        // 후보가 없으면 전체 와인 중 상위 일부를 샘플링하거나 전체 조회 (성능 고려 필요 시 샘플링)
+        targetWines = wineQueryService.getAllWines();
+    }
+
     PriorityQueue<WineScore> minHeap = new PriorityQueue<>(Comparator.comparingInt(WineScore::match));
-    for (Wine wine : candidateWines) {
-        // relaxValidation=true: isReal 무시, 있는 데이터 그대로 사용
+    for (Wine wine : targetWines) {
+        // relaxValidation=true: 데이터 누락 와인도 점수 계산
         int match = score(wine, null, mainPref, blended, true);
-        if (match == Integer.MIN_VALUE) match = 0; // 안전망
-        addToHeap(minHeap, new WineScore(match, wine), 1);
+        if (match == Integer.MIN_VALUE) continue;
+        addToHeap(minHeap, new WineScore(match, wine), 3); // 상위 3개까지 수집
     }
-    return WineQuickRecommendResponse.of(heapToList(minHeap, null), List.of());
+
+    List<WineRecommendationItem> result = heapToList(minHeap, null);
+    
+    // [최종 안전장치] 만약 결과가 여전히 비어있다면, 전체 DB에서 무작위 상위 와인 1개라도 강제 반환
+    if (result.isEmpty() && targetWines != null && !targetWines.isEmpty()) {
+        result = List.of(WineRecommendationItem.of(targetWines.get(0), 85, (DrinkingSituation) null, List.of()));
+    }
+    
+    return WineQuickRecommendResponse.of(result, List.of());
 }
 /** 여러 취향 프로필의 단순 평균을 구한다 (NaN 무시) */
 private CalibratedProfile blendProfiles(List<CalibratedProfile> profiles) {
@@ -746,5 +772,83 @@ private CalibratedProfile blendProfiles(List<CalibratedProfile> profiles) {
     );
 }
 
-    record WineScore(int match, Wine wine) {}
+/**
+ * [그룹 취향 결합 로직]
+ * 여러 명의 취향 데이터를 분석하여 리스크를 회피하고 공통점을 추출한 그룹 컨텍스트를 생성합니다.
+ */
+public Map<String, Object> calculateGroupContext(List<Preference> preferences) {
+    if (preferences == null || preferences.isEmpty()) return Map.of();
+
+    List<String> constraints = new ArrayList<>();
+    Map<String, Double> targetProfile = new HashMap<>();
+
+    // 1. 각 속성별 통계 추출 및 제약 사항 도출
+    analyzeAttribute("sweetness", preferences, constraints, targetProfile, "sweet", "당도");
+    analyzeAttribute("acidity", preferences, constraints, targetProfile, "acid", "산도");
+    analyzeAttribute("body", preferences, constraints, targetProfile, "body", "바디감");
+    analyzeAttribute("tannin", preferences, constraints, targetProfile, "tannin", "탄닌");
+    Map<String, Object> result = new HashMap<>();
+    result.put("target_profile", targetProfile);
+    result.put("constraints", constraints);
+
+    // 2. 간단한 요약 텍스트 생성
+    String summary = generateGroupSummary(constraints);
+    result.put("summary", summary);
+
+    return result;
 }
+
+private void analyzeAttribute(String fieldName, List<Preference> prefs, List<String> constraints, 
+                             Map<String, Double> target, String key, String label) {
+    List<Integer> values = prefs.stream()
+            .map(p -> {
+                if (fieldName.equals("sweetness")) return p.getSweetness();
+                if (fieldName.equals("acidity")) return p.getAcidity();
+                if (fieldName.equals("body")) return p.getBody();
+                if (fieldName.equals("tannin")) return p.getTannin();
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .toList();
+
+    if (values.isEmpty()) return;
+
+    int min = Collections.min(values);
+    int max = Collections.max(values);
+    double avg = values.stream().mapToInt(Integer::intValue).average().orElse(3.0);
+
+    // 리스크 회피 로직: 한 명이라도 1점(극불호)이면 목표 수치를 낮추고 제약 추가
+    if (min <= 1) {
+        constraints.add("avoid_high_" + fieldName);
+        avg = Math.min(avg, 2.5); // 평균치를 강제로 낮춤 (불호 반영)
+    }
+
+    // 취향 충돌 감지
+    if (max - min >= 3) {
+        constraints.add(fieldName + "_preference_conflict");
+    }
+
+    // 공통 선호 감지
+    if (avg >= 4.0) {
+        constraints.add("unanimous_high_" + fieldName);
+    }
+
+    target.put(key, avg);
+}
+
+private String generateGroupSummary(List<String> constraints) {
+    if (constraints.isEmpty()) return "멤버들의 취향이 대체로 조화롭습니다.";
+
+    StringBuilder sb = new StringBuilder();
+    if (constraints.stream().anyMatch(c -> c.startsWith("avoid_"))) {
+        sb.append("특정 맛에 민감한 멤버가 있어 리스크를 최소화했습니다. ");
+    }
+    if (constraints.stream().anyMatch(c -> c.endsWith("_conflict"))) {
+        sb.append("멤버 간 취향 차이가 있는 부분은 중간 지점을 고려했습니다.");
+    }
+    return sb.toString().trim();
+}
+
+record WineScore(int match, Wine wine) {}
+}
+

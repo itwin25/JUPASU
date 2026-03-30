@@ -1,0 +1,8 @@
+{
+  "active": true,
+  "current_iteration": 1,
+  "max_iterations": 10,
+  "completion_promise": "",
+  "original_prompt": "any 타입 사용 제거 및 MentionsInput 스타일 타입 최적화",
+  "started_at": "2026-03-28T13:24:13Z"
+}

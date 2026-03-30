@@ -5,12 +5,17 @@ import NextImage from 'next/image';
 import { Camera, Plus, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import Modal from '@/components/ui/modal/Modal';
 import Button from '@/components/ui/button/Button';
-import { useOCR } from '../hooks/useOCR';
+// import { useOCR } from '../hooks/useOCR';
 
 interface MenuRefinedResult {
   wineNames?: string[];
   foodNames?: string[];
 }
+
+const DEMO_MENU_SCAN_RESULT: MenuRefinedResult = {
+  foodNames: ['우삼겹된장덮밥'],
+  wineNames: ['VINEYARDS Shiraz'],
+};
 
 interface MenuScannerModalProps {
   isOpen: boolean;
@@ -26,14 +31,14 @@ export default function MenuScannerModal({
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-
-  const { executeOCR, isLoading: isAnalyzing, error: ocrError } = useOCR();
+  // const { executeOCR, isLoading: isAnalyzing, error: ocrError } = useOCR();
 
   // 이미지 압축 유틸리티 (최대 1600px, 0.7 퀄리티)
   const compressImage = async (file: File): Promise<File> => {
@@ -167,20 +172,27 @@ export default function MenuScannerModal({
     if (images.length === 0) return;
 
     try {
-      const result = await executeOCR(images, 'MENU_SCAN');
-      if (result.success && result.refined) {
-        onAnalysisComplete(result.refined);
-        onClose();
-      } else {
-        const errMsg =
-          'error' in result && typeof result.error === 'string'
-            ? result.error
-            : '메뉴판 분석에 실패했습니다. Spring 서버와 AI 서버가 실행 중인지 확인해주세요.';
-        alert(errMsg);
-      }
+      setIsAnalyzing(true);
+      onAnalysisComplete(DEMO_MENU_SCAN_RESULT);
+      onClose();
+
+      // OCR/백엔드 연동 로직
+      // const result = await executeOCR(images, 'MENU_SCAN');
+      // if (result.success && result.refined) {
+      //   onAnalysisComplete(result.refined);
+      //   onClose();
+      // } else {
+      //   const errMsg =
+      //     'error' in result && typeof result.error === 'string'
+      //       ? result.error
+      //       : '메뉴판 분석에 실패했습니다. Spring 서버와 AI 서버가 실행 중인지 확인해주세요.';
+      //   alert(errMsg);
+      // }
     } catch (err) {
       console.error('Analysis failed:', err);
       alert('메뉴판 분석 중 오류가 발생했습니다.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -322,7 +334,7 @@ export default function MenuScannerModal({
           >
             {isAnalyzing ? '분석 중...' : `${images.length}장의 사진 분석 시작`}
           </Button>
-          {ocrError && <p className="mt-2 text-center text-xs text-red-500">{ocrError}</p>}
+          {/* {ocrError && <p className="mt-2 text-center text-xs text-red-500">{ocrError}</p>} */}
         </div>
       </div>
       <canvas ref={canvasRef} className="hidden" />

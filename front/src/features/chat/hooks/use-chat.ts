@@ -4,6 +4,28 @@ import { useAuthStore } from '@/stores/auth.store';
 import { ChatAction, ChatCard, ChatMessageResponse, ChatStreamChunk } from '../types/chat.types';
 
 const SESSION_STORAGE_KEY = 'chat_session_id';
+const DEMO_MENU_SCAN_TRIGGER = '메뉴판 스캔 완료';
+const DEMO_MENU_LOADING_MESSAGE = '소믈리에가 최적의 와인과 음식 페어링 조합을 찾고 있습니다.';
+const DEMO_MENU_WINE_ID = 7139;
+const DEMO_MENU_PAIRING: MenuRecommendation = {
+  pairingNumber: 1,
+  foodName: '우삼겹된장덮밥',
+  wineName: 'VINEYARDS Shiraz',
+  reasons: [
+    '평소 묵직한 바디감과 스파이시한 레드 와인을 즐기시는 취향에 맞춰, 우삼겹된장덮밥과 쉬라즈를 추천해 드립니다.',
+    '쉬라즈는 바디감이 묵직하고 탄닌(떫은맛)이 강하며, 후추 같은 스파이시한 풍미가 특징인 적포도주입니다.',
+    '우삼겹의 풍부한 지방과 고기 향이 와인의 떫은맛을 부드럽게 중화시켜 최적의 균형을 만들어냅니다.',
+    '된장 특유의 짭짤하고 깊은 감칠맛은 쉬라즈 와인이 가진 진한 검은 과실 향을 더욱 돋보이고 풍성하게 만들어 줍니다.',
+  ],
+};
+const DEMO_MENU_WINE_CARD: WineCardData = {
+  wine_id: DEMO_MENU_WINE_ID,
+  name_kr: '빈야드 월드 시라즈',
+  name_en: 'VINEYARDS Shiraz',
+  subtitle: 'Shiraz',
+  image_url: '/vineyards.png',
+  match_percent: 82,
+};
 
 export interface WineCardData {
   wine_id?: number;
@@ -13,6 +35,7 @@ export interface WineCardData {
   price?: number;
   match_percent?: number;
   image_url?: string;
+  detail_url?: string;
 }
 
 export interface MenuRecommendation {
@@ -25,6 +48,7 @@ export interface MenuRecommendation {
 export interface SelectedMenuContext {
   wineNames?: string[];
   foodNames?: string[];
+  taggedFoods?: string[];
 }
 
 export interface MentionedFriend {
@@ -39,14 +63,12 @@ export interface ChatMessage {
   displayText?: string;
   card?: ChatCard | null;
   actions?: ChatAction[];
-  recommendations?: WineCardData[]; // 리스트형 추천
-  menuPairings?: MenuRecommendation[]; // 메뉴판 페어링
+  recommendations?: WineCardData[];
+  menuPairings?: MenuRecommendation[];
 }
 
-/** 세션 ID 생성 유틸리티 */
 const createSessionId = () => `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-/** 기존 세션 ID를 가져오거나 새로 생성 */
 const getOrCreateSessionId = () => {
   if (typeof window === 'undefined') return createSessionId();
   const stored = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -56,7 +78,6 @@ const getOrCreateSessionId = () => {
   return next;
 };
 
-/** 메뉴판 페어링 인트로 랜덤 생성 */
 const PAIRING_INTROS = [
   (name: string) =>
     `${name}님의 취향에 맞는 멋진 페어링을 찾았습니다!\n깊이 있는 풍미를 즐기시는 분께 특별히 추천드립니다.`,
@@ -80,7 +101,6 @@ function stripMarkdown(text: string): string {
   return text.replace(/\*+/g, '').trim();
 }
 
-/** AI 응답에서 메뉴판 페어링 정보 파싱 */
 function parseMenuPairings(responseText: string): MenuRecommendation[] {
   const recommendations: MenuRecommendation[] = [];
   const sections = responseText.split(/(?=\d+\.\s*\**\s*메뉴판\s*음식)/);
@@ -133,7 +153,6 @@ export const useChat = () => {
   const [selectedMenuContext, setSelectedMenuContext] = useState<SelectedMenuContext | null>(null);
   const [activeMode, setActiveMode] = useState<'general' | 'menu'>('general');
 
-  /** 히스토리 데이터를 메시지 객체로 변환 */
   const mapHistoryToMessages = useCallback(
     (history: ChatMessageResponse[]): ChatMessage[] => {
       return history.map((msg) => {
@@ -187,18 +206,25 @@ export const useChat = () => {
     fetchHistory();
   }, [mapHistoryToMessages]);
 
-  /** 스트림 데이터를 메시지에 적용 */
   const applyStreamChunk = useCallback((botMessageId: number, chunk: ChatStreamChunk) => {
     setMessages((prev) =>
       prev.map((msg) => {
         if (msg.id !== botMessageId) return msg;
+
         const nextText = chunk.content ?? chunk.answer;
+
+        // 서버에서 정규화된 필드명(name_kr, match_percent)을 그대로 반영
+        const nextCard = chunk.card !== undefined ? chunk.card : msg.card;
+        const nextRecommendations = chunk.cards
+          ? (chunk.cards as WineCardData[])
+          : msg.recommendations;
+
         return {
           ...msg,
           text: nextText ? msg.text + nextText : msg.text,
-          card: chunk.card !== undefined ? chunk.card : msg.card,
+          card: nextCard,
           actions: chunk.actions ?? msg.actions ?? [],
-          recommendations: (chunk.cards as WineCardData[]) ?? msg.recommendations,
+          recommendations: nextRecommendations,
         };
       }),
     );
@@ -216,12 +242,15 @@ export const useChat = () => {
       const activeSessionId = sessionId || getOrCreateSessionId();
       if (!sessionId) setSessionId(activeSessionId);
 
-      // 메뉴 모드 컨텍스트 결정
       const effectiveSelectedMenu =
         selectedMenu ?? (activeMode === 'menu' ? (selectedMenuContext ?? undefined) : undefined);
+
+      const isActualMenuScan = selectedMenu && (selectedMenu.foodNames || selectedMenu.wineNames);
       if (selectedMenu) {
         setSelectedMenuContext(selectedMenu);
-        setActiveMode('menu');
+        if (isActualMenuScan) {
+          setActiveMode('menu');
+        }
       }
 
       const userMessage: ChatMessage = {
@@ -232,6 +261,44 @@ export const useChat = () => {
       };
 
       const botMessageId = Date.now() + 1;
+      const isDemoMenuRecommendation =
+        text === DEMO_MENU_SCAN_TRIGGER && Boolean(selectedMenu || effectiveSelectedMenu);
+
+      // 메뉴판 추천 데모
+      if (isDemoMenuRecommendation) {
+        setMessages((prev) => [
+          ...prev,
+          userMessage,
+          {
+            id: botMessageId,
+            type: 'bot',
+            text: DEMO_MENU_LOADING_MESSAGE,
+            card: null,
+            actions: [],
+          },
+        ]);
+        setIsLoading(true);
+
+        await new Promise((resolve) => window.setTimeout(resolve, 8000));
+
+        const introText = getRandomPairingIntro(nickname);
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === botMessageId
+              ? {
+                  ...msg,
+                  text: introText,
+                  recommendations: [DEMO_MENU_WINE_CARD],
+                  menuPairings: [DEMO_MENU_PAIRING],
+                }
+              : msg,
+          ),
+        );
+        setIsLoading(false);
+        return;
+      }
+
       const botPlaceholder: ChatMessage = {
         id: botMessageId,
         type: 'bot',
@@ -258,7 +325,6 @@ export const useChat = () => {
           mentionedFriends,
         );
 
-        // 스트리밍 완료 후 메뉴판 페어링 추가 분석
         if (fullBotText.includes('메뉴판 음식') || fullBotText.includes('메뉴판음식')) {
           const pairings = parseMenuPairings(fullBotText);
           if (pairings.length > 0) {
@@ -309,12 +375,18 @@ export const useChat = () => {
     setActiveMode('general');
   }, []);
 
+  const hasActualMenuContext = Boolean(
+    selectedMenuContext &&
+    ((selectedMenuContext.foodNames && selectedMenuContext.foodNames.length > 0) ||
+      (selectedMenuContext.wineNames && selectedMenuContext.wineNames.length > 0)),
+  );
+
   return {
     messages,
     isLoading,
     isInitializing,
     activeMode,
-    hasMenuContext: Boolean(selectedMenuContext),
+    hasMenuContext: hasActualMenuContext,
     enterMenuMode,
     exitMenuMode,
     sendMessage,
