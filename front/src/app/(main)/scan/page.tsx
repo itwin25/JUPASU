@@ -92,6 +92,7 @@ export default function ScanPage() {
 
         // [DEMO CODE - 시연용 가짜 딜레이 2.5초 후 성공 결과 반환]
         await new Promise((resolve) => setTimeout(resolve, 2500));
+        setCapturedImage('/vineyards.png');
         const result = { success: true, results: [], imageInfo: { width: 1080, height: 1080 } };
         console.log('✅ [DEMO] 서버 분석 (가짜 딜레이 완료)');
 
@@ -163,8 +164,9 @@ export default function ScanPage() {
         console.log('✅ 온디바이스 분석 결과:', result);
         */
 
-        // [DEMO CODE - 시연용 가짜 딜레이 2.5초 후 성공 결과 반환]
+        // [DEMO CODE - 시연용 데모 딜레이 2.5초 후 성공 결과 반환]
         await new Promise((resolve) => setTimeout(resolve, 2500));
+        setCapturedImage('/vineyards.png');
         const result = { success: true, refined: { winery: '', wineName: '', vintage: '' } };
         console.log('✅ [DEMO] 온디바이스 분석 (가짜 딜레이 완료)');
 

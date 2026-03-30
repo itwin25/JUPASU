@@ -173,7 +173,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#2E1E18]">
+    <div className="relative -mb-[calc(var(--bottom-nav-height)+var(--safe-bottom)+1rem)] min-h-screen overflow-hidden bg-[#2E1E18]">
       <div className="absolute inset-0 z-0">
         <Image src="/chatbot.svg" alt="소믈리에 배경" fill className="object-cover" priority />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(25,16,12,0.28),rgba(25,16,12,0.1)_30%,rgba(25,16,12,0.18)_72%,rgba(25,16,12,0.5))]" />
