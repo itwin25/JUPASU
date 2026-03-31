@@ -539,7 +539,11 @@ export default function ScanPage() {
                   <div className="flex aspect-[0.92] items-center justify-center bg-[#FCFBF8] p-8">
                     <div className="relative h-full w-full">
                       <NextImage
-                        src={hybridResult.bestMatch.imageUrl || '/images/default_wine.png'}
+                        src={
+                          capturedImage ||
+                          hybridResult.bestMatch.imageUrl ||
+                          '/images/default_wine.png'
+                        }
                         alt={hybridResult.bestMatch.nameEn}
                         fill
                         className="object-contain"
